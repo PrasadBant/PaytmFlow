@@ -60,7 +60,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ) : (
           <>
             {leftIcon && <span className="inline-flex shrink-0 items-center">{leftIcon}</span>}
-            <span>{children}</span>
+            <span className="inline-flex items-center gap-1.5">{children}</span>
             {rightIcon && <span className="inline-flex shrink-0 items-center">{rightIcon}</span>}
           </>
         )}
