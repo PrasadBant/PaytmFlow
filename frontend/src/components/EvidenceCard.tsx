@@ -68,11 +68,11 @@ export function EvidenceCard({
           </div>
 
           <div className="min-w-0">
-            <h3 className="text-sm font-bold text-content-primary truncate" title={filename || 'Salary_Slip_Mar2024.pdf'}>
-              {filename || 'Salary_Slip_Mar2024.pdf'}
+            <h3 className="text-sm font-bold text-content-primary truncate" title={filename || 'Uploaded document'}>
+              {filename || 'Uploaded document'}
             </h3>
             <p className="text-xs text-content-secondary mt-0.5">
-              <span>Uploaded {uploadedAt ? formattedDate : 'today, 10:24 AM'}</span>
+              <span>Uploaded {uploadedAt ? formattedDate : 'just now'}</span>
               {formattedSize && (
                 <>
                   <span> • </span>
@@ -100,21 +100,26 @@ export function EvidenceCard({
         </div>
       </div>
 
-      {/* Prominent Monthly Income Detected */}
-      <div className="pt-4 border-t border-surface-border space-y-0.5">
-        <div className="text-2xl sm:text-3xl font-extrabold text-content-primary tracking-tight">
-          ₹ 85,000
-        </div>
-        <div className="text-xs font-semibold text-content-secondary">
-          Monthly Income Detected
-        </div>
-      </div>
-
-      {/* Detected Metadata Fields (if any other specific fields) */}
+      {/* Prominent primary field, whatever THIS document/action actually detected -
+          never a fixed figure. Each action's own resolved field (income, coverage
+          amount, PAN, address, ITR, etc.) is what's rendered here; there is
+          nothing to headline when nothing was detected. */}
       {detected.length > 0 && (
+        <div className="pt-4 border-t border-surface-border space-y-0.5">
+          <div className="text-2xl sm:text-3xl font-extrabold text-content-primary tracking-tight">
+            {detected[0].display_value || '—'}
+          </div>
+          <div className="text-xs font-semibold text-content-secondary">
+            {detected[0].label || detected[0].key}
+          </div>
+        </div>
+      )}
+
+      {/* Remaining detected metadata fields (if any beyond the headline one) */}
+      {detected.length > 1 && (
         <div className="pt-3 border-t border-surface-border space-y-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="detected-fields-grid">
-            {detected.map((item, idx) => (
+            {detected.slice(1).map((item, idx) => (
               <div
                 key={item.key || `detected-${idx}`}
                 className="p-2.5 rounded-button bg-surface-subtle border border-surface-border/50"

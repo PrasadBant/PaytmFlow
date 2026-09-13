@@ -147,62 +147,29 @@ export const Screen09CompleteJourney: React.FC = () => {
         </div>
       </div>
 
-      {/* Verification Checklist Card matching reference */}
+      {/* Verification Checklist Card - matches the reference's generic 4-line
+          checklist. These four statements are generic corollaries of
+          `readiness === 'READY'` (guaranteed true by the guard above for every
+          pack: no mandatory field can be unsatisfied, no blocker can remain),
+          not fabricated per-pack business data, so one fixed list safely
+          covers all six packs without any journey-specific branching. */}
       <Card
         data-testid="verification-checklist-section"
         className="p-6 bg-white border border-surface-border shadow-xs rounded-2xl text-left space-y-3.5 max-w-md mx-auto"
       >
-        {journey.fields && journey.fields.length > 0 ? (
-          journey.fields.map((field) => (
-            <div
-              key={field.key}
-              data-testid={`checklist-item-${field.key}`}
-              className="flex items-center justify-between gap-3 text-sm text-content-primary"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-5 h-5 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                </div>
-                <span className="font-semibold truncate">{field.label}</span>
-              </div>
-              {field.display_value && (
-                <span className="text-xs font-semibold text-content-secondary shrink-0">
-                  {field.display_value}
-                </span>
-              )}
+        {[
+          'All mandatory fields completed',
+          'No blockers remaining',
+          'Documents verified',
+          'Ready for provider submission',
+        ].map((line) => (
+          <div key={line} className="flex items-center gap-3 text-sm text-content-primary">
+            <div className="w-5 h-5 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-3.5 h-3.5 text-white" />
             </div>
-          ))
-        ) : (
-          <>
-            <div className="flex items-center gap-3 text-sm text-content-primary">
-              <div className="w-5 h-5 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="font-semibold">All mandatory fields completed</span>
-            </div>
-
-            <div className="flex items-center gap-3 text-sm text-content-primary">
-              <div className="w-5 h-5 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="font-semibold">No blockers remaining</span>
-            </div>
-
-            <div className="flex items-center gap-3 text-sm text-content-primary">
-              <div className="w-5 h-5 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="font-semibold">Documents verified</span>
-            </div>
-
-            <div className="flex items-center gap-3 text-sm text-content-primary">
-              <div className="w-5 h-5 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="font-semibold">Ready for provider submission</span>
-            </div>
-          </>
-        )}
+            <span className="font-semibold">{line}</span>
+          </div>
+        ))}
       </Card>
 
       {/* Action Buttons */}

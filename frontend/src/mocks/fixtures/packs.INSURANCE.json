@@ -1,7 +1,7 @@
 {
   "journey_type": "INSURANCE",
-  "display_name": "Health & Life Insurance",
-  "description": "Fast-track policy issuance by validating medical declarations.",
+  "display_name": "Insurance",
+  "description": "Resume or complete your insurance application",
   "icon": "shield",
   "flagship_demo": false,
   "lifecycle_status": "SUPPORTED",
@@ -20,7 +20,11 @@
       "type": "enum",
       "label": "Policy Type",
       "required": true,
-      "options": ["Health Comprehensive", "Term Life", "Family Floater"]
+      "options": [
+        "Health Comprehensive",
+        "Term Life",
+        "Family Floater"
+      ]
     },
     {
       "key": "tobacco_consumer",

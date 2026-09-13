@@ -1,7 +1,7 @@
 {
   "journey_type": "ACCOUNT_OPENING",
-  "display_name": "Savings Account",
-  "description": "Zero balance digital savings account onboarding.",
+  "display_name": "Account Opening",
+  "description": "Resume your account opening journey",
   "icon": "bank",
   "flagship_demo": false,
   "lifecycle_status": "SUPPORTED",
@@ -11,7 +11,11 @@
       "type": "enum",
       "label": "Account Type",
       "required": true,
-      "options": ["Digital Savings Zero Balance", "Salary Advantage", "Premium Wealth Savings"]
+      "options": [
+        "Digital Savings Zero Balance",
+        "Salary Advantage",
+        "Premium Wealth Savings"
+      ]
     },
     {
       "key": "nominee_required",

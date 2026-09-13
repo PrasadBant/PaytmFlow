@@ -14,7 +14,7 @@ export interface AssistantHelpCardProps {
 
 export function AssistantHelpCard({
   title = 'Need help?',
-  description = 'Ask our AI Assistant for guidance.',
+  description = 'Ask our AI assistant for guidance.',
   tips = [],
   onAskNow,
   className,
@@ -22,20 +22,25 @@ export function AssistantHelpCard({
   return (
     <Card
       data-testid="assistant-help-card"
-      className={cn('p-6 space-y-4 text-center rounded-card bg-white border border-surface-border shadow-xs flex flex-col items-center justify-center', className)}
+      className={cn(
+        'p-5 space-y-4 rounded-card bg-paytm-blue-50 border border-paytm-blue/10',
+        className
+      )}
     >
-      <div className="w-14 h-14 rounded-full bg-blue-50 text-paytm-blue-action flex items-center justify-center">
-        <Bot className="w-7 h-7" aria-hidden="true" />
-      </div>
-
-      <div className="space-y-1">
-        <h3 className="text-base font-bold text-content-primary">
-          {title}
-          <span className="sr-only">Need Help with this Step?</span>
-        </h3>
-        <p className="text-xs sm:text-sm text-content-secondary leading-relaxed max-w-xs">
-          {description}
-        </p>
+      {/* Horizontal icon + copy row, matching the reference layout */}
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-full bg-white text-paytm-blue-action flex items-center justify-center shrink-0 shadow-xs">
+          <Bot className="w-6 h-6" aria-hidden="true" />
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-content-primary">
+            {title}
+            <span className="sr-only">Need Help with this Step?</span>
+          </h3>
+          <p className="text-xs text-content-secondary leading-relaxed">
+            {description}
+          </p>
+        </div>
       </div>
 
       {tips.length > 0 && (
@@ -51,7 +56,7 @@ export function AssistantHelpCard({
       <Button
         variant="outline"
         size="sm"
-        className="w-full sm:w-auto px-6 py-2 text-xs font-bold"
+        className="w-full font-bold"
         onClick={onAskNow}
       >
         Ask Now

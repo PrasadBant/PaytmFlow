@@ -402,3 +402,105 @@ test.describe("All six journey packs render without error", () => {
     });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Suite 7 — Evidence analysis never reuses a previous document's result
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Regression for a real bug: Screen 6 -> POST /evidence -> Screen 7 previously
+// showed the salary-slip result for every subsequent evidence upload, because
+// the mock handler ignored doc_type and always returned the same fixture. Both
+// uploads below happen within ONE page/session (via client-side navigation, not
+// page.goto, which would reset the mock's in-memory step state) so this proves
+// the SECOND upload's analysis is genuinely independent of the first - not
+// cached React state, not a stale query, not a reused fixture.
+
+test.describe("Evidence analysis does not reuse the previous document (regression)", () => {
+  test("Salary Slip then Bank Statement each show their own filename and extracted values", async ({ page }) => {
+    // 1. Upload a salary slip for UPLOAD_INCOME_PROOF via the real file dropzone.
+    await page.goto(`/j/${JOURNEY_ID}/act/UPLOAD_INCOME_PROOF`);
+    await expect(page.getByTestId("screen-06-upload-evidence")).toBeVisible({ timeout: 10_000 });
+    await page.setInputFiles('[data-testid="evidence-file-input"]', {
+      name: "my_payslip.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("dummy salary slip content"),
+    });
+    await page.getByTestId("upload-submit-btn").click();
+    await expect(page.getByTestId("screen-07-ai-analysis")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("payslip_august_2026.pdf")).toBeVisible();
+    await expect(page.getByText(/85,000/).first()).toBeVisible();
+
+    // Apply it, advancing the journey to version 2.
+    await page.getByTestId("continue-apply-btn").click();
+    await expect(page.getByTestId("screen-08-updated-status")).toBeVisible({ timeout: 10_000 });
+
+    // 2. Client-side navigate (not page.goto - that would reload the app and
+    // reset the mock's step counter) to the NEXT evidence action and upload a
+    // completely different document.
+    await page.evaluate((id) => {
+      window.history.pushState({}, "", `/j/${id}/act/UPLOAD_BANK_STATEMENT`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }, JOURNEY_ID);
+    await expect(page.getByTestId("screen-06-upload-evidence")).toBeVisible({ timeout: 10_000 });
+    // Title is action-specific, not the previous action's "Upload Income Proof".
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Bank Statement/i);
+
+    await page.setInputFiles('[data-testid="evidence-file-input"]', {
+      name: "my_bank_statement.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("dummy bank statement content"),
+    });
+    await page.getByTestId("upload-submit-btn").click();
+    await expect(page.getByTestId("screen-07-ai-analysis")).toBeVisible({ timeout: 10_000 });
+
+    // The analysis screen must show THIS document's own result...
+    await expect(page.getByText("bank_statement_aug2026.pdf")).toBeVisible();
+    await expect(page.getByText(/Average Monthly Credit/i)).toBeVisible();
+    // ...and must never leak the salary slip's filename or field label forward.
+    await expect(page.getByText("payslip_august_2026.pdf")).not.toBeVisible();
+    await expect(page.getByText("Net Monthly Salary")).not.toBeVisible();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Suite 8 — Every journey shows its own data, never Lending's (regression)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Root cause: GET /journeys/:id (and recommendation/actions/evidence/
+// clarifications) ignored the real journey_id and always returned LENDING
+// fixture data. A cold page load of ANY other journey - exactly what a
+// refresh, deep link, or "Resume" from Screen 10 does - silently showed
+// someone else's fields and progress. These tests load each journey directly
+// (no prior navigation/cache to paper over it) and via "Resume" from Screen 10.
+
+test.describe("Every journey shows its own pack data (regression)", () => {
+  const INSURANCE_ID = "22222222-2222-2222-2222-222222222222";
+  const KYC_ID = "33333333-3333-3333-3333-333333333333";
+
+  test("cold-loading the INSURANCE journey shows Insurance fields, never Lending's", async ({ page }) => {
+    await page.goto(`/j/${INSURANCE_ID}`);
+    await expect(page.getByTestId("screen-04-current-status")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Government ID Proof")).toBeVisible();
+    await expect(page.getByText("Loan Amount")).not.toBeVisible();
+    await expect(page.getByText("Verified Monthly Income")).not.toBeVisible();
+  });
+
+  test("cold-loading the KYC journey shows KYC fields, never Lending's or Insurance's", async ({ page }) => {
+    await page.goto(`/j/${KYC_ID}`);
+    await expect(page.getByTestId("screen-04-current-status")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/Aadhaar/i).first()).toBeVisible();
+    await expect(page.getByText("Loan Amount")).not.toBeVisible();
+    await expect(page.getByText("Government ID Proof")).not.toBeVisible();
+  });
+
+  test("resuming Insurance from My Journeys shows its own Needs Review clarification, not Lending's", async ({ page }) => {
+    await page.goto("/my-journeys");
+    await expect(page.getByTestId("screen-10-my-journeys")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId(`journey-row-${INSURANCE_ID}`).click();
+    await expect(page).toHaveURL(new RegExp(`/j/${INSURANCE_ID}$`), { timeout: 10_000 });
+    await expect(page.getByTestId("needs-review-card")).toBeVisible({ timeout: 8_000 });
+    await expect(
+      page.getByText(/pre-existing medical conditions/i)
+    ).toBeVisible();
+  });
+});

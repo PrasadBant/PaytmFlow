@@ -93,7 +93,7 @@ describe('Phase F28: Responsive Design & Layout Verification (375px / 768px / 14
       expect(grid?.className).toContain('md:grid-cols-2');
 
       const flagshipCard = screen.getByTestId('pack-card-LENDING');
-      expect(flagshipCard).toHaveTextContent('Personal Loan');
+      expect(flagshipCard).toHaveTextContent('Loan / Lending');
       expect(flagshipCard).toHaveTextContent('Flagship Demo');
     });
 

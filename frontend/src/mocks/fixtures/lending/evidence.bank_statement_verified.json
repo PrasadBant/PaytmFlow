@@ -1,0 +1,93 @@
+{
+  "evidence_id": "44444444-4444-4444-4444-444444444444",
+  "filename": "bank_statement_aug2026.pdf",
+  "uploaded_at": "2026-09-12T10:12:00Z",
+  "size_bytes": 2210000,
+  "interpretation": {
+    "verified": true,
+    "confidence": 0.94,
+    "detected": [
+      {
+        "key": "bank_statement",
+        "label": "Average Monthly Credit",
+        "display_value": "₹85,000"
+      }
+    ],
+    "summary": "Verified 3-month bank statement confirming recurring salary credits of ₹85,000.",
+    "conflicts": []
+  },
+  "proposed_action_id": "UPLOAD_BANK_STATEMENT",
+  "consequence_preview": {
+    "newly_satisfied": [
+      {
+        "key": "bank_statement",
+        "label": "Salary Account Verification"
+      }
+    ],
+    "newly_unlocked": [
+      {
+        "action_id": "VERIFY_PAN",
+        "title": "Verify PAN Card"
+      }
+    ],
+    "still_blocked": [
+      {
+        "key": "pan_verification",
+        "label": "PAN Card Verification"
+      },
+      {
+        "key": "current_address",
+        "label": "Current Residential Address"
+      }
+    ],
+    "predicted_readiness": "NOT_READY",
+    "progress_before": {
+      "completed": 4,
+      "pending": 2,
+      "blockers": 1,
+      "total": 7
+    },
+    "progress_after": {
+      "completed": 5,
+      "pending": 1,
+      "blockers": 1,
+      "total": 7
+    }
+  },
+  "diff_preview": {
+    "from_version": 2,
+    "to_version": 3,
+    "fields_changed": [
+      {
+        "key": "bank_statement",
+        "label": "Salary Account Verification",
+        "from_status": "BLOCKED",
+        "to_status": "SATISFIED",
+        "display_value": "Verified (HDFC Bank)",
+        "cause": "ACTION:UPLOAD_BANK_STATEMENT",
+        "cascaded": false
+      }
+    ],
+    "actions_unlocked": ["VERIFY_PAN"],
+    "actions_removed": ["UPLOAD_BANK_STATEMENT"],
+    "readiness": {
+      "from": "NOT_READY",
+      "to": "NOT_READY"
+    },
+    "progress": {
+      "from": {
+        "completed": 4,
+        "pending": 2,
+        "blockers": 1,
+        "total": 7
+      },
+      "to": {
+        "completed": 5,
+        "pending": 1,
+        "blockers": 1,
+        "total": 7
+      }
+    }
+  },
+  "requires_review": false
+}

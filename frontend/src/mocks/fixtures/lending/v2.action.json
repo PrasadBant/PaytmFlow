@@ -125,7 +125,7 @@
       "kind": "EVIDENCE",
       "why": "Verifying recurring salary credits validates cash flow stability.",
       "unlocks": ["bank_statement", "pan_verification"],
-      "accepts": ["application/pdf"]
+      "accepts": ["BANK_STATEMENT"]
     },
     "alternatives": [
       {

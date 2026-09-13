@@ -4,12 +4,12 @@
   "journey_type": "INSURANCE",
   "version_number": 1,
   "snapshot_id": "ffffffff-1111-1111-1111-111111111111",
-  "readiness": "NOT_READY",
-  "status": "IN_PROGRESS",
+  "readiness": "NEEDS_REVIEW",
+  "status": "NEEDS_REVIEW",
   "progress": {
     "completed": 2,
-    "pending": 2,
-    "blockers": 1,
+    "pending": 1,
+    "blockers": 2,
     "total": 5
   },
   "fields": [
@@ -34,10 +34,16 @@
     {
       "key": "medical_declaration",
       "label": "Medical History Declaration",
-      "status": "BLOCKED",
-      "explanation": "Health questionnaire must be completed",
-      "resolve_action_id": "COMPLETE_HEALTH_DECLARATION",
-      "mandatory": true
+      "status": "AMBIGUOUS",
+      "explanation": "Declared health questionnaire conflicts with a prior medical record on file",
+      "mandatory": true,
+      "ambiguity": {
+        "ambiguity_id": "MEDICAL_HISTORY_CONFLICT",
+        "reason": "The submitted health questionnaire indicates no pre-existing conditions, but an earlier record on file lists a declared condition.",
+        "question": "Do you have any pre-existing medical conditions to declare for this policy?",
+        "answer_type": "BOOLEAN",
+        "choices": null
+      }
     },
     {
       "key": "identity_proof",
@@ -56,7 +62,8 @@
       "mandatory": true
     }
   ],
-  "available_actions": ["COMPLETE_HEALTH_DECLARATION", "UPLOAD_KYC_DOC", "ADD_NOMINEE"],
+  "available_actions": ["UPLOAD_KYC_DOC", "ADD_NOMINEE"],
+  "display": { "title": "Insurance", "summary": "₹10,00,000 · Health Comprehensive" },
   "history_summary": "Insurance journey initialized.",
   "created_at": "2026-09-12T10:00:00Z",
   "updated_at": "2026-09-12T10:00:00Z",

@@ -1,7 +1,7 @@
 {
   "journey_type": "LENDING",
-  "display_name": "Personal Loan",
-  "description": "Unlock instant disbursement and optimize required documents.",
+  "display_name": "Loan / Lending",
+  "description": "Complete your loan application",
   "icon": "rupee",
   "flagship_demo": true,
   "lifecycle_status": "SUPPORTED",
@@ -22,11 +22,26 @@
       "label": "Purpose of Loan",
       "required": true,
       "options": [
-        { "value": "HOME_RENOVATION", "label": "Home Renovation" },
-        { "value": "MEDICAL_EXPENSES", "label": "Medical Expenses" },
-        { "value": "EDUCATION", "label": "Higher Education" },
-        { "value": "DEBT_CONSOLIDATION", "label": "Debt Consolidation" },
-        { "value": "OTHER", "label": "Other Personal Needs" }
+        {
+          "value": "HOME_RENOVATION",
+          "label": "Home Renovation"
+        },
+        {
+          "value": "MEDICAL_EXPENSES",
+          "label": "Medical Expenses"
+        },
+        {
+          "value": "EDUCATION",
+          "label": "Higher Education"
+        },
+        {
+          "value": "DEBT_CONSOLIDATION",
+          "label": "Debt Consolidation"
+        },
+        {
+          "value": "OTHER",
+          "label": "Other Personal Needs"
+        }
       ]
     },
     {

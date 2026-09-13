@@ -43,9 +43,10 @@ describe('Screen05Recommendation (F16)', () => {
       expect(screen.getByText('Recommended Next Step')).toBeInTheDocument();
     });
 
-    // Recommendation card
+    // Recommendation card - the reference design has no "Recommended Next Action"
+    // badge, just the icon/title/description/button.
     expect(screen.getByText('Upload Salary Slip')).toBeInTheDocument();
-    expect(screen.getByText('Recommended Next Action')).toBeInTheDocument();
+    expect(screen.queryByText('Recommended Next Action')).not.toBeInTheDocument();
 
     // Alternatives list
     expect(screen.getByText(/Alternative Options/i)).toBeInTheDocument();

@@ -15,7 +15,10 @@ describe('RecommendationCard (F15)', () => {
     accepts: ['application/pdf', 'image/jpeg', 'image/png'],
   };
 
-  it('renders title, explanation, kind badge, and unlock tags', () => {
+  it('renders title, explanation, and an accessible (non-visual) kind label', () => {
+    // The reference design has no "Recommended Next Action" / "Document Upload"
+    // badges and no "unlocks" pill row - just an icon, title, and description.
+    // The kind is still available to assistive tech via sr-only text.
     render(<RecommendationCard action={sampleAction} onSelect={vi.fn()} />);
 
     expect(screen.getByText('Upload Salary Slip')).toBeInTheDocument();
@@ -24,10 +27,10 @@ describe('RecommendationCard (F15)', () => {
         'Uploading your latest salary slip verifies your net monthly income and unlocks loan limit calculation.'
       )
     ).toBeInTheDocument();
-    expect(screen.getByText('Recommended Next Action')).toBeInTheDocument();
-    expect(screen.getByText('Document Upload')).toBeInTheDocument();
-    expect(screen.getByText('monthly income')).toBeInTheDocument();
-    expect(screen.getByText('bank statement')).toBeInTheDocument();
+    expect(screen.queryByText('Recommended Next Action')).not.toBeInTheDocument();
+    expect(screen.getByText('Document Upload')).toHaveClass('sr-only');
+    expect(screen.queryByText('monthly income')).not.toBeInTheDocument();
+    expect(screen.queryByText('bank statement')).not.toBeInTheDocument();
   });
 
   it('fires onSelect when CTA button is clicked', async () => {
@@ -64,15 +67,16 @@ describe('ActionList (F15)', () => {
     },
   ];
 
-  it('renders all alternatives dynamically from array', () => {
-    render(<ActionList alternatives={alternatives} onSelect={vi.fn()} />);
+  it('renders all alternatives dynamically from array as compact rows in one container', () => {
+    // The reference shows compact single-line rows (icon + title + chevron) inside
+    // one bordered container, not separate cards with a description line each.
+    const { container } = render(<ActionList alternatives={alternatives} onSelect={vi.fn()} />);
 
     expect(screen.getByText('Alternative Options (2)')).toBeInTheDocument();
     expect(screen.getByText('Adjust Loan Tenure')).toBeInTheDocument();
     expect(screen.getByText('Update Employer Details')).toBeInTheDocument();
-    expect(
-      screen.getByText('Modify repayment tenure to adjust monthly EMI projections.')
-    ).toBeInTheDocument();
+    // Only one outer container card, not one per alternative.
+    expect(container.querySelectorAll('[data-testid^="action-option-"]')).toHaveLength(2);
   });
 
   it('calls onSelect with chosen alternative', async () => {

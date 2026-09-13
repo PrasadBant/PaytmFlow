@@ -65,6 +65,37 @@ describe('EvidenceCard (F20)', () => {
     expect(screen.getByText('Paytm Technologies Ltd')).toBeInTheDocument();
   });
 
+  it('never shows a hardcoded ₹85,000/Monthly Income headline for a document whose own detected field is unrelated to income (regression)', () => {
+    // Root cause: this component used to render a fixed "₹ 85,000 / Monthly
+    // Income Detected" headline unconditionally, regardless of `detected` -
+    // so a Bank Statement, Address Proof, ITR, or any non-Lending pack's
+    // evidence (PAN, FATCA, medical declaration, etc.) all showed the exact
+    // same salary figure on Screen 7. The headline must always come from
+    // THIS document's own first detected field.
+    render(
+      <EvidenceCard
+        filename="itr_2025.pdf"
+        uploadedAt="2026-09-12T10:05:00Z"
+        verified={true}
+        detected={[{ key: 'itr_verification', label: 'Income Tax Return (ITR)', display_value: 'Verified' }]}
+      />
+    );
+
+    expect(screen.getByText('Verified', { selector: 'div.text-2xl' })).toBeInTheDocument();
+    expect(screen.getByText('Income Tax Return (ITR)')).toBeInTheDocument();
+    expect(screen.queryByText('₹ 85,000')).not.toBeInTheDocument();
+    expect(screen.queryByText('Monthly Income Detected')).not.toBeInTheDocument();
+  });
+
+  it('renders no headline figure at all when nothing was detected, rather than fabricating one (regression)', () => {
+    render(
+      <EvidenceCard filename="unrelated_document.pdf" uploadedAt="2026-09-12T10:05:00Z" verified={false} detected={[]} />
+    );
+
+    expect(screen.queryByText('₹ 85,000')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Monthly Income Detected/)).not.toBeInTheDocument();
+  });
+
   it('strictly contains no prohibited words', () => {
     const { container } = render(
       <EvidenceCard

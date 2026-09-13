@@ -50,7 +50,13 @@ export const Screen07AiAnalysis: React.FC = () => {
 
   const evidenceResponse: EvidenceResponse | undefined = locationState.evidenceResponse;
   const snapshotId = locationState.snapshotId || journey?.snapshot_id || '';
-  const actionId = locationState.actionId || evidenceResponse?.proposed_action_id || 'UPLOAD_INCOME_PROOF';
+  // Never fabricate an action_id: it must come from the action the user actually
+  // navigated here to resolve (locationState.actionId, forwarded by Screen 6) or
+  // from what THIS document's own analysis proposes. If neither is present -
+  // e.g. a stale deep link, or a document that didn't match any pending
+  // requirement - there is no correct action to apply, and handleApply below
+  // refuses to submit rather than guessing a different pack's action.
+  const actionId = locationState.actionId || evidenceResponse?.proposed_action_id || '';
 
   // A real AI-detected conflict (EvidenceConflict.ambiguity_id, from the evidence
   // response itself) is forwarded on apply so the mutation can genuinely flag the
@@ -60,6 +66,10 @@ export const Screen07AiAnalysis: React.FC = () => {
 
   const handleApply = async (): Promise<void> => {
     if (!journeyId || !snapshotId || !evidenceResponse || applyAction.isPending) return;
+    if (!actionId) {
+      setApplyError('We could not determine which requirement this document resolves. Please go back and re-select the action.');
+      return;
+    }
     setApplyError(null);
 
     try {
@@ -185,7 +195,7 @@ export const Screen07AiAnalysis: React.FC = () => {
 
       {/* 1. Evidence Document Card */}
       <EvidenceCard
-        filename={filename || 'Salary_Slip_Mar2024.pdf'}
+        filename={filename || 'Uploaded document'}
         uploadedAt={uploaded_at}
         sizeBytes={size_bytes}
         verified={interpretation.verified}

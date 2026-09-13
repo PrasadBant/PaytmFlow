@@ -201,26 +201,15 @@ export const Screen10MyJourneys: React.FC = () => {
             const isCompleted = journey.status === 'COMPLETED' || journey.readiness === 'READY';
             const isNeedsReview = journey.status === 'NEEDS_REVIEW' || journey.readiness === 'NEEDS_REVIEW';
 
-            const referenceTitle =
-              journey.journey_type === 'LENDING'
-                ? 'Loan / Lending'
-                : journey.journey_type === 'INSURANCE'
-                ? 'Insurance'
-                : journey.journey_type === 'CREDIT_CARD'
-                ? 'Credit Card'
-                : journey.journey_type === 'KYC'
-                ? 'KYC / Onboarding'
-                : journey.journey_type === 'ACCOUNT_OPENING'
-                ? 'Account Opening'
-                : journey.journey_type === 'INVESTMENT'
-                ? 'Investment / Wealth'
-                : journey.title || journey.display_name;
+            // `display_name` (e.g. "Loan / Lending") is the server's real, pack-level
+            // display name - required on every JourneyListItem per the contract, and
+            // exactly what the reference mockup's row titles are. Previously this
+            // hardcoded a `journey_type`-keyed switch of fixed strings instead of
+            // using it, which is both a journey-specific-branching violation and
+            // silently ignored the real API value.
+            const referenceTitle = journey.display_name;
 
-            const timeDisplay = journey.updated_at
-              ? formatRelativeTime(journey.updated_at)
-              : isCompleted
-              ? 'Today'
-              : 'Last updated 3 days ago';
+            const timeDisplay = formatRelativeTime(journey.updated_at);
 
             return (
               <Card
@@ -241,7 +230,7 @@ export const Screen10MyJourneys: React.FC = () => {
                         {referenceTitle}
                       </h2>
                       <p className="text-xs text-content-secondary truncate">
-                        {journey.summary || (journey.journey_type === 'LENDING' ? 'Personal Loan • ₹ 5,00,000' : '')}
+                        {journey.summary}
                       </p>
                       {journey.progress && (
                         <p className="text-xs text-content-tertiary">
