@@ -1036,17 +1036,51 @@ class JourneyService:
                 detail=ErrorEnvelope(error=error_obj).model_dump(mode="json"),
             ) from err
 
+        # 6b. Recognize a real, AI-surfaced evidence conflict, if the caller forwards
+        # one. Screen07 sends the evidence response's own EvidenceConflict.ambiguity_id
+        # back in this action's `input` (a free-form object per the contract - no
+        # schema change) after a real POST /evidence detected it. Validated against
+        # manifest.ambiguity_rules exactly the way submit_clarification already
+        # validates ambiguity_id/field below - deterministic_check above is untouched
+        # and stays pure; this only decides SATISFIED vs AMBIGUOUS for the mutation
+        # apply_action was already going to make.
+        pending_ambiguity: CoreAmbiguity | None = None
+        raw_ambiguity_id = (action_input or {}).get("ambiguity_id")
+        if raw_ambiguity_id:
+            amb_rule = next(
+                (a for a in (manifest.ambiguity_rules or []) if a.ambiguity_id == raw_ambiguity_id),
+                None,
+            )
+            if amb_rule and amb_rule.field in token.direct_fields:
+                pending_ambiguity = CoreAmbiguity(
+                    ambiguity_id=amb_rule.ambiguity_id,
+                    field=amb_rule.field,
+                    reason=amb_rule.reason,
+                    question=amb_rule.question,
+                    answer_type=(
+                        amb_rule.answer_type.value
+                        if hasattr(amb_rule.answer_type, "value")
+                        else str(amb_rule.answer_type)
+                    ),
+                    choices=(
+                        [asdict(c) for c in (amb_rule.choices or [])] if amb_rule.choices else None
+                    ),
+                )
+
         # 7. Apply state mutation
         updated_values = dict(current_values)
         updated_values.update(token.new_values)
         updated_statuses = dict(current_statuses)
         for f_key in token.direct_fields:
             updated_statuses[f_key] = CoreFieldStatus.SATISFIED
+        if pending_ambiguity:
+            updated_statuses[pending_ambiguity.field] = CoreFieldStatus.AMBIGUOUS
 
         derived_states_b, _ = derive_field_states(
             manifest=manifest,
             current_values=updated_values,
             current_statuses=updated_statuses,
+            ambiguities={pending_ambiguity.field: pending_ambiguity} if pending_ambiguity else None,
             goal=journey.goal,
         )
         new_readiness = evaluate_readiness(
@@ -1057,14 +1091,19 @@ class JourneyService:
 
         # 8. Create new immutable snapshot
         fields_to_save = {
-            k: {"status": f.status.value, "value": f.value} for k, f in derived_states_b.items()
+            k: {
+                "status": f.status.value,
+                "value": f.value,
+                "ambiguity": asdict(f.ambiguity) if f.ambiguity else None,
+            }
+            for k, f in derived_states_b.items()
         }
         new_snap = await snapshot_repo.create(
             token=token,
             readiness=new_readiness.value,
             fields=fields_to_save,
             goal=journey.goal,
-            pending_clarification=None,
+            pending_clarification=asdict(pending_ambiguity) if pending_ambiguity else None,
         )
 
         # 9. Update journey state

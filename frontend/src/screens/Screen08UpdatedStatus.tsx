@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type React from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -7,6 +8,8 @@ import {
 } from 'lucide-react';
 import { useJourney, type JourneyStateResponse } from '@/api/hooks/useJourney';
 import { JourneyDiff } from '@/components/JourneyDiff';
+import { NeedsReviewCard } from '@/components/NeedsReviewCard';
+import type { ActionResponse as ClarificationActionResponse } from '@/api/hooks/useClarification';
 import { Card } from '@/components/primitives/Card';
 import { Button } from '@/components/primitives/Button';
 import { Spinner } from '@/components/primitives/Spinner';
@@ -38,8 +41,16 @@ export const Screen08UpdatedStatus: React.FC = () => {
     refetch,
   } = useJourney(journeyId);
 
+  // Overrides actionResponse's (static route-state) journey once a clarification is
+  // resolved via NeedsReviewCard below, so this screen reflects the real post-resolve
+  // state instead of the stale NEEDS_REVIEW snapshot the user arrived with.
+  const [resolvedJourney, setResolvedJourney] = useState<JourneyStateResponse | undefined>(
+    undefined
+  );
+
   // Server-returned post-action journey state (route state first, fallback to fetched query cache)
-  const journey: JourneyStateResponse | undefined = actionResponse?.journey ?? fetchedJourney;
+  const journey: JourneyStateResponse | undefined =
+    resolvedJourney ?? actionResponse?.journey ?? fetchedJourney;
   const diff: JourneyDiffType | undefined = actionResponse?.diff;
 
   if (isJourneyLoading && !journey) {
@@ -179,6 +190,22 @@ export const Screen08UpdatedStatus: React.FC = () => {
           </span>
         </div>
       </Card>
+
+      {/* Needs Review: the just-applied action left a field AMBIGUOUS (real AI-detected
+          evidence conflict, per contract §5 - "Dev1 shows NeedsReviewCard instead of
+          the Continue button"). Purely additive: existing content above is unchanged. */}
+      {journey.readiness === 'NEEDS_REVIEW' && (
+        <div className="text-left max-w-md mx-auto">
+          <NeedsReviewCard
+            journeyId={journey.journey_id}
+            snapshotId={journey.snapshot_id}
+            fields={journey.fields}
+            onResolved={(response: ClarificationActionResponse) =>
+              setResolvedJourney(response.journey)
+            }
+          />
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div className="space-y-3 max-w-md mx-auto pt-2">

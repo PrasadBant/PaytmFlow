@@ -52,6 +52,12 @@ export const Screen07AiAnalysis: React.FC = () => {
   const snapshotId = locationState.snapshotId || journey?.snapshot_id || '';
   const actionId = locationState.actionId || evidenceResponse?.proposed_action_id || 'UPLOAD_INCOME_PROOF';
 
+  // A real AI-detected conflict (EvidenceConflict.ambiguity_id, from the evidence
+  // response itself) is forwarded on apply so the mutation can genuinely flag the
+  // targeted field AMBIGUOUS instead of silently marking it satisfied. `input` is a
+  // free-form object per the contract - no schema change.
+  const conflictAmbiguityId = evidenceResponse?.interpretation.conflicts?.[0]?.ambiguity_id;
+
   const handleApply = async (): Promise<void> => {
     if (!journeyId || !snapshotId || !evidenceResponse || applyAction.isPending) return;
     setApplyError(null);
@@ -64,6 +70,7 @@ export const Screen07AiAnalysis: React.FC = () => {
         idempotency_key: generateIdempotencyKey(),
         input: {
           evidence_id: evidenceResponse.evidence_id,
+          ...(conflictAmbiguityId ? { ambiguity_id: conflictAmbiguityId } : {}),
         },
       });
 
@@ -234,12 +241,31 @@ export const Screen07AiAnalysis: React.FC = () => {
         </Button>
 
         {requires_review ? (
-          <div
-            data-testid="requires-review-notice"
-            className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 p-2.5 rounded-card border border-amber-200"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>This evidence requires manual review or clarification before continuing.</span>
+          <div className="flex flex-col items-stretch sm:items-end gap-3 w-full sm:w-auto">
+            <div
+              data-testid="requires-review-notice"
+              className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 p-2.5 rounded-card border border-amber-200"
+            >
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>This evidence requires manual review or clarification before continuing.</span>
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleApply}
+              disabled={applyAction.isPending}
+              data-testid="submit-for-review-btn"
+              className="w-full sm:w-auto px-8 py-2.5 inline-flex items-center justify-center gap-2"
+            >
+              {applyAction.isPending ? (
+                <>
+                  <Spinner size="sm" className="mr-2" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <span>Submit for Review →</span>
+              )}
+            </Button>
           </div>
         ) : (
           <Button
