@@ -133,6 +133,33 @@ describe('Screen07AiAnalysis (F20)', () => {
     expect(await screen.findByText('No Evidence Upload to Analyze')).toBeInTheDocument();
   });
 
+  it('never falls back to a hardcoded Lending action_id when no action can be determined (regression)', async () => {
+    // Root cause: this screen used to fall back to the literal string
+    // 'UPLOAD_INCOME_PROOF' (a Lending-specific action id) whenever neither
+    // locationState.actionId nor evidenceResponse.proposed_action_id was set -
+    // e.g. a non-Lending document that didn't match any pending requirement.
+    // Applying would then silently submit the WRONG action for whatever
+    // journey/pack the user was actually in. It must refuse instead.
+    const user = userEvent.setup();
+    const unmatchedEvidence: EvidenceResponse = {
+      ...mockEvidenceResponse,
+      proposed_action_id: null,
+    };
+
+    renderScreen7('/j/11111111-1111-1111-1111-111111111111/analysis', {
+      evidenceResponse: unmatchedEvidence,
+      journeyId: '11111111-1111-1111-1111-111111111111',
+      snapshotId: '11111111-1111-1111-1111-111111111111',
+      // deliberately no actionId
+    });
+
+    const continueBtn = await screen.findByTestId('continue-apply-btn');
+    await user.click(continueBtn);
+
+    expect(await screen.findByTestId('apply-error-banner')).toBeInTheDocument();
+    expect(screen.queryByTestId('screen-08-stub')).not.toBeInTheDocument();
+  });
+
   it('strictly contains no prohibited words or percentage indicators', async () => {
     const { container } = renderScreen7();
 

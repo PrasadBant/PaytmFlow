@@ -7,10 +7,10 @@
   "readiness": "NOT_READY",
   "status": "IN_PROGRESS",
   "progress": {
-    "completed": 2,
-    "pending": 2,
-    "blockers": 1,
-    "total": 5
+    "completed": 1,
+    "pending": 0,
+    "blockers": 2,
+    "total": 3
   },
   "fields": [
     {
@@ -38,9 +38,16 @@
       "mandatory": true
     }
   ],
-  "available_actions": ["VERIFY_PAN_LINK", "START_VIDEO_KYC"],
+  "available_actions": [
+    "VERIFY_PAN_LINK",
+    "START_VIDEO_KYC"
+  ],
   "history_summary": "KYC verification initialized.",
   "created_at": "2026-09-12T10:00:00Z",
   "updated_at": "2026-09-12T10:00:00Z",
-  "resume_screen": "STATUS"
+  "resume_screen": "STATUS",
+  "display": {
+    "title": "KYC / Onboarding",
+    "summary": "Aadhaar XXXX XXXX 1234"
+  }
 }

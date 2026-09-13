@@ -1,0 +1,79 @@
+{
+  "evidence_id": "55555555-5555-5555-5555-555555555555",
+  "filename": "aadhaar_address_proof.pdf",
+  "uploaded_at": "2026-09-12T10:18:00Z",
+  "size_bytes": 986000,
+  "interpretation": {
+    "verified": true,
+    "confidence": 0.91,
+    "detected": [
+      {
+        "key": "current_address",
+        "label": "Registered Address",
+        "display_value": "Verified (Aadhaar e-KYC)"
+      }
+    ],
+    "summary": "Verified current residential address via Aadhaar e-KYC record match.",
+    "conflicts": []
+  },
+  "proposed_action_id": "UPLOAD_ADDRESS_PROOF",
+  "consequence_preview": {
+    "newly_satisfied": [
+      {
+        "key": "current_address",
+        "label": "Current Residential Address"
+      }
+    ],
+    "newly_unlocked": [],
+    "still_blocked": [],
+    "predicted_readiness": "READY",
+    "progress_before": {
+      "completed": 6,
+      "pending": 1,
+      "blockers": 0,
+      "total": 7
+    },
+    "progress_after": {
+      "completed": 7,
+      "pending": 0,
+      "blockers": 0,
+      "total": 7
+    }
+  },
+  "diff_preview": {
+    "from_version": 3,
+    "to_version": 4,
+    "fields_changed": [
+      {
+        "key": "current_address",
+        "label": "Current Residential Address",
+        "from_status": "BLOCKED",
+        "to_status": "SATISFIED",
+        "display_value": "Verified (Aadhaar e-KYC)",
+        "cause": "ACTION:UPLOAD_ADDRESS_PROOF",
+        "cascaded": false
+      }
+    ],
+    "actions_unlocked": [],
+    "actions_removed": ["UPLOAD_ADDRESS_PROOF"],
+    "readiness": {
+      "from": "NOT_READY",
+      "to": "READY"
+    },
+    "progress": {
+      "from": {
+        "completed": 6,
+        "pending": 1,
+        "blockers": 0,
+        "total": 7
+      },
+      "to": {
+        "completed": 7,
+        "pending": 0,
+        "blockers": 0,
+        "total": 7
+      }
+    }
+  },
+  "requires_review": false
+}

@@ -39,8 +39,14 @@ describe('Router & Route Map Suite (F07)', () => {
     });
   });
 
+  // These route-smoke tests use the real seeded LENDING demo journey_id
+  // (not a placeholder like "journey-123") because the mock's
+  // GET /journeys/:id now correctly 404s for any journey_id it doesn't
+  // actually know about - previously it silently returned Lending fixture
+  // data for literally any ID, which is exactly the "every journey behaves
+  // like Lending" bug this mock rewrite fixes.
   it('renders Screen 4 Current Status with route param on "/j/:id"', async () => {
-    renderWithRouter('/j/journey-123');
+    renderWithRouter('/j/11111111-1111-1111-1111-111111111111');
     await waitFor(() => {
       expect(screen.getByTestId('screen-04-current-status')).toBeInTheDocument();
       expect(screen.getByText('Your Current Status')).toBeInTheDocument();
@@ -48,7 +54,7 @@ describe('Router & Route Map Suite (F07)', () => {
   });
 
   it('renders Screen 5 Recommendation with route param on "/j/:id/next"', async () => {
-    renderWithRouter('/j/journey-123/next');
+    renderWithRouter('/j/11111111-1111-1111-1111-111111111111/next');
     await waitFor(() => {
       expect(screen.getByTestId('screen-05-recommendation')).toBeInTheDocument();
       expect(screen.getByText('Recommended Next Step')).toBeInTheDocument();
@@ -56,28 +62,28 @@ describe('Router & Route Map Suite (F07)', () => {
   });
 
   it('renders Screen 6 Upload Evidence with route params on "/j/:id/act/:actionId"', async () => {
-    renderWithRouter('/j/journey-123/act/action-456');
+    renderWithRouter('/j/11111111-1111-1111-1111-111111111111/act/UPLOAD_INCOME_PROOF');
     await waitFor(() => {
       expect(screen.getByTestId('screen-06-upload-evidence')).toBeInTheDocument();
     });
   });
 
   it('renders Screen 7 AI Analysis with route param on "/j/:id/analysis"', async () => {
-    renderWithRouter('/j/journey-123/analysis');
+    renderWithRouter('/j/11111111-1111-1111-1111-111111111111/analysis');
     await waitFor(() => {
       expect(screen.getByTestId('screen-07-ai-analysis')).toBeInTheDocument();
     });
   });
 
   it('renders Screen 8 Updated Status with route param on "/j/:id/updated"', async () => {
-    renderWithRouter('/j/journey-123/updated');
+    renderWithRouter('/j/11111111-1111-1111-1111-111111111111/updated');
     await waitFor(() => {
       expect(screen.getByTestId('screen-08-updated-status')).toBeInTheDocument();
     });
   });
 
   it('renders Screen 9 Complete with route param on "/j/:id/complete"', async () => {
-    renderWithRouter('/j/journey-123/complete');
+    renderWithRouter('/j/11111111-1111-1111-1111-111111111111/complete');
     await waitFor(() => {
       expect(screen.getByTestId('screen-09-complete-journey')).toBeInTheDocument();
     });

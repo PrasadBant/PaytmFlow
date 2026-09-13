@@ -29,9 +29,9 @@
       "readiness": "NEEDS_REVIEW",
       "progress": {
         "completed": 2,
-        "pending": 2,
-        "blockers": 0,
-        "total": 4
+        "pending": 1,
+        "blockers": 2,
+        "total": 5
       },
       "updated_at": "2026-09-11T16:30:00Z",
       "resume_screen": "NEEDS_REVIEW"
@@ -42,17 +42,17 @@
       "display_name": "Video & Biometric KYC",
       "icon": "id",
       "title": "Full Wallet KYC Upgrade",
-      "summary": "All verifications complete",
-      "status": "COMPLETED",
-      "readiness": "READY",
+      "summary": "PAN linkage and video verification pending",
+      "status": "IN_PROGRESS",
+      "readiness": "NOT_READY",
       "progress": {
-        "completed": 5,
+        "completed": 1,
         "pending": 0,
-        "blockers": 0,
-        "total": 5
+        "blockers": 2,
+        "total": 3
       },
       "updated_at": "2026-09-10T09:15:00Z",
-      "resume_screen": "COMPLETE"
+      "resume_screen": "STATUS"
     }
   ]
 }

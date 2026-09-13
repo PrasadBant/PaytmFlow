@@ -120,7 +120,11 @@ export const Screen08UpdatedStatus: React.FC = () => {
       : justSatisfiedFields.length > 1
         ? 'information'
         : null;
-  const journeyTitle = journey.display?.title || 'Personal Loan';
+  // `display` is a real, contract-required field - this fallback is only for a
+  // malformed/incomplete response, and must never assume LENDING regardless of
+  // which pack the journey actually is (same pattern already used correctly in
+  // Screen09CompleteJourney).
+  const journeyTitle = journey.display?.title || journey.journey_type.replace(/_/g, ' ');
 
   const handleNextStep = (): void => {
     if (isReady) {

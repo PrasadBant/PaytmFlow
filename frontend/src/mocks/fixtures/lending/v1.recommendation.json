@@ -7,7 +7,7 @@
     "kind": "EVIDENCE",
     "why": "Uploading your latest salary slip verifies your net monthly income and unlocks your loan limit calculation.",
     "unlocks": ["monthly_income", "bank_statement"],
-    "accepts": ["application/pdf", "image/jpeg", "image/png"]
+    "accepts": ["SALARY_SLIP", "BANK_STATEMENT"]
   },
   "alternatives": [
     {

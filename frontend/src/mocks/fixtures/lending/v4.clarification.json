@@ -134,7 +134,7 @@
       "kind": "EVIDENCE",
       "why": "Verifying your current address completes all regulatory pre-checks.",
       "unlocks": ["current_address"],
-      "accepts": ["application/pdf", "image/jpeg", "image/png"]
+      "accepts": ["ADDRESS_PROOF"]
     },
     "alternatives": [],
     "minimum_path_length": 1,
