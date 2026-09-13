@@ -9,54 +9,42 @@
     {
       "key": "loan_amount",
       "type": "money",
-      "label": "Required Loan Amount",
+      "label": "Loan Amount (₹)",
       "required": true,
-      "placeholder": "e.g. 5,00,000",
-      "min": 10000,
-      "max": 10000000,
-      "help_text": "Enter the amount you wish to borrow."
+      "placeholder": "e.g. 200000",
+      "min": 50000,
+      "max": 500000,
+      "help_text": "Enter required amount between ₹50,000 and ₹5,00,000"
+    },
+    {
+      "key": "loan_purpose",
+      "type": "enum",
+      "label": "Purpose of Loan",
+      "required": true,
+      "options": [
+        { "value": "HOME_RENOVATION", "label": "Home Renovation" },
+        { "value": "MEDICAL_EXPENSES", "label": "Medical Expenses" },
+        { "value": "EDUCATION", "label": "Higher Education" },
+        { "value": "DEBT_CONSOLIDATION", "label": "Debt Consolidation" },
+        { "value": "OTHER", "label": "Other Personal Needs" }
+      ]
     },
     {
       "key": "tenure_months",
       "type": "number",
-      "label": "Desired Tenure (Months)",
+      "label": "Tenure (Months)",
       "required": true,
       "placeholder": "e.g. 36",
       "min": 6,
-      "max": 84,
+      "max": 60,
       "help_text": "Repayment duration in months."
-    },
-    {
-      "key": "employment_type",
-      "type": "enum",
-      "label": "Employment Type",
-      "required": true,
-      "options": ["Salaried", "Self-Employed Professional", "Self-Employed Business"],
-      "help_text": "Select your current employment classification."
-    },
-    {
-      "key": "monthly_income",
-      "type": "money",
-      "label": "Net Monthly Income",
-      "required": true,
-      "placeholder": "e.g. 85,000",
-      "min": 5000,
-      "help_text": "Take-home salary after deductions."
-    },
-    {
-      "key": "pan_number",
-      "type": "text",
-      "label": "Permanent Account Number (PAN)",
-      "required": true,
-      "placeholder": "ABCDE1234F",
-      "help_text": "10-digit alphanumeric PAN."
     }
   ],
   "ui_labels": {
-    "hero_title": "Instant Personal Loan Eligibility Optimization",
+    "hero_title": "Instant Personal Loan Application",
     "hero_subtitle": "Resolve application blockers with automated evidence verification.",
     "goal_heading": "Set Your Loan Goal",
-    "goal_subtext": "Provide your loan requirement and income profile to begin.",
+    "goal_subtext": "Provide your loan requirement to begin.",
     "status_heading": "Your Current Status",
     "status_subtext": "Review verified fields and outstanding blockers.",
     "recommendation_heading": "Recommended Next Step",

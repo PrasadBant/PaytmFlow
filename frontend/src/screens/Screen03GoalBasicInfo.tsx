@@ -100,9 +100,8 @@ export function Screen03GoalBasicInfo(): ReactElement {
     pack.journey_type === 'LENDING'
       ? {
           loan_amount: 500000,
-          purpose: 'home_renovation',
-          desired_tenure_months: 36,
-          intent: 'new_loan',
+          loan_purpose: 'HOME_RENOVATION',
+          tenure_months: 36,
         }
       : undefined;
 

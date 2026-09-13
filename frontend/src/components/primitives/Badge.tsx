@@ -32,7 +32,7 @@ export function Badge({
     danger: 'bg-paytm-red-light text-paytm-red-dark border-red-200',
     info: 'bg-paytm-cyan-light text-paytm-blue border-cyan-200',
     neutral: 'bg-surface-subtle text-content-secondary border-surface-border',
-    flagship: 'bg-paytm-blue text-white border-transparent shadow-xs',
+    flagship: 'bg-paytm-blue-action text-white border-transparent shadow-xs',
   };
 
   const defaultIcons: Record<BadgeVariant, ReactNode> = {

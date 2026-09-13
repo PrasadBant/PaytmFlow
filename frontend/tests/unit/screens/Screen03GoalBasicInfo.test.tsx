@@ -40,15 +40,16 @@ describe('Screen03GoalBasicInfo', () => {
     });
 
     expect(
-      screen.getByText('Provide your loan requirement and income profile to begin.')
+      screen.getByText('Provide your loan requirement to begin.')
     ).toBeInTheDocument();
 
-    // Verify LENDING specific fields rendered by SchemaForm
-    expect(screen.getByLabelText(/Required Loan Amount/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Desired Tenure \(Months\)/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Employment Type/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Net Monthly Income/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Permanent Account Number/i)).toBeInTheDocument();
+    // Verify LENDING specific fields rendered by SchemaForm - matches the real
+    // backend's actual goal_schema (loan_amount, loan_purpose, tenure_months only;
+    // employment/income/PAN are state-schema fields collected later via actions,
+    // not part of the initial goal).
+    expect(screen.getByLabelText(/Loan Amount/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Purpose of Loan/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Tenure \(Months\)/i)).toBeInTheDocument();
   });
 
   it('renders correctly for INSURANCE pack with schema fields', async () => {
