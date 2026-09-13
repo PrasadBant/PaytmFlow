@@ -6,8 +6,26 @@ up:
 down:
 	docker compose down
 
+# --loop none: uvicorn's default ("auto") builds its own event loop via
+# asyncio.run(loop_factory=...), which bypasses whatever event loop policy the
+# app sets - on native Windows that silently breaks psycopg3's async driver
+# (app/db/session.py sets WindowsSelectorEventLoopPolicy for exactly this
+# reason: without it, GET /health reports db:false and every other endpoint
+# 500s). "none" makes uvicorn fall back to asyncio.run()'s own loop creation,
+# which does respect the policy. No effect on Docker/Linux, where this policy
+# branch never runs.
+#
+# No --reload here: uvicorn's --reload runs the server in a spawned child
+# process, and on native Windows that child does not end up honouring
+# --loop none the same way the parent does (confirmed by direct testing -
+# the exact same ProactorEventLoop/psycopg3 failure returns). Prefer
+# correctness (a backend that can reach its database) over auto-restart;
+# restart `make api` manually after code changes, or run
+# `uv run uvicorn app.main:app --reload --port 8000` yourself and accept the
+# Windows caveat if hot-reload is worth more to you locally. Unaffected on
+# Docker/Linux either way.
 api:
-	uv run uvicorn app.main:app --reload --port 8000
+	uv run uvicorn app.main:app --port 8000 --loop none
 
 test:
 	uv run pytest

@@ -107,6 +107,19 @@ export const Screen08UpdatedStatus: React.FC = () => {
   const blockedFields = journey.fields.filter((f) => f.status !== 'SATISFIED');
   const satisfiedFields = journey.fields.filter((f) => f.status === 'SATISFIED');
   const isReady = journey.readiness === 'READY';
+
+  // What this update actually satisfied, from the real diff - never assume it was
+  // income (this screen renders after every action, across all six packs, not just
+  // LENDING's income-proof upload).
+  const justSatisfiedFields = (diff?.fields_changed ?? []).filter(
+    (fc) => fc.to_status === 'SATISFIED'
+  );
+  const updateSubject =
+    justSatisfiedFields.length === 1
+      ? justSatisfiedFields[0].label
+      : justSatisfiedFields.length > 1
+        ? 'information'
+        : null;
   const journeyTitle = journey.display?.title || 'Personal Loan';
 
   const handleNextStep = (): void => {
@@ -143,7 +156,9 @@ export const Screen08UpdatedStatus: React.FC = () => {
           Progress Updated!
         </h1>
         <p className="text-sm text-content-secondary max-w-md mx-auto leading-relaxed">
-          Your income proof has been successfully uploaded and verified.
+          {updateSubject
+            ? `Your ${updateSubject} has been successfully updated and verified.`
+            : 'Your information has been successfully updated and verified.'}
         </p>
       </div>
 
@@ -167,12 +182,26 @@ export const Screen08UpdatedStatus: React.FC = () => {
 
       {/* 3-Item Verification Checklist Card */}
       <Card className="p-6 bg-white border border-surface-border shadow-xs rounded-2xl text-left space-y-3.5 max-w-md mx-auto">
-        <div className="flex items-center gap-3 text-sm text-content-primary">
-          <div className="w-5 h-5 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+        {justSatisfiedFields.length > 0 ? (
+          justSatisfiedFields.map((fc, idx) => (
+            <div
+              key={fc.key || `satisfied-${idx}`}
+              className="flex items-center gap-3 text-sm text-content-primary"
+            >
+              <div className="w-5 h-5 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+              </div>
+              <span className="font-semibold">{fc.label || fc.key} marked as completed</span>
+            </div>
+          ))
+        ) : (
+          <div className="flex items-center gap-3 text-sm text-content-primary">
+            <div className="w-5 h-5 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="font-semibold">Update marked as completed</span>
           </div>
-          <span className="font-semibold">Income verification marked as completed</span>
-        </div>
+        )}
 
         <div className="flex items-center gap-3 text-sm text-content-primary">
           <div className="w-5 h-5 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0">

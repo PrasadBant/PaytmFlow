@@ -263,4 +263,56 @@ describe('Screen08UpdatedStatus (F22)', () => {
 
     expect(await screen.findByText('All blockers cleared!')).toBeInTheDocument();
   });
+
+  it('regression: never claims "income proof" for a non-LENDING/non-income update', async () => {
+    // This screen previously hardcoded "Income verification marked as completed" /
+    // "Your income proof has been successfully uploaded and verified." unconditionally,
+    // regardless of pack or which field actually changed - a fabricated, journey-specific
+    // claim shown after every action across all six packs. It must now be derived from
+    // the real diff instead.
+    const kycJourney: JourneyStateResponse = {
+      ...mockJourney,
+      journey_type: 'KYC',
+      fields: [
+        { key: 'aadhaar_verified', label: 'Aadhaar Verification', status: 'SATISFIED' },
+      ],
+      progress: { completed: 1, pending: 1, blockers: 0, total: 2 },
+      display: { title: 'Video & Biometric KYC', summary: 'Wallet Upgrade' },
+    };
+    const kycActionResponse: ActionResponse = {
+      journey: kycJourney,
+      diff: {
+        from_version: 1,
+        to_version: 2,
+        fields_changed: [
+          {
+            key: 'aadhaar_verified',
+            label: 'Aadhaar Verification',
+            from_status: 'BLOCKED',
+            to_status: 'SATISFIED',
+            display_value: 'Verified',
+            cause: 'ACTION:VERIFY_AADHAAR',
+          },
+        ],
+        actions_unlocked: [],
+        actions_removed: [],
+        readiness: { from: 'NOT_READY', to: 'NOT_READY' },
+        progress: { from: { completed: 0, pending: 2, blockers: 0, total: 2 }, to: { completed: 1, pending: 1, blockers: 0, total: 2 } },
+      },
+      next_recommendation: null,
+    };
+
+    renderScreen8('/j/11111111-1111-1111-1111-111111111111/updated', {
+      actionResponse: kycActionResponse,
+      journeyId: '11111111-1111-1111-1111-111111111111',
+    });
+
+    await screen.findByTestId('celebration-header');
+    expect(screen.queryByText(/income verification/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/income proof/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Aadhaar Verification marked as completed')).toBeInTheDocument();
+    expect(
+      screen.getByText('Your Aadhaar Verification has been successfully updated and verified.')
+    ).toBeInTheDocument();
+  });
 });

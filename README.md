@@ -36,18 +36,25 @@ mypy (strict on `app/core`), import-linter, structlog.
 ## Running locally
 
 ```bash
-# 1. Postgres
+# 1. Postgres + backend
 cd backend
 docker compose up -d postgres
 uv sync
 uv run alembic upgrade head
-uv run uvicorn app.main:app --reload --port 8000
+make api      # or: uv run uvicorn app.main:app --port 8000 --loop none
 
 # 2. Frontend (separate shell)
 cd frontend
 npm install
 npm run dev   # http://localhost:5173, proxies /api -> http://localhost:8000
 ```
+
+`make api` runs without `--reload` and with `--loop none` - required on native Windows,
+where uvicorn's default event loop setup silently breaks psycopg3's async driver (every
+request would 500). Harmless on Docker/Linux, where that code path never runs; see the
+comment above the `api` target in `backend/Makefile` for the full explanation. If you're
+on macOS/Linux and want hot-reload for local dev, `uv run uvicorn app.main:app --reload
+--port 8000` works fine directly.
 
 By default the frontend runs in `VITE_API_MODE=mock` (MSW, no backend required — see
 `frontend/.env`). Set `VITE_API_MODE=live` to talk to the real backend above through the
@@ -70,12 +77,19 @@ in application code).
 ```bash
 # Backend
 cd backend
-uv run pytest
+uv run pytest                    # add REQUIRE_POSTGRES=1 to fail instead of skipping if Postgres is down
 uv run ruff check app tests
-uv run mypy app
+uv run mypy --strict app/core    # the actual spec requirement, and clean
 lint-imports
 
 # Frontend
 cd frontend
 npm run lint && npm run typecheck && npm run test && npm run test:e2e
 ```
+
+`uv run mypy app` (whole-app, non-strict) also runs and is what `make type-check` invokes,
+but it currently reports pre-existing errors outside `app/core` (mostly `app/services`,
+`app/evidence`, `app/eval` - narrow-typing gaps like unvalidated `Any` flowing into a
+`Literal` field, not runtime bugs). `app/core` itself - the one the spec holds to strict
+typing - is clean. Don't expect a clean whole-app `mypy` run; do expect a clean
+`mypy --strict app/core`.

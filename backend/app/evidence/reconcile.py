@@ -75,15 +75,19 @@ class EvidenceReconciliationService:
         journey_id = journey.id
 
         # 1. Verify journey existence and session ownership (404 if not found or unowned)
+        # NOTE: "NOT_FOUND" is intentionally not a member of the ErrorCode enum (see
+        # contract/openapi.yaml's ErrorCode schema and app.schemas.enums.ErrorCode) -
+        # 404s use a plain string code, exactly like security.session.verify_journey_ownership
+        # already does, bypassing the strict ErrorObject(code: ErrorCode) model.
         if journey.session_id != current_session.id:
             raise HTTPException(
                 status_code=404,
-                detail=ErrorEnvelope(
-                    error=ErrorObject(
-                        code=ErrorCode.NOT_FOUND,
-                        message=f"Journey '{journey_id}' not found",
-                    )
-                ).model_dump(mode="json"),
+                detail={
+                    "error": {
+                        "code": "NOT_FOUND",
+                        "message": f"Journey '{journey_id}' not found",
+                    }
+                },
             )
 
         # 2. Check for stale action
@@ -107,24 +111,19 @@ class EvidenceReconciliationService:
         if not snapshot_model:
             raise HTTPException(
                 status_code=404,
-                detail=ErrorEnvelope(
-                    error=ErrorObject(
-                        code=ErrorCode.NOT_FOUND,
-                        message="Snapshot not found",
-                    )
-                ).model_dump(mode="json"),
+                detail={"error": {"code": "NOT_FOUND", "message": "Snapshot not found"}},
             )
 
         manifest = pack_registry.get_pack(journey.journey_type)
         if not manifest:
             raise HTTPException(
                 status_code=404,
-                detail=ErrorEnvelope(
-                    error=ErrorObject(
-                        code=ErrorCode.NOT_FOUND,
-                        message=f"Journey pack '{journey.journey_type}' not found",
-                    )
-                ).model_dump(mode="json"),
+                detail={
+                    "error": {
+                        "code": "NOT_FOUND",
+                        "message": f"Journey pack '{journey.journey_type}' not found",
+                    }
+                },
             )
 
         current_values = {

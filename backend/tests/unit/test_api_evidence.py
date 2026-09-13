@@ -287,3 +287,57 @@ async def test_upload_evidence_cross_session_returns_404(
         files={"file": ("doc.pdf", pdf_bytes, "application/pdf")},
     )
     assert upload_res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_upload_evidence_missing_snapshot_returns_clean_404(
+    client_with_db: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    """Regression test: reconcile.py previously referenced the non-existent
+    ErrorCode.NOT_FOUND enum member (ErrorCode has no NOT_FOUND value - see
+    app/schemas/enums.py and contract/openapi.yaml's ErrorCode schema, both of
+    which intentionally omit it; 404s use a plain string code instead, exactly
+    like security.session.verify_journey_ownership already does). That made
+    every "not found" branch inside submit_evidence raise an unhandled
+    AttributeError instead of returning a 404, for any journey whose current
+    snapshot cannot be loaded (a real, if rare, data-integrity edge case -
+    e.g. a dangling current_snapshot_id). This forces that branch by
+    monkeypatching SnapshotRepository.get_by_id to simulate a missing snapshot
+    for an otherwise legitimate, correctly-owned request, and asserts a clean
+    contract-shaped 404 comes back rather than a 500/crash.
+    """
+    from app.db.repositories.snapshots import SnapshotRepository
+
+    async def fake_get_by_id(self, snapshot_id):
+        return None
+
+    monkeypatch.setattr(SnapshotRepository, "get_by_id", fake_get_by_id)
+
+    s1 = str(uuid4())
+    create_res = await client_with_db.post(
+        "/api/v1/journeys",
+        headers={"X-Session-Id": s1},
+        json={
+            "journey_type": "LENDING",
+            "goal": {
+                "loan_amount": 100000,
+                "loan_purpose": "HOME_RENOVATION",
+                "tenure_months": 12,
+            },
+        },
+    )
+    assert create_res.status_code == 201
+    journey_id = create_res.json()["journey_id"]
+    snapshot_id = create_res.json()["snapshot_id"]
+
+    pdf_bytes = create_sample_pdf("Sample PDF")
+    upload_res = await client_with_db.post(
+        f"/api/v1/journeys/{journey_id}/evidence",
+        headers={"X-Session-Id": s1},
+        data={"doc_type": "salary_slip", "expected_snapshot_id": snapshot_id},
+        files={"file": ("doc.pdf", pdf_bytes, "application/pdf")},
+    )
+    assert upload_res.status_code == 404
+    body = upload_res.json()
+    assert body["error"]["code"] == "NOT_FOUND"
+    assert body["error"]["message"] == "Snapshot not found"

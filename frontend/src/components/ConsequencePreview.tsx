@@ -38,8 +38,9 @@ export function ConsequencePreview({
       </div>
 
       <div className="space-y-2.5 pt-2 border-t border-surface-border">
-        {/* 1. Newly Satisfied Items or Default Reference Items */}
-        {newly_satisfied.length > 0 ? (
+        {/* 1. Newly Satisfied Items (nothing rendered when the deterministic
+            preview reports none - never invent a claim the API didn't make) */}
+        {newly_satisfied.length > 0 &&
           newly_satisfied.map((item, idx) => (
             <div
               key={item.key || `satisfied-${idx}`}
@@ -49,17 +50,10 @@ export function ConsequencePreview({
               <span className="font-medium">{item.label || item.key}</span>
               <span className="text-content-secondary font-medium">→ Completed</span>
             </div>
-          ))
-        ) : (
-          <div className="flex items-center gap-2.5 text-xs sm:text-sm text-content-primary">
-            <CheckCircle2 className="w-4 h-4 text-paytm-green shrink-0" aria-hidden="true" />
-            <span className="font-medium">Income verification</span>
-            <span className="text-content-secondary font-medium">→ Completed</span>
-          </div>
-        )}
+          ))}
 
-        {/* 2. Newly Unlocked Actions */}
-        {newly_unlocked.length > 0 ? (
+        {/* 2. Newly Unlocked Actions (same rule: no fallback claim) */}
+        {newly_unlocked.length > 0 &&
           newly_unlocked.map((action, idx) => (
             <div
               key={action.action_id || `unlocked-${idx}`}
@@ -69,14 +63,7 @@ export function ConsequencePreview({
               <span className="font-medium">{action.title || action.action_id}</span>
               <span className="text-content-secondary font-medium">→ Unlocked</span>
             </div>
-          ))
-        ) : (
-          <div className="flex items-center gap-2.5 text-xs sm:text-sm text-content-primary">
-            <CheckCircle2 className="w-4 h-4 text-paytm-green shrink-0" aria-hidden="true" />
-            <span className="font-medium">Loan eligibility calculation</span>
-            <span className="text-content-secondary font-medium">→ Unlocked</span>
-          </div>
-        )}
+          ))}
 
         {/* Still Blocked Items (if any) */}
         {still_blocked && still_blocked.length > 0 && (
@@ -92,19 +79,24 @@ export function ConsequencePreview({
           ))
         )}
 
-        {/* 3. Overall Progress */}
-        <div
-          data-testid="predicted-progress"
-          className="flex items-center gap-2.5 text-xs sm:text-sm text-content-primary"
-        >
-          <CheckCircle2 className="w-4 h-4 text-paytm-green shrink-0" aria-hidden="true" />
-          <span className="font-medium">Overall progress</span>
-          <span className="text-content-secondary font-medium">
-            → {progress_after ? `${progress_after.completed}/${progress_after.total} Completed` : '4/7 Completed'}
-          </span>
-        </div>
+        {/* 3. Overall Progress - progress_after is a required field per the
+            contract, but never fabricate a count if it's ever absent */}
+        {progress_after && (
+          <div
+            data-testid="predicted-progress"
+            className="flex items-center gap-2.5 text-xs sm:text-sm text-content-primary"
+          >
+            <CheckCircle2 className="w-4 h-4 text-paytm-green shrink-0" aria-hidden="true" />
+            <span className="font-medium">Overall progress</span>
+            <span className="text-content-secondary font-medium">
+              → {progress_after.completed}/{progress_after.total} Completed
+            </span>
+          </div>
+        )}
 
-        {/* 4. Next Step */}
+        {/* 4. Next Step - generic footer prompt, not tied to a specific data
+            field, so kept as static copy (unlike the sections above, it
+            makes no claim about the user's actual state). */}
         <div className="flex items-center gap-2.5 text-xs sm:text-sm text-content-primary">
           <CheckCircle2 className="w-4 h-4 text-paytm-green shrink-0" aria-hidden="true" />
           <span className="font-medium">Next step</span>

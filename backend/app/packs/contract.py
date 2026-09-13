@@ -12,7 +12,7 @@ from app.schemas.enums import (
     PackIcon,
 )
 from app.schemas.journeys import AmbiguityChoice
-from app.schemas.packs import GoalFieldSpec
+from app.schemas.packs import GoalFieldSpec, GoalOption
 
 
 class ManifestMetadata(BaseModel):
@@ -39,6 +39,13 @@ class StateFieldSpec(BaseModel):
     display: bool = True
     explanation: str | None = None
     default_status: FieldStatus | None = FieldStatus.BLOCKED
+    # Matches GoalFieldSpec.options. No current manifest sets this on a state field
+    # (extra="ignore" would otherwise have silently dropped it), but app/ai/mock.py's
+    # deterministic extraction already reads field_spec.options for ENUM-typed state
+    # fields (e.g. LENDING's employment_type) - without this, that read would raise
+    # AttributeError instead of a schema-driven value the moment a manifest ever adds
+    # options to an enum state field.
+    options: list[GoalOption] | None = None
 
 
 class DependencyEdge(BaseModel):
