@@ -110,9 +110,10 @@ describe('Application Shell Components Suite (F06)', () => {
       const startLink = screen.getByRole('link', { name: 'Start Journey' });
       const homeLink = screen.getByRole('link', { name: 'Home' });
 
-      // Start Journey is active
-      expect(startLink.className).toContain('text-paytm-blue-600');
-      expect(startLink.className).toContain('bg-paytm-blue-50');
+      // Start Journey is active - solid blue pill with inverted (white) text/icon,
+      // matching the reference design's active nav treatment.
+      expect(startLink.className).toContain('bg-paytm-blue-action');
+      expect(startLink.className).toContain('text-content-inverted');
 
       // Home is inactive
       expect(homeLink.className).toContain('text-content-secondary');

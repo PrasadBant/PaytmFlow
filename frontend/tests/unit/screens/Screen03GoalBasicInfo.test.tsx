@@ -159,6 +159,29 @@ describe('Screen03GoalBasicInfo', () => {
     });
   });
 
+  it('renders the real pack description as the "I want to" context line, not fabricated per-pack copy', async () => {
+    // The reference mockup shows an "I want to: Apply for a new personal loan"
+    // dropdown here. No goal_schema field or option list backs that exact control
+    // for any pack (verified against contract/openapi.yaml), so fabricating a fake
+    // dropdown would violate the no-invented-data rule. Instead this renders the
+    // pack's own real, already-fetched, contract-required `description` field -
+    // proven here by checking it differs correctly across two different packs.
+    renderWithProviders('/start/lending');
+    await waitFor(() => {
+      expect(screen.getByText('I want to')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText('Unlock instant disbursement and optimize required documents.')
+    ).toBeInTheDocument();
+
+    renderWithProviders('/start/insurance');
+    await waitFor(() => {
+      expect(
+        screen.getByText('Fast-track policy issuance by validating medical declarations.')
+      ).toBeInTheDocument();
+    });
+  });
+
   it('contains no prohibited words or claims', async () => {
     renderWithProviders('/start/lending');
 

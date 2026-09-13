@@ -18,9 +18,12 @@ export const Header: React.FC = () => {
             variant="ghost"
           />
         </div>
-        <div className="font-bold text-xl tracking-tight" data-testid="header-wordmark">
-          <span className="text-paytm-blue">Paytm</span>
-          <span className="text-content-primary">Flow</span>
+        <div
+          className="font-bold text-xl tracking-tight bg-gradient-to-r from-paytm-blue to-paytm-blue-action bg-clip-text text-transparent"
+          data-testid="header-wordmark"
+        >
+          <span>Paytm</span>
+          <span>Flow</span>
         </div>
       </div>
 

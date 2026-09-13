@@ -1,14 +1,14 @@
 import type React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, PlayCircle, FolderOpen, HelpCircle, X } from 'lucide-react';
+import { Home, RotateCw, FileText, HelpCircle, X } from 'lucide-react';
 import { useUiStore } from '../state/ui';
 import { IconButton } from './primitives/IconButton';
 import { cn } from '../lib/utils';
 
 const navItems = [
   { label: 'Home', icon: Home, to: '/' },
-  { label: 'Start Journey', icon: PlayCircle, to: '/start' },
-  { label: 'My Journeys', icon: FolderOpen, to: '/my-journeys' },
+  { label: 'Start Journey', icon: RotateCw, to: '/start' },
+  { label: 'My Journeys', icon: FileText, to: '/my-journeys' },
   { label: 'Help', icon: HelpCircle, to: '/help' },
 ];
 
@@ -43,9 +43,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ hideOnDesktop = false }) => {
       >
         {/* Mobile Header (close button + mobile brand) */}
         <div className="h-header flex items-center justify-between px-4 border-b border-surface-border md:hidden">
-          <div className="font-bold text-xl tracking-tight" data-testid="sidebar-mobile-wordmark">
-            <span className="text-paytm-blue">Paytm</span>
-            <span className="text-content-primary">Flow</span>
+          <div
+            className="font-bold text-xl tracking-tight bg-gradient-to-r from-paytm-blue to-paytm-blue-action bg-clip-text text-transparent"
+            data-testid="sidebar-mobile-wordmark"
+          >
+            <span>Paytm</span>
+            <span>Flow</span>
           </div>
           <IconButton
             icon={<X className="w-5 h-5" />}
@@ -57,9 +60,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ hideOnDesktop = false }) => {
 
         {/* Desktop Wordmark Container */}
         <div className="h-header hidden md:flex items-center px-6 border-b border-surface-border">
-          <div className="font-bold text-xl tracking-tight" data-testid="sidebar-desktop-wordmark">
-            <span className="text-paytm-blue">Paytm</span>
-            <span className="text-content-primary">Flow</span>
+          <div
+            className="font-bold text-xl tracking-tight bg-gradient-to-r from-paytm-blue to-paytm-blue-action bg-clip-text text-transparent"
+            data-testid="sidebar-desktop-wordmark"
+          >
+            <span>Paytm</span>
+            <span>Flow</span>
           </div>
         </div>
 
@@ -74,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ hideOnDesktop = false }) => {
                 cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-button text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-paytm-blue-50 text-paytm-blue-600 font-semibold'
+                    ? 'bg-paytm-blue-action text-content-inverted font-semibold shadow-xs'
                     : 'text-content-secondary hover:bg-surface-hover hover:text-content-primary'
                 )
               }

@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, afterEach } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
+import { server } from '@/mocks/server';
 import { Screen05Recommendation } from '@/screens/Screen05Recommendation';
 import { setOverrideScenario } from '@/mocks/scenarios';
 
@@ -72,7 +74,11 @@ describe('Screen05Recommendation (F16)', () => {
     });
   });
 
-  it('navigates to action route when an alternative is selected', async () => {
+  it('opens the FormActionModal (not the act/:actionId screen) when a FORM-kind alternative is selected', async () => {
+    // "Adjust Loan Tenure" is a FORM-kind action. Per contract, kind tells Dev1 which
+    // UI to open: EVIDENCE -> Screen 6, FORM -> generic action modal rendered from
+    // input_schema, CLARIFICATION -> NeedsReviewCard. Screen 5 already holds the full
+    // ActionOption (incl. input_schema), so FORM opens inline instead of navigating away.
     const user = userEvent.setup();
     renderWithProviders();
 
@@ -85,9 +91,9 @@ describe('Screen05Recommendation (F16)', () => {
     });
     await user.click(selectBtn);
 
-    await waitFor(() => {
-      expect(screen.getByTestId('act-screen')).toBeInTheDocument();
-    });
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Tenure in Months/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('act-screen')).not.toBeInTheDocument();
   });
 
   it('renders DeadEndState when scenario forces deadend', async () => {
@@ -98,6 +104,44 @@ describe('Screen05Recommendation (F16)', () => {
       expect(screen.getByTestId('dead-end-state')).toBeInTheDocument();
       expect(screen.getByText('No Automated Action Available')).toBeInTheDocument();
     });
+  });
+
+  it('routes a CLARIFICATION-kind recommendation to Screen 4, never to the act/:actionId screen', async () => {
+    // Screen 6 (act/:actionId) has no UI for a CLARIFICATION action - per contract,
+    // that kind maps to NeedsReviewCard. Previously "Take Action" navigated to
+    // /j/:id/act/:actionId unconditionally regardless of kind, which would have opened
+    // Screen 6's upload/form screen for a plain clarification question.
+    server.use(
+      http.get('*/api/v1/journeys/:journey_id/recommendation', () => {
+        return HttpResponse.json({
+          snapshot_id: '33333333-3333-3333-3333-333333333333',
+          readiness: 'NEEDS_REVIEW',
+          recommendation: {
+            action_id: 'CLARIFY_MONTHLY_INCOME',
+            title: 'Clarify Monthly Income',
+            kind: 'CLARIFICATION',
+            why: 'Salary credit amount does not match the declared income.',
+            unlocks: [],
+          },
+          alternatives: [],
+          minimum_path_length: 1,
+          source: 'AI_RANKED',
+        });
+      })
+    );
+
+    const user = userEvent.setup();
+    renderWithProviders();
+
+    const ctaBtn = await screen.findByRole('button', {
+      name: /Take action: Clarify Monthly Income/i,
+    });
+    await user.click(ctaBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status-screen')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('act-screen')).not.toBeInTheDocument();
   });
 
   it('strictly contains no prohibited words or claims', async () => {

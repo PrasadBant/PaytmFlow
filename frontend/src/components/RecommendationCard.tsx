@@ -87,7 +87,9 @@ export function RecommendationCard({
         <div className="text-xs text-content-tertiary">
           {action.kind === 'EVIDENCE'
             ? 'PDF, JPEG, or PNG supported (max 10MB)'
-            : 'Fill in requested form parameters'}
+            : action.kind === 'FORM'
+              ? 'Fill in requested form parameters'
+              : 'Answer a quick clarifying question'}
         </div>
 
         <Button
@@ -97,7 +99,7 @@ export function RecommendationCard({
           className="w-full sm:w-auto px-6 font-bold inline-flex items-center gap-2"
           aria-label={`Take action: ${action.title}`}
         >
-          <span>Take Action</span>
+          <span>{action.kind === 'CLARIFICATION' ? 'Review' : 'Take Action'}</span>
           <ArrowRight className="w-4 h-4" />
         </Button>
       </div>

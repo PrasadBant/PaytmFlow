@@ -3,7 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
+import { server } from '@/mocks/server';
 import { Screen04CurrentStatus } from '@/screens/Screen04CurrentStatus';
+import type { components } from '@/api/types.gen';
+
+type JourneyStateResponse = components['schemas']['JourneyStateResponse'];
 
 function renderWithProviders(initialRoute = '/j/11111111-1111-1111-1111-111111111111') {
   const queryClient = new QueryClient({
@@ -117,6 +122,67 @@ describe('Screen04CurrentStatus (F14)', () => {
     // Collapse
     await user.click(toggleButton);
     expect(screen.queryByText('Repayment Tenure')).not.toBeInTheDocument();
+  });
+
+  it('renders NeedsReviewCard for an AMBIGUOUS field on a resumed/navigated-to journey', async () => {
+    // Screen 4 is exactly where resume_screen: NEEDS_REVIEW sends a returning applicant,
+    // and it must surface the pending clarification standalone here - not only right
+    // after the action that caused it (previously only Screen 7/8 wired NeedsReviewCard).
+    const needsReviewJourney: JourneyStateResponse = {
+      journey_id: '11111111-1111-1111-1111-111111111111',
+      journey_type: 'LENDING',
+      schema_version: '1.0.0',
+      snapshot_id: 'cccccccc-3333-3333-3333-333333333333',
+      version_number: 3,
+      readiness: 'NEEDS_REVIEW',
+      status: 'IN_PROGRESS',
+      fields: [
+        {
+          key: 'monthly_income',
+          label: 'Verified Monthly Income',
+          status: 'AMBIGUOUS',
+          explanation: 'Bank statement salary credit differs from declared amount.',
+          ambiguity: {
+            ambiguity_id: 'INCOME_MISMATCH',
+            reason: 'Bank statement reflects ₹80,000 average monthly credit, while salary slip indicates ₹85,000.',
+            question: 'Which amount reflects your recurring monthly net base salary?',
+            answer_type: 'CHOICE',
+            choices: [
+              { value: 85000, label: '₹85,000 (Base Salary with deductions)' },
+              { value: 80000, label: '₹80,000 (Average in-hand deposit)' },
+            ],
+          },
+        },
+        {
+          key: 'pan_verification',
+          label: 'PAN Card Verification',
+          status: 'BLOCKED',
+          explanation: 'PAN required for KYC.',
+          resolve_action_id: 'UPLOAD_PAN',
+          mandatory: true,
+        },
+      ],
+      progress: { completed: 0, pending: 1, blockers: 1, total: 2 },
+      display: { title: 'Personal Loan', summary: '₹5,00,000 · Home Renovation' },
+      updated_at: '2026-09-12T10:10:00Z',
+    };
+
+    server.use(
+      http.get('*/api/v1/journeys/:journey_id', () => HttpResponse.json(needsReviewJourney))
+    );
+
+    renderWithProviders();
+
+    expect(await screen.findByTestId('needs-review-card')).toBeInTheDocument();
+    expect(
+      screen.getByText('Which amount reflects your recurring monthly net base salary?')
+    ).toBeInTheDocument();
+
+    // The AMBIGUOUS field is handled by NeedsReviewCard, not the generic BlockerCard
+    // "Resolve" flow (which offers no targeted clarification question) - it must not
+    // also appear duplicated in Blocked Items.
+    expect(screen.getByText('Blocked Items (1)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Resolve Verified Monthly Income/i })).not.toBeInTheDocument();
   });
 
   it('strictly asserts absence of prohibited words and % character', async () => {
