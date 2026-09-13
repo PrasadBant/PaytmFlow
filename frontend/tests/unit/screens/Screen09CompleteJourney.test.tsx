@@ -108,10 +108,15 @@ describe('Screen09CompleteJourney (F23)', () => {
     expect(await screen.findByTestId('completion-title')).toHaveTextContent('Application Ready!');
     expect(screen.getByText('Verification Complete')).toBeInTheDocument();
     expect(screen.getByText('Snapshot v5')).toBeInTheDocument();
+    // The checklist is the reference's fixed 4-line generic completion summary
+    // (each line is a true corollary of readiness === READY for any pack, not
+    // per-field business data), not a per-field listing.
     expect(screen.getByTestId('verification-checklist-section')).toBeInTheDocument();
-    expect(screen.getByText('Verified Monthly Income')).toBeInTheDocument();
-    expect(screen.getByText('₹85,000')).toBeInTheDocument();
-    expect(screen.getByText('Salary Account Verification')).toBeInTheDocument();
+    expect(screen.getByText('All mandatory fields completed')).toBeInTheDocument();
+    expect(screen.getByText('No blockers remaining')).toBeInTheDocument();
+    expect(screen.getByText('Documents verified')).toBeInTheDocument();
+    expect(screen.getByText('Ready for provider submission')).toBeInTheDocument();
+    expect(screen.queryByText('Verified Monthly Income')).not.toBeInTheDocument();
     expect(screen.getByTestId('proceed-submit-btn')).toBeInTheDocument();
     expect(screen.getByTestId('review-app-btn')).toBeInTheDocument();
   });
@@ -150,6 +155,25 @@ describe('Screen09CompleteJourney (F23)', () => {
     await user.click(reviewBtn);
 
     expect(await screen.findByTestId('screen-04-stub')).toBeInTheDocument();
+  });
+
+  it('renders the identical generic checklist for a completely different pack (no per-pack branching)', async () => {
+    const kycReadyJourney: JourneyStateResponse = {
+      ...mockReadyJourney,
+      journey_type: 'KYC',
+      fields: [
+        { key: 'aadhaar_verified', label: 'Aadhaar Verification', status: 'SATISFIED' },
+      ],
+      display: { title: 'Video & Biometric KYC', summary: 'Wallet Upgrade' },
+    };
+    renderScreen9('/j/11111111-1111-1111-1111-111111111111/complete', kycReadyJourney);
+
+    expect(await screen.findByTestId('completion-title')).toHaveTextContent('Application Ready!');
+    expect(screen.getByText('All mandatory fields completed')).toBeInTheDocument();
+    expect(screen.getByText('No blockers remaining')).toBeInTheDocument();
+    expect(screen.getByText('Documents verified')).toBeInTheDocument();
+    expect(screen.getByText('Ready for provider submission')).toBeInTheDocument();
+    expect(screen.queryByText('Aadhaar Verification')).not.toBeInTheDocument();
   });
 
   it('strictly contains no prohibited words (approv, score, gauge, etc.) or %', async () => {

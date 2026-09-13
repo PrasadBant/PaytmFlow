@@ -35,7 +35,7 @@ describe('Screen03GoalBasicInfo', () => {
     renderWithProviders('/start/lending');
 
     await waitFor(() => {
-      expect(screen.getByText('Personal Loan')).toBeInTheDocument();
+      expect(screen.getByText('Loan / Lending')).toBeInTheDocument();
       expect(screen.getByText('Set Your Loan Goal')).toBeInTheDocument();
     });
 
@@ -56,7 +56,7 @@ describe('Screen03GoalBasicInfo', () => {
     renderWithProviders('/start/insurance');
 
     await waitFor(() => {
-      expect(screen.getByText('Health & Life Insurance')).toBeInTheDocument();
+      expect(screen.getByText('Insurance')).toBeInTheDocument();
       expect(screen.getByText('Insurance Coverage Goal')).toBeInTheDocument();
     });
 
@@ -70,7 +70,7 @@ describe('Screen03GoalBasicInfo', () => {
     renderWithProviders('/start/kyc');
 
     await waitFor(() => {
-      expect(screen.getByText('Video & Biometric KYC')).toBeInTheDocument();
+      expect(screen.getByText('KYC / Onboarding')).toBeInTheDocument();
       expect(screen.getByText('Identity Verification Details')).toBeInTheDocument();
     });
 
@@ -95,7 +95,7 @@ describe('Screen03GoalBasicInfo', () => {
     renderWithProviders('/start/account_opening');
 
     await waitFor(() => {
-      expect(screen.getByText('Savings Account')).toBeInTheDocument();
+      expect(screen.getByText('Account Opening')).toBeInTheDocument();
       expect(screen.getByText('Savings Account Options')).toBeInTheDocument();
     });
 
@@ -107,7 +107,7 @@ describe('Screen03GoalBasicInfo', () => {
     renderWithProviders('/start/investment');
 
     await waitFor(() => {
-      expect(screen.getByText('Mutual Funds & Stocks')).toBeInTheDocument();
+      expect(screen.getByText('Investment / Wealth')).toBeInTheDocument();
       expect(screen.getByText('Investment Portfolio Goal')).toBeInTheDocument();
     });
 
@@ -171,13 +171,13 @@ describe('Screen03GoalBasicInfo', () => {
       expect(screen.getByText('I want to')).toBeInTheDocument();
     });
     expect(
-      screen.getByText('Unlock instant disbursement and optimize required documents.')
+      screen.getByText('Complete your loan application')
     ).toBeInTheDocument();
 
     renderWithProviders('/start/insurance');
     await waitFor(() => {
       expect(
-        screen.getByText('Fast-track policy issuance by validating medical declarations.')
+        screen.getByText('Resume or complete your insurance application')
       ).toBeInTheDocument();
     });
   });
@@ -186,7 +186,7 @@ describe('Screen03GoalBasicInfo', () => {
     renderWithProviders('/start/lending');
 
     await waitFor(() => {
-      expect(screen.getByText('Personal Loan')).toBeInTheDocument();
+      expect(screen.getByText('Loan / Lending')).toBeInTheDocument();
     });
 
     const bodyText = document.body.textContent || '';

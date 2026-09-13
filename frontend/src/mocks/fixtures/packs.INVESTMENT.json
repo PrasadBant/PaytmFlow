@@ -1,7 +1,7 @@
 {
   "journey_type": "INVESTMENT",
-  "display_name": "Mutual Funds & Stocks",
-  "description": "Risk profiling and automated FATCA verification.",
+  "display_name": "Investment / Wealth",
+  "description": "Complete your investment onboarding",
   "icon": "chart",
   "flagship_demo": false,
   "lifecycle_status": "SUPPORTED",
@@ -11,7 +11,11 @@
       "type": "enum",
       "label": "Primary Objective",
       "required": true,
-      "options": ["Long-term Wealth Creation", "Tax Saving ELSS", "Short-term Emergency Fund"]
+      "options": [
+        "Long-term Wealth Creation",
+        "Tax Saving ELSS",
+        "Short-term Emergency Fund"
+      ]
     },
     {
       "key": "monthly_sip_budget",

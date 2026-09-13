@@ -35,7 +35,7 @@ describe('Router & Route Map Suite (F07)', () => {
     renderWithRouter('/start/LENDING');
     await waitFor(() => {
       expect(screen.getByTestId('screen-03-goal-basic-info')).toBeInTheDocument();
-      expect(screen.getByText('Personal Loan')).toBeInTheDocument();
+      expect(screen.getByText('Loan / Lending')).toBeInTheDocument();
     });
   });
 

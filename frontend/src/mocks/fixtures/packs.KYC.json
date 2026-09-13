@@ -1,7 +1,7 @@
 {
   "journey_type": "KYC",
-  "display_name": "Video & Biometric KYC",
-  "description": "Resolve identity ambiguities across government registers.",
+  "display_name": "KYC / Onboarding",
+  "description": "Complete your KYC verification",
   "icon": "id",
   "flagship_demo": false,
   "lifecycle_status": "SUPPORTED",
@@ -18,7 +18,12 @@
       "type": "enum",
       "label": "Verification Purpose",
       "required": true,
-      "options": ["Wallet Upgrade", "Bank Account Opening", "Fastag KYC", "Lending Verification"]
+      "options": [
+        "Wallet Upgrade",
+        "Bank Account Opening",
+        "Fastag KYC",
+        "Lending Verification"
+      ]
     }
   ],
   "ui_labels": {

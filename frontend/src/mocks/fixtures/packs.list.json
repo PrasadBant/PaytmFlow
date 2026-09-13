@@ -2,16 +2,16 @@
   "packs": [
     {
       "journey_type": "LENDING",
-      "display_name": "Personal Loan",
-      "description": "Unlock instant disbursement and optimize required documents.",
+      "display_name": "Loan / Lending",
+      "description": "Complete your loan application",
       "icon": "rupee",
       "flagship_demo": true,
       "lifecycle_status": "SUPPORTED"
     },
     {
       "journey_type": "INSURANCE",
-      "display_name": "Health & Life Insurance",
-      "description": "Fast-track policy issuance by validating medical declarations.",
+      "display_name": "Insurance",
+      "description": "Resume or complete your insurance application",
       "icon": "shield",
       "flagship_demo": false,
       "lifecycle_status": "SUPPORTED"
@@ -19,31 +19,31 @@
     {
       "journey_type": "CREDIT_CARD",
       "display_name": "Credit Card",
-      "description": "Instant card limit determination with income verification.",
+      "description": "Finish your credit card application",
       "icon": "card",
       "flagship_demo": false,
       "lifecycle_status": "SUPPORTED"
     },
     {
       "journey_type": "KYC",
-      "display_name": "Video & Biometric KYC",
-      "description": "Resolve identity ambiguities across government registers.",
+      "display_name": "KYC / Onboarding",
+      "description": "Complete your KYC verification",
       "icon": "id",
       "flagship_demo": false,
       "lifecycle_status": "SUPPORTED"
     },
     {
       "journey_type": "ACCOUNT_OPENING",
-      "display_name": "Savings Account",
-      "description": "Zero balance digital savings account onboarding.",
+      "display_name": "Account Opening",
+      "description": "Resume your account opening journey",
       "icon": "bank",
       "flagship_demo": false,
       "lifecycle_status": "SUPPORTED"
     },
     {
       "journey_type": "INVESTMENT",
-      "display_name": "Mutual Funds & Stocks",
-      "description": "Risk profiling and automated FATCA verification.",
+      "display_name": "Investment / Wealth",
+      "description": "Complete your investment onboarding",
       "icon": "chart",
       "flagship_demo": false,
       "lifecycle_status": "SUPPORTED"

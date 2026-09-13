@@ -145,6 +145,36 @@ describe('Screen10MyJourneys (F24)', () => {
     expect(screen.getByText('No Financial Journeys Found')).toBeInTheDocument();
   });
 
+  it('renders the real display_name/summary/updated_at for every pack - never a hardcoded LENDING fallback', async () => {
+    // This screen previously hardcoded a journey_type-keyed switch of fixed row
+    // titles (e.g. always "Loan / Lending" for LENDING) and a "Personal Loan •
+    // ₹ 5,00,000" fallback whenever `summary` was falsy - both journey-specific
+    // branching AND fabricated business data, ignoring the real (contract-required)
+    // display_name/summary/updated_at fields. Assert a non-LENDING pack renders its
+    // own real values with nothing hardcoded standing in for them.
+    const investmentJourney: JourneyListItem = {
+      journey_id: '99999999-9999-9999-9999-999999999999',
+      journey_type: 'INVESTMENT',
+      display_name: 'Investment / Wealth',
+      icon: 'chart',
+      title: 'Mutual Fund SIP Setup',
+      summary: 'SIP amount ₹10,000 · Equity Fund',
+      status: 'IN_PROGRESS',
+      readiness: 'NOT_READY',
+      progress: { completed: 1, pending: 2, blockers: 0, total: 3 },
+      updated_at: '2026-09-10T08:00:00Z',
+      resume_screen: 'STATUS',
+    };
+
+    renderScreen10('/my-journeys', [investmentJourney]);
+
+    expect(await screen.findByTestId('journey-row-99999999-9999-9999-9999-999999999999')).toBeInTheDocument();
+    expect(screen.getByText('Investment / Wealth')).toBeInTheDocument();
+    expect(screen.getByText('SIP amount ₹10,000 · Equity Fund')).toBeInTheDocument();
+    expect(screen.queryByText(/Personal Loan/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/5,00,000/i)).not.toBeInTheDocument();
+  });
+
   it('strictly contains no prohibited words (approv, score, gauge, etc.) or %', async () => {
     const { container } = renderScreen10();
 

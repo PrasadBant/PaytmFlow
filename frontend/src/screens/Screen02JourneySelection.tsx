@@ -51,38 +51,11 @@ export const Screen02JourneySelection: React.FC = () => {
           {packs.map((pack: JourneyPackSummary) => {
             const Icon = IconMap[pack.icon] || AlertCircle;
             const isDraft = pack.lifecycle_status === 'DRAFT';
-            const isFlagship = pack.flagship_demo || pack.journey_type === 'LENDING';
-
-            // Clean concise title matching reference
-            const referenceTitle =
-              pack.journey_type === 'LENDING'
-                ? 'Loan / Lending'
-                : pack.journey_type === 'INSURANCE'
-                ? 'Insurance'
-                : pack.journey_type === 'CREDIT_CARD'
-                ? 'Credit Card'
-                : pack.journey_type === 'KYC'
-                ? 'KYC / Onboarding'
-                : pack.journey_type === 'ACCOUNT_OPENING'
-                ? 'Account Opening'
-                : pack.journey_type === 'INVESTMENT'
-                ? 'Investment / Wealth'
-                : pack.display_name;
-
-            const referenceDescription =
-              pack.journey_type === 'LENDING'
-                ? 'Complete your loan application'
-                : pack.journey_type === 'INSURANCE'
-                ? 'Resume or complete your insurance application'
-                : pack.journey_type === 'CREDIT_CARD'
-                ? 'Finish your credit card application'
-                : pack.journey_type === 'KYC'
-                ? 'Complete your KYC verification'
-                : pack.journey_type === 'ACCOUNT_OPENING'
-                ? 'Resume your account opening journey'
-                : pack.journey_type === 'INVESTMENT'
-                ? 'Complete your investment onboarding'
-                : pack.description;
+            // `flagship_demo` is a real, required field on JourneyPackSummary -
+            // previously OR'd with a hardcoded `journey_type === 'LENDING'` check,
+            // which was both redundant (LENDING's fixture already sets it true) and
+            // a journey-specific-branching violation.
+            const isFlagship = pack.flagship_demo;
 
             return (
               <Card
@@ -107,17 +80,11 @@ export const Screen02JourneySelection: React.FC = () => {
                 </div>
                 
                 <h2 className="font-bold text-lg text-content-primary mb-1">
-                  {referenceTitle}
-                  {pack.display_name && pack.display_name !== referenceTitle && (
-                    <span className="sr-only"> {pack.display_name}</span>
-                  )}
+                  {pack.display_name}
                 </h2>
-                
+
                 <p className="text-xs sm:text-sm text-content-secondary mb-3 max-w-xs">
-                  {referenceDescription}
-                  {pack.description && pack.description !== referenceDescription && (
-                    <span className="sr-only"> {pack.description}</span>
-                  )}
+                  {pack.description}
                 </p>
 
                 {isFlagship && (

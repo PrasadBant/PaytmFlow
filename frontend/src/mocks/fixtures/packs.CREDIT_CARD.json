@@ -1,7 +1,7 @@
 {
   "journey_type": "CREDIT_CARD",
   "display_name": "Credit Card",
-  "description": "Instant card limit determination with income verification.",
+  "description": "Finish your credit card application",
   "icon": "card",
   "flagship_demo": false,
   "lifecycle_status": "SUPPORTED",
@@ -18,7 +18,12 @@
       "type": "enum",
       "label": "Reward Preference",
       "required": true,
-      "options": ["Cashback", "Travel & Air Miles", "Fuel Surcharge Waiver", "Shopping Vouchers"]
+      "options": [
+        "Cashback",
+        "Travel & Air Miles",
+        "Fuel Surcharge Waiver",
+        "Shopping Vouchers"
+      ]
     },
     {
       "key": "annual_income",
