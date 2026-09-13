@@ -4,6 +4,7 @@ import { ArrowLeft, UploadCloud, FileEdit, HelpCircle, ShieldCheck, CheckCircle2
 import { useJourney } from '@/api/hooks/useJourney';
 import { useRecommendation } from '@/api/hooks/useRecommendation';
 import { useUploadEvidence } from '@/api/hooks/useUploadEvidence';
+import { useApplyAction } from '@/api/hooks/useApplyAction';
 import { EvidenceDropzone } from '@/components/EvidenceDropzone';
 import { SchemaForm } from '@/components/SchemaForm/SchemaForm';
 import { Tabs, type TabItem } from '@/components/primitives/Tabs';
@@ -19,6 +20,17 @@ type ActionOption = components['schemas']['ActionOption'];
 interface LocationState {
   action?: ActionOption;
   snapshotId?: string;
+}
+
+function generateIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 const DEFAULT_MANUAL_SCHEMA: GoalFieldSpec[] = [
@@ -63,6 +75,7 @@ export const Screen06UploadEvidence: React.FC = () => {
   } = useRecommendation(journeyId);
 
   const uploadEvidence = useUploadEvidence();
+  const applyAction = useApplyAction();
 
   // Find action from location state or recommendation response
   const action: ActionOption | undefined =
@@ -120,6 +133,35 @@ export const Screen06UploadEvidence: React.FC = () => {
   const handleManualSubmit = async (values: Record<string, unknown>): Promise<void> => {
     if (!journeyId || !currentSnapshotId) return;
     setSubmitError(null);
+
+    // FORM-kind actions (e.g. "Declare Employment Details", "Accept Loan Agreement
+    // Terms") carry no document to interpret - they are a direct state mutation, not
+    // evidence. Route them straight to POST /actions with the entered field values so
+    // the values the applicant typed are the ones actually applied (per Shared
+    // Contract: POST /evidence is preview-only and never mutates; POST /actions is the
+    // sole mutation endpoint). EVIDENCE-kind actions keep going through the existing
+    // evidence -> AI analysis preview flow below.
+    if (action?.kind === 'FORM') {
+      try {
+        const response = await applyAction.mutateAsync({
+          journeyId,
+          action_id: actionId || action.action_id,
+          expected_snapshot_id: currentSnapshotId,
+          idempotency_key: generateIdempotencyKey(),
+          input: values,
+        });
+
+        navigate(`/j/${journeyId}/updated`, {
+          state: {
+            actionResponse: response,
+            journeyId,
+          },
+        });
+      } catch (err) {
+        setSubmitError(mapErrorToUxAction(err).message);
+      }
+      return;
+    }
 
     try {
       const response = await uploadEvidence.mutateAsync({
@@ -317,9 +359,11 @@ export const Screen06UploadEvidence: React.FC = () => {
 
             <SchemaForm
               schema={manualSchema}
-              submitLabel={uploadEvidence.isPending ? 'Analyzing...' : 'Submit Details →'}
+              submitLabel={
+                uploadEvidence.isPending || applyAction.isPending ? 'Submitting...' : 'Submit Details →'
+              }
               onSubmit={handleManualSubmit}
-              isSubmitting={uploadEvidence.isPending}
+              isSubmitting={uploadEvidence.isPending || applyAction.isPending}
             />
           </Card>
         </div>
