@@ -1,0 +1,31 @@
+{
+  "snapshot_id": "bbbbbbbb-2222-2222-2222-222222222222",
+  "readiness": "NOT_READY",
+  "recommendation": {
+    "action_id": "UPLOAD_BANK_STATEMENT",
+    "title": "Upload 3-Month Bank Statement",
+    "kind": "EVIDENCE",
+    "why": "Verifying recurring salary credits validates cash flow stability.",
+    "unlocks": ["bank_statement", "pan_verification"],
+    "accepts": ["application/pdf"]
+  },
+  "alternatives": [
+    {
+      "action_id": "VERIFY_PAN",
+      "title": "Verify PAN Card",
+      "kind": "FORM",
+      "why": "Validate PAN against central tax database.",
+      "unlocks": ["pan_verification"],
+      "input_schema": [
+        {
+          "key": "pan_number",
+          "type": "text",
+          "label": "Permanent Account Number (PAN)",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "minimum_path_length": 2,
+  "source": "AI_RANKED"
+}

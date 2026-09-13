@@ -1,0 +1,39 @@
+{
+  "snapshot_id": "c1111111-1111-4111-8111-111111111111",
+  "readiness": "NOT_READY",
+  "recommendation": {
+    "action_id": "CONFIRM_DELIVERY_ADDRESS",
+    "title": "Confirm Delivery Address",
+    "kind": "FORM",
+    "why": "Confirm delivery location for physical card dispatch",
+    "unlocks": ["delivery_address_confirmed"],
+    "accepts": null,
+    "input_schema": [
+      {
+        "key": "address_line",
+        "type": "text",
+        "label": "Street Address",
+        "required": true
+      },
+      {
+        "key": "pincode",
+        "type": "text",
+        "label": "PIN Code",
+        "required": true
+      }
+    ]
+  },
+  "alternatives": [
+    {
+      "action_id": "VERIFY_INCOME_CREDIT",
+      "title": "Upload Income Proof",
+      "kind": "EVIDENCE",
+      "why": "Income statement enables higher credit limit assignment",
+      "unlocks": ["income_verified"],
+      "accepts": ["SALARY_SLIP", "BANK_STATEMENT"],
+      "input_schema": null
+    }
+  ],
+  "minimum_path_length": 3,
+  "source": "AI_RANKED"
+}

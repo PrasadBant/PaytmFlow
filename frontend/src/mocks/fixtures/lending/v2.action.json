@@ -1,0 +1,150 @@
+{
+  "journey": {
+    "journey_id": "11111111-1111-1111-1111-111111111111",
+    "session_id": "00000000-0000-0000-0000-000000000001",
+    "journey_type": "LENDING",
+    "version_number": 2,
+    "snapshot_id": "bbbbbbbb-2222-2222-2222-222222222222",
+    "readiness": "NOT_READY",
+    "status": "IN_PROGRESS",
+    "progress": {
+      "completed": 4,
+      "pending": 2,
+      "blockers": 1,
+      "total": 7
+    },
+    "fields": [
+      {
+        "key": "loan_amount",
+        "label": "Loan Amount",
+        "status": "SATISFIED",
+        "value": 500000,
+        "display_value": "₹5,00,000",
+        "explanation": "Target loan requirement established",
+        "mandatory": true
+      },
+      {
+        "key": "tenure_months",
+        "label": "Repayment Tenure",
+        "status": "SATISFIED",
+        "value": 36,
+        "display_value": "36 Months",
+        "explanation": "Chosen loan tenure",
+        "mandatory": true
+      },
+      {
+        "key": "employment_type",
+        "label": "Employment Classification",
+        "status": "SATISFIED",
+        "value": "Salaried",
+        "display_value": "Salaried",
+        "explanation": "Salaried employment declared",
+        "mandatory": true
+      },
+      {
+        "key": "monthly_income",
+        "label": "Verified Monthly Income",
+        "status": "SATISFIED",
+        "value": 85000,
+        "display_value": "₹85,000",
+        "explanation": "Verified from salary slip",
+        "mandatory": true
+      },
+      {
+        "key": "bank_statement",
+        "label": "Salary Account Verification",
+        "status": "BLOCKED",
+        "explanation": "Recent 3-month salary credits required",
+        "resolve_action_id": "UPLOAD_BANK_STATEMENT",
+        "mandatory": true
+      },
+      {
+        "key": "pan_verification",
+        "label": "PAN Card Verification",
+        "status": "BLOCKED",
+        "explanation": "Identity and tax record validation required",
+        "resolve_action_id": "VERIFY_PAN",
+        "mandatory": true
+      },
+      {
+        "key": "current_address",
+        "label": "Current Residential Address",
+        "status": "BLOCKED",
+        "explanation": "Address proof or Aadhaar verification required",
+        "resolve_action_id": "UPLOAD_ADDRESS_PROOF",
+        "mandatory": true
+      }
+    ],
+    "available_actions": ["UPLOAD_BANK_STATEMENT", "VERIFY_PAN"],
+    "history_summary": "Income verification completed via salary slip.",
+    "created_at": "2026-09-12T10:00:00Z",
+    "updated_at": "2026-09-12T10:06:00Z",
+    "resume_screen": "STATUS"
+  },
+  "diff": {
+    "from_version": 1,
+    "to_version": 2,
+    "fields_changed": [
+      {
+        "key": "monthly_income",
+        "label": "Verified Monthly Income",
+        "from_status": "BLOCKED",
+        "to_status": "SATISFIED",
+        "display_value": "₹85,000",
+        "cause": "ACTION:UPLOAD_INCOME_PROOF",
+        "cascaded": false
+      }
+    ],
+    "actions_unlocked": ["UPLOAD_BANK_STATEMENT"],
+    "actions_removed": ["UPLOAD_INCOME_PROOF"],
+    "readiness": {
+      "from": "NOT_READY",
+      "to": "NOT_READY"
+    },
+    "progress": {
+      "from": {
+        "completed": 3,
+        "pending": 3,
+        "blockers": 1,
+        "total": 7
+      },
+      "to": {
+        "completed": 4,
+        "pending": 2,
+        "blockers": 1,
+        "total": 7
+      }
+    }
+  },
+  "next_recommendation": {
+    "snapshot_id": "bbbbbbbb-2222-2222-2222-222222222222",
+    "readiness": "NOT_READY",
+    "recommendation": {
+      "action_id": "UPLOAD_BANK_STATEMENT",
+      "title": "Upload 3-Month Bank Statement",
+      "kind": "EVIDENCE",
+      "why": "Verifying recurring salary credits validates cash flow stability.",
+      "unlocks": ["bank_statement", "pan_verification"],
+      "accepts": ["application/pdf"]
+    },
+    "alternatives": [
+      {
+        "action_id": "VERIFY_PAN",
+        "title": "Verify PAN Card",
+        "kind": "FORM",
+        "why": "Validate PAN against central tax database.",
+        "unlocks": ["pan_verification"],
+        "input_schema": [
+          {
+            "key": "pan_number",
+            "type": "text",
+            "label": "Permanent Account Number (PAN)",
+            "required": true
+          }
+        ]
+      }
+    ],
+    "minimum_path_length": 2,
+    "source": "AI_RANKED"
+  }
+}

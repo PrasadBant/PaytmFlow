@@ -1,0 +1,39 @@
+{
+  "snapshot_id": "d1111111-1111-4111-8111-111111111111",
+  "readiness": "NOT_READY",
+  "recommendation": {
+    "action_id": "PERFORM_AADHAAR_OTP",
+    "title": "Authenticate via Aadhaar OTP",
+    "kind": "FORM",
+    "why": "UIDAI e-KYC extracts verified name, DOB, and address directly",
+    "unlocks": ["aadhaar_xml_verified", "live_selfie_captured"],
+    "accepts": null,
+    "input_schema": [
+      {
+        "key": "aadhaar_number",
+        "type": "text",
+        "label": "12-digit Aadhaar Number",
+        "required": true
+      },
+      {
+        "key": "otp",
+        "type": "text",
+        "label": "UIDAI OTP",
+        "required": true
+      }
+    ]
+  },
+  "alternatives": [
+    {
+      "action_id": "UPLOAD_OFFICIAL_VALID_DOC",
+      "title": "Upload Officially Valid Document (OVD)",
+      "kind": "EVIDENCE",
+      "why": "Alternative manual identity proof via Passport or Voter ID",
+      "unlocks": ["aadhaar_xml_verified"],
+      "accepts": ["PASSPORT", "VOTER_ID", "DRIVING_LICENSE"],
+      "input_schema": null
+    }
+  ],
+  "minimum_path_length": 3,
+  "source": "AI_RANKED"
+}

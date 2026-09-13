@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "ACTION_INVALID",
+    "message": "The selected action is no longer valid for the current journey state.",
+    "details": {
+      "action_id": "UPLOAD_INCOME_PROOF",
+      "reason": "Income is already verified in current snapshot."
+    }
+  }
+}

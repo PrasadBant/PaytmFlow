@@ -1,0 +1,45 @@
+{
+  "snapshot_id": "f1111111-1111-4111-8111-111111111111",
+  "readiness": "NOT_READY",
+  "recommendation": {
+    "action_id": "VERIFY_INVESTOR_IDENTITY",
+    "title": "Verify KRA Mutual Fund KYC",
+    "kind": "FORM",
+    "why": "SEBI requires valid KRA record check before MF investment units can be allotted",
+    "unlocks": ["kra_kyc_status_verified"],
+    "accepts": null,
+    "input_schema": [
+      {
+        "key": "pan_number",
+        "type": "text",
+        "label": "Permanent Account Number (PAN)",
+        "required": true
+      }
+    ]
+  },
+  "alternatives": [
+    {
+      "action_id": "COMPLETE_RISK_ASSESSMENT",
+      "title": "Complete Investor Risk Profiling",
+      "kind": "FORM",
+      "why": "Assess investment horizon and risk appetite",
+      "unlocks": ["risk_profile_assessed"],
+      "accepts": null,
+      "input_schema": [
+        {
+          "key": "risk_tolerance",
+          "type": "enum",
+          "label": "Risk Tolerance Level",
+          "required": true,
+          "options": [
+            { "value": "CONSERVATIVE", "label": "Conservative" },
+            { "value": "MODERATE", "label": "Moderate" },
+            { "value": "AGGRESSIVE", "label": "Aggressive" }
+          ]
+        }
+      ]
+    }
+  ],
+  "minimum_path_length": 3,
+  "source": "AI_RANKED"
+}

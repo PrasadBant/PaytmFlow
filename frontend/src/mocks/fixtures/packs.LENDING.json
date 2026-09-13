@@ -1,0 +1,69 @@
+{
+  "journey_type": "LENDING",
+  "display_name": "Personal Loan",
+  "description": "Unlock instant disbursement and optimize required documents.",
+  "icon": "rupee",
+  "flagship_demo": true,
+  "lifecycle_status": "SUPPORTED",
+  "goal_schema": [
+    {
+      "key": "loan_amount",
+      "type": "money",
+      "label": "Required Loan Amount",
+      "required": true,
+      "placeholder": "e.g. 5,00,000",
+      "min": 10000,
+      "max": 10000000,
+      "help_text": "Enter the amount you wish to borrow."
+    },
+    {
+      "key": "tenure_months",
+      "type": "number",
+      "label": "Desired Tenure (Months)",
+      "required": true,
+      "placeholder": "e.g. 36",
+      "min": 6,
+      "max": 84,
+      "help_text": "Repayment duration in months."
+    },
+    {
+      "key": "employment_type",
+      "type": "enum",
+      "label": "Employment Type",
+      "required": true,
+      "options": ["Salaried", "Self-Employed Professional", "Self-Employed Business"],
+      "help_text": "Select your current employment classification."
+    },
+    {
+      "key": "monthly_income",
+      "type": "money",
+      "label": "Net Monthly Income",
+      "required": true,
+      "placeholder": "e.g. 85,000",
+      "min": 5000,
+      "help_text": "Take-home salary after deductions."
+    },
+    {
+      "key": "pan_number",
+      "type": "text",
+      "label": "Permanent Account Number (PAN)",
+      "required": true,
+      "placeholder": "ABCDE1234F",
+      "help_text": "10-digit alphanumeric PAN."
+    }
+  ],
+  "ui_labels": {
+    "hero_title": "Instant Personal Loan Eligibility Optimization",
+    "hero_subtitle": "Resolve application blockers with automated evidence verification.",
+    "goal_heading": "Set Your Loan Goal",
+    "goal_subtext": "Provide your loan requirement and income profile to begin.",
+    "status_heading": "Your Current Status",
+    "status_subtext": "Review verified fields and outstanding blockers.",
+    "recommendation_heading": "Recommended Next Step",
+    "recommendation_subtext": "Complete this highest-impact action to unlock your application.",
+    "evidence_heading": "Upload Required Evidence",
+    "evidence_subtext": "Supported formats: PDF, JPEG, PNG (up to 10MB).",
+    "completion_heading": "Application Ready!",
+    "completion_subtext": "All application requirements have been satisfied."
+  }
+}

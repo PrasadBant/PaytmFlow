@@ -1,0 +1,63 @@
+{
+  "journey_id": "b1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+  "journey_type": "INSURANCE",
+  "schema_version": "1.0.0",
+  "snapshot_id": "b5555555-5555-4555-8555-555555555555",
+  "version_number": 4,
+  "readiness": "READY",
+  "status": "COMPLETED",
+  "fields": [
+    {
+      "key": "kyc_verified",
+      "label": "Identity Verification",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Verified",
+      "mandatory": true
+    },
+    {
+      "key": "proposer_details",
+      "label": "Proposer Information",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Complete",
+      "mandatory": true
+    },
+    {
+      "key": "medical_declaration",
+      "label": "Good Health Declaration",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Declared",
+      "mandatory": true
+    },
+    {
+      "key": "nominee_registered",
+      "label": "Policy Nominee",
+      "status": "SATISFIED",
+      "value": "Ananya Sharma (Spouse)",
+      "display_value": "Ananya Sharma (Spouse)",
+      "mandatory": true
+    },
+    {
+      "key": "premium_payment_setup",
+      "label": "Premium Payment Mandate",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Active",
+      "mandatory": true
+    }
+  ],
+  "progress": {
+    "completed": 5,
+    "pending": 0,
+    "blockers": 0,
+    "total": 5
+  },
+  "pending_clarification": null,
+  "display": {
+    "title": "Health Insurance Cover",
+    "summary": "₹5,00,000 · Individual Cover"
+  },
+  "updated_at": "2026-03-01T11:20:00Z"
+}

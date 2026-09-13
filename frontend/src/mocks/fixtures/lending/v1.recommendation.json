@@ -1,0 +1,56 @@
+{
+  "snapshot_id": "aaaaaaaa-1111-1111-1111-111111111111",
+  "readiness": "NOT_READY",
+  "recommendation": {
+    "action_id": "UPLOAD_INCOME_PROOF",
+    "title": "Upload Salary Slip",
+    "kind": "EVIDENCE",
+    "why": "Uploading your latest salary slip verifies your net monthly income and unlocks your loan limit calculation.",
+    "unlocks": ["monthly_income", "bank_statement"],
+    "accepts": ["application/pdf", "image/jpeg", "image/png"]
+  },
+  "alternatives": [
+    {
+      "action_id": "SET_LOAN_TENURE",
+      "title": "Adjust Loan Tenure",
+      "kind": "FORM",
+      "why": "Modify repayment tenure to adjust monthly EMI projections.",
+      "unlocks": ["tenure_months"],
+      "input_schema": [
+        {
+          "key": "tenure_months",
+          "type": "number",
+          "label": "Tenure in Months",
+          "required": true,
+          "min": 6,
+          "max": 84
+        }
+      ]
+    },
+    {
+      "action_id": "ADD_EMPLOYMENT_DETAILS",
+      "title": "Update Employer Details",
+      "kind": "FORM",
+      "why": "Add employer name and work experience for faster credit assessment.",
+      "unlocks": ["employment_type"],
+      "input_schema": [
+        {
+          "key": "employer_name",
+          "type": "text",
+          "label": "Company / Employer Name",
+          "required": true
+        },
+        {
+          "key": "experience_years",
+          "type": "number",
+          "label": "Total Work Experience (Years)",
+          "required": true,
+          "min": 0,
+          "max": 40
+        }
+      ]
+    }
+  ],
+  "minimum_path_length": 3,
+  "source": "AI_RANKED"
+}

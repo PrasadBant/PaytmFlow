@@ -1,0 +1,29 @@
+{
+  "journey_type": "INVESTMENT",
+  "display_name": "Mutual Funds & Stocks",
+  "description": "Risk profiling and automated FATCA verification.",
+  "icon": "chart",
+  "flagship_demo": false,
+  "lifecycle_status": "SUPPORTED",
+  "goal_schema": [
+    {
+      "key": "investment_objective",
+      "type": "enum",
+      "label": "Primary Objective",
+      "required": true,
+      "options": ["Long-term Wealth Creation", "Tax Saving ELSS", "Short-term Emergency Fund"]
+    },
+    {
+      "key": "monthly_sip_budget",
+      "type": "money",
+      "label": "Target Monthly SIP",
+      "required": true,
+      "placeholder": "e.g. 10,000",
+      "min": 500
+    }
+  ],
+  "ui_labels": {
+    "goal_heading": "Investment Portfolio Goal",
+    "goal_subtext": "Set your investment parameters and monthly savings goal."
+  }
+}

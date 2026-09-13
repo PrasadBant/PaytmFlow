@@ -1,0 +1,52 @@
+{
+  "packs": [
+    {
+      "journey_type": "LENDING",
+      "display_name": "Personal Loan",
+      "description": "Unlock instant disbursement and optimize required documents.",
+      "icon": "rupee",
+      "flagship_demo": true,
+      "lifecycle_status": "SUPPORTED"
+    },
+    {
+      "journey_type": "INSURANCE",
+      "display_name": "Health & Life Insurance",
+      "description": "Fast-track policy issuance by validating medical declarations.",
+      "icon": "shield",
+      "flagship_demo": false,
+      "lifecycle_status": "SUPPORTED"
+    },
+    {
+      "journey_type": "CREDIT_CARD",
+      "display_name": "Credit Card",
+      "description": "Instant card limit determination with income verification.",
+      "icon": "card",
+      "flagship_demo": false,
+      "lifecycle_status": "SUPPORTED"
+    },
+    {
+      "journey_type": "KYC",
+      "display_name": "Video & Biometric KYC",
+      "description": "Resolve identity ambiguities across government registers.",
+      "icon": "id",
+      "flagship_demo": false,
+      "lifecycle_status": "SUPPORTED"
+    },
+    {
+      "journey_type": "ACCOUNT_OPENING",
+      "display_name": "Savings Account",
+      "description": "Zero balance digital savings account onboarding.",
+      "icon": "bank",
+      "flagship_demo": false,
+      "lifecycle_status": "SUPPORTED"
+    },
+    {
+      "journey_type": "INVESTMENT",
+      "display_name": "Mutual Funds & Stocks",
+      "description": "Risk profiling and automated FATCA verification.",
+      "icon": "chart",
+      "flagship_demo": false,
+      "lifecycle_status": "SUPPORTED"
+    }
+  ]
+}

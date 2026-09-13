@@ -1,0 +1,39 @@
+{
+  "journey_type": "INVESTMENT",
+  "display_name": "Mutual Fund Investment",
+  "description": "SIP and lump-sum investment portfolio setup",
+  "icon": "chart",
+  "flagship_demo": false,
+  "lifecycle_status": "SUPPORTED",
+  "schema_version": "1.0.0",
+  "goal_schema": [
+    {
+      "key": "investment_mode",
+      "type": "enum",
+      "label": "Investment Mode",
+      "required": true,
+      "options": [
+        { "value": "MONTHLY_SIP", "label": "Monthly Systematic Investment (SIP)" },
+        { "value": "ONE_TIME_LUMPSUM", "label": "One-Time Lump Sum" }
+      ]
+    },
+    {
+      "key": "target_amount",
+      "type": "money",
+      "label": "Investment Amount (₹)",
+      "required": true,
+      "min": 500,
+      "max": 1000000
+    }
+  ],
+  "supports_natural_language": false,
+  "ui_labels": {
+    "goal_heading": "Set Investment Goal",
+    "status_heading": "Investment Portfolio Readiness",
+    "status_subtext": "Complete risk profile, mandate, and KYC to start investing",
+    "evidence_heading": "Investor Proofs",
+    "ready_heading": "Portfolio Ready to Transact",
+    "ready_subtext": "Mandate and KYC verified",
+    "recommendation_heading": "Next Step"
+  }
+}

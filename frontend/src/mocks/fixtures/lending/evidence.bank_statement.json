@@ -1,0 +1,29 @@
+{
+  "evidence_id": "33333333-3333-3333-3333-333333333333",
+  "filename": "bank_statement_q3.pdf",
+  "uploaded_at": "2026-09-12T10:10:00Z",
+  "size_bytes": 2841000,
+  "interpretation": {
+    "verified": false,
+    "confidence": 0.78,
+    "detected": [
+      {
+        "key": "monthly_income",
+        "label": "Average Monthly Salary Credits",
+        "display_value": "₹80,000"
+      }
+    ],
+    "summary": "Bank statement parsed. Detected average monthly credit of ₹80,000, which differs slightly from the declared ₹85,000.",
+    "conflicts": [
+      {
+        "ambiguity_id": "INCOME_MISMATCH",
+        "field": "monthly_income",
+        "message": "Bank statement reflects ₹80,000 average monthly credit, while salary slip indicates ₹85,000."
+      }
+    ]
+  },
+  "proposed_action_id": "RESOLVE_INCOME_CLARIFICATION",
+  "consequence_preview": null,
+  "diff_preview": null,
+  "requires_review": true
+}

@@ -1,0 +1,38 @@
+pack: INSURANCE
+family: ALTERNATE_OR_OVERRIDE
+description: "Uses PED exemption declaration instead of medical record uploads"
+initial_goal:
+  sum_insured: 750000
+  policy_type: INDIVIDUAL
+
+steps:
+  - type: action
+    action_id: submit_medical_declaration
+    expected_status_code: 200
+    expected_version: 2
+    expected_completed_count: 2
+
+  - type: action
+    action_id: submit_ped_exemption
+    expected_status_code: 200
+    expected_version: 3
+    expected_completed_count: 3
+
+  - type: action
+    action_id: setup_insurance_mandate
+    expected_status_code: 200
+    expected_version: 4
+    expected_completed_count: 4
+
+  - type: action
+    action_id: schedule_tele_mer
+    expected_status_code: 200
+    expected_version: 5
+    expected_completed_count: 5
+
+  - type: action
+    action_id: accept_insurance_policy
+    expected_status_code: 200
+    expected_version: 6
+    expected_readiness: READY
+    expected_completed_count: 6

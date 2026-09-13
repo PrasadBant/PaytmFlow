@@ -1,0 +1,85 @@
+{
+  "journey_id": "11111111-1111-1111-1111-111111111111",
+  "session_id": "00000000-0000-0000-0000-000000000001",
+  "journey_type": "LENDING",
+  "version_number": 1,
+  "snapshot_id": "aaaaaaaa-1111-1111-1111-111111111111",
+  "readiness": "NOT_READY",
+  "status": "IN_PROGRESS",
+  "progress": {
+    "completed": 3,
+    "pending": 3,
+    "blockers": 1,
+    "total": 7
+  },
+  "fields": [
+    {
+      "key": "loan_amount",
+      "label": "Loan Amount",
+      "status": "SATISFIED",
+      "value": 500000,
+      "display_value": "₹5,00,000",
+      "explanation": "Target loan requirement established",
+      "mandatory": true
+    },
+    {
+      "key": "tenure_months",
+      "label": "Repayment Tenure",
+      "status": "SATISFIED",
+      "value": 36,
+      "display_value": "36 Months",
+      "explanation": "Chosen loan tenure",
+      "mandatory": true
+    },
+    {
+      "key": "employment_type",
+      "label": "Employment Classification",
+      "status": "SATISFIED",
+      "value": "Salaried",
+      "display_value": "Salaried",
+      "explanation": "Salaried employment declared",
+      "mandatory": true
+    },
+    {
+      "key": "monthly_income",
+      "label": "Verified Monthly Income",
+      "status": "BLOCKED",
+      "explanation": "Income proof required to establish loan limit",
+      "resolve_action_id": "UPLOAD_INCOME_PROOF",
+      "mandatory": true
+    },
+    {
+      "key": "bank_statement",
+      "label": "Salary Account Verification",
+      "status": "BLOCKED",
+      "explanation": "Recent 3-month salary credits required",
+      "resolve_action_id": "UPLOAD_BANK_STATEMENT",
+      "mandatory": true
+    },
+    {
+      "key": "pan_verification",
+      "label": "PAN Card Verification",
+      "status": "BLOCKED",
+      "explanation": "Identity and tax record validation required",
+      "resolve_action_id": "VERIFY_PAN",
+      "mandatory": true
+    },
+    {
+      "key": "current_address",
+      "label": "Current Residential Address",
+      "status": "BLOCKED",
+      "explanation": "Address proof or Aadhaar verification required",
+      "resolve_action_id": "UPLOAD_ADDRESS_PROOF",
+      "mandatory": true
+    }
+  ],
+  "available_actions": ["UPLOAD_INCOME_PROOF", "SET_LOAN_TENURE", "ADD_EMPLOYMENT_DETAILS"],
+  "history_summary": "Journey initialized with goal criteria.",
+  "created_at": "2026-09-12T10:00:00Z",
+  "updated_at": "2026-09-12T10:00:00Z",
+  "ui_labels": {
+    "status_heading": "Your Current Status",
+    "status_subtext": "Complete the highlighted actions to unlock full loan disbursement."
+  },
+  "resume_screen": "STATUS"
+}

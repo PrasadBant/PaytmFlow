@@ -1,0 +1,42 @@
+pack: CREDIT_CARD
+family: GOLDEN
+description: "Golden path for Credit Card application to READY status"
+initial_goal:
+  card_variant: CASHBACK
+  credit_limit_preference: 100000
+
+steps:
+  - type: action
+    action_id: upload_salary_statement
+    expected_status_code: 200
+    expected_version: 2
+    expected_readiness: NOT_READY
+    expected_completed_count: 2
+
+  - type: action
+    action_id: verify_employment_details
+    expected_status_code: 200
+    expected_version: 3
+    expected_readiness: NOT_READY
+    expected_completed_count: 3
+
+  - type: action
+    action_id: verify_utility_bill
+    expected_status_code: 200
+    expected_version: 4
+    expected_readiness: NOT_READY
+    expected_completed_count: 4
+
+  - type: action
+    action_id: confirm_dispatch_address
+    expected_status_code: 200
+    expected_version: 5
+    expected_readiness: NOT_READY
+    expected_completed_count: 5
+
+  - type: action
+    action_id: sign_cardholder_agreement
+    expected_status_code: 200
+    expected_version: 6
+    expected_readiness: READY
+    expected_completed_count: 6

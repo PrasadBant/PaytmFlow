@@ -1,0 +1,47 @@
+pack: CREDIT_CARD
+family: AMBIGUITY_CONFLICT
+description: "Resolves address match ambiguity through explicit clarification"
+initial_goal:
+  card_variant: TRAVEL
+  credit_limit_preference: 150000
+
+steps:
+  - type: action
+    action_id: verify_utility_bill
+    expected_status_code: 200
+    expected_version: 2
+
+  - type: inject_ambiguity
+    ambiguity_id: AMB_ADDRESS_MATCH
+    field: current_address_verified
+    reason: Address proof document name differs from applicant
+    question: Is the utility bill in the name of your spouse or family member?
+    answer_type: CHOICE
+
+  - type: clarification
+    ambiguity_id: AMB_ADDRESS_MATCH
+    field: current_address_verified
+    answer: FAMILY_OWNED
+    expected_status_code: 200
+    expected_version: 4
+
+  - type: action
+    action_id: confirm_dispatch_address
+    expected_status_code: 200
+    expected_version: 5
+
+  - type: action
+    action_id: upload_salary_statement
+    expected_status_code: 200
+    expected_version: 6
+
+  - type: action
+    action_id: verify_employment_details
+    expected_status_code: 200
+    expected_version: 7
+
+  - type: action
+    action_id: sign_cardholder_agreement
+    expected_status_code: 200
+    expected_version: 8
+    expected_readiness: READY

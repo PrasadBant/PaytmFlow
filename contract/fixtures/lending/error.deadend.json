@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "DEAD_END",
+    "message": "We are unable to proceed with your loan request based on the criteria provided. Please explore alternate offerings.",
+    "details": {
+      "reason": "Minimum income threshold not met for the requested loan tier"
+    }
+  }
+}

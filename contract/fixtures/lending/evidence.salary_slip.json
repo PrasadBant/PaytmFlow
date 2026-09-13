@@ -1,0 +1,87 @@
+{
+  "evidence_id": "e1111111-2222-4333-8444-555555555555",
+  "filename": "salary_slip_feb_2026.pdf",
+  "uploaded_at": "2026-03-01T10:05:00Z",
+  "size_bytes": 245760,
+  "interpretation": {
+    "verified": true,
+    "confidence": 0.92,
+    "detected": [
+      {
+        "key": "monthly_income",
+        "label": "Net Monthly Salary",
+        "display_value": "₹85,000"
+      },
+      {
+        "key": "employer_name",
+        "label": "Employer Name",
+        "display_value": "Acme Technologies India Pvt Ltd"
+      }
+    ],
+    "summary": "Verified February 2026 salary slip from Acme Technologies with net credited salary ₹85,000.",
+    "conflicts": []
+  },
+  "proposed_action_id": "UPLOAD_INCOME_PROOF",
+  "consequence_preview": {
+    "newly_satisfied": [
+      { "key": "monthly_income", "label": "Monthly Net Income" }
+    ],
+    "newly_unlocked": [
+      { "action_id": "SUBMIT_EMPLOYMENT_INFO", "title": "Declare Employment Details" }
+    ],
+    "still_blocked": [
+      { "key": "employment_type", "label": "Employment Category" },
+      { "key": "employer_name", "label": "Current Employer" },
+      { "key": "loan_offer_accepted", "label": "Final Loan Agreement" }
+    ],
+    "predicted_readiness": "NOT_READY",
+    "progress_before": {
+      "completed": 3,
+      "pending": 4,
+      "blockers": 3,
+      "total": 7
+    },
+    "progress_after": {
+      "completed": 4,
+      "pending": 3,
+      "blockers": 2,
+      "total": 7
+    }
+  },
+  "diff_preview": {
+    "from_version": 1,
+    "to_version": 2,
+    "fields_changed": [
+      {
+        "key": "monthly_income",
+        "label": "Monthly Net Income",
+        "from_status": "BLOCKED",
+        "to_status": "SATISFIED",
+        "display_value": "₹85,000",
+        "cause": "ACTION:UPLOAD_INCOME_PROOF",
+        "cascaded": false
+      }
+    ],
+    "actions_unlocked": ["SUBMIT_EMPLOYMENT_INFO"],
+    "actions_removed": ["UPLOAD_INCOME_PROOF"],
+    "readiness": {
+      "from": "NOT_READY",
+      "to": "NOT_READY"
+    },
+    "progress": {
+      "from": {
+        "completed": 3,
+        "pending": 4,
+        "blockers": 3,
+        "total": 7
+      },
+      "to": {
+        "completed": 4,
+        "pending": 3,
+        "blockers": 2,
+        "total": 7
+      }
+    }
+  },
+  "requires_review": false
+}

@@ -1,0 +1,141 @@
+{
+  "journey": {
+    "journey_id": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+    "journey_type": "LENDING",
+    "schema_version": "1.0.0",
+    "snapshot_id": "44444444-4444-4444-8444-444444444444",
+    "version_number": 4,
+    "readiness": "NOT_READY",
+    "status": "IN_PROGRESS",
+    "fields": [
+      {
+        "key": "kyc_verified",
+        "label": "Identity & KYC Status",
+        "status": "SATISFIED",
+        "value": true,
+        "display_value": "Verified",
+        "mandatory": true
+      },
+      {
+        "key": "pan_validated",
+        "label": "PAN Card Validation",
+        "status": "SATISFIED",
+        "value": "ABCDE1234F",
+        "display_value": "ABCDE1234F",
+        "mandatory": true
+      },
+      {
+        "key": "bank_account_linked",
+        "label": "Primary Bank Account",
+        "status": "SATISFIED",
+        "value": "HDFC0001234",
+        "display_value": "HDFC Bank ··· 1234",
+        "mandatory": true
+      },
+      {
+        "key": "monthly_income",
+        "label": "Monthly Net Income",
+        "status": "SATISFIED",
+        "value": 85000,
+        "display_value": "₹85,000",
+        "mandatory": true
+      },
+      {
+        "key": "employment_type",
+        "label": "Employment Category",
+        "status": "SATISFIED",
+        "value": "SALARIED",
+        "display_value": "Salaried",
+        "mandatory": true
+      },
+      {
+        "key": "employer_name",
+        "label": "Current Employer",
+        "status": "SATISFIED",
+        "value": "Acme Technologies India Pvt Ltd",
+        "display_value": "Acme Technologies India Pvt Ltd",
+        "mandatory": true
+      },
+      {
+        "key": "loan_offer_accepted",
+        "label": "Final Loan Agreement",
+        "status": "BLOCKED",
+        "value": false,
+        "display_value": "Pending",
+        "explanation": "Accept loan agreement terms to finalize",
+        "resolve_action_id": "ACCEPT_LOAN_TERMS",
+        "mandatory": true
+      }
+    ],
+    "progress": {
+      "completed": 6,
+      "pending": 1,
+      "blockers": 1,
+      "total": 7
+    },
+    "pending_clarification": null,
+    "display": {
+      "title": "Personal Loan",
+      "summary": "₹2,00,000 · Home Renovation"
+    },
+    "updated_at": "2026-03-01T10:15:00Z"
+  },
+  "diff": {
+    "from_version": 3,
+    "to_version": 4,
+    "fields_changed": [
+      {
+        "key": "monthly_income",
+        "label": "Monthly Net Income",
+        "from_status": "AMBIGUOUS",
+        "to_status": "SATISFIED",
+        "display_value": "₹85,000",
+        "cause": "CLARIFICATION:INCOME_MISMATCH",
+        "cascaded": false
+      }
+    ],
+    "actions_unlocked": ["ACCEPT_LOAN_TERMS"],
+    "actions_removed": [],
+    "readiness": {
+      "from": "NEEDS_REVIEW",
+      "to": "NOT_READY"
+    },
+    "progress": {
+      "from": {
+        "completed": 5,
+        "pending": 2,
+        "blockers": 2,
+        "total": 7
+      },
+      "to": {
+        "completed": 6,
+        "pending": 1,
+        "blockers": 1,
+        "total": 7
+      }
+    }
+  },
+  "next_recommendation": {
+    "snapshot_id": "44444444-4444-4444-8444-444444444444",
+    "readiness": "NOT_READY",
+    "recommendation": {
+      "action_id": "ACCEPT_LOAN_TERMS",
+      "title": "Accept Loan Agreement Terms",
+      "kind": "FORM",
+      "why": "Accept finalized loan rate of 11.5% p.a. and ₹9,320 monthly EMI to complete application",
+      "unlocks": ["loan_offer_accepted"],
+      "accepts": null,
+      "input_schema": [
+        {
+          "key": "accept_terms",
+          "type": "boolean",
+          "label": "I agree to the loan agreement and repayment terms",
+          "required": true
+        }
+      ]
+    },
+    "alternatives": [],
+    "minimum_path_length": 1,
+    "source": "AI_RANKED"
+  }
+}

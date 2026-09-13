@@ -1,0 +1,39 @@
+{
+  "journey_id": "66666666-6666-6666-6666-666666666666",
+  "session_id": "00000000-0000-0000-0000-000000000001",
+  "journey_type": "INVESTMENT",
+  "version_number": 1,
+  "snapshot_id": "jjjjjjjj-1111-1111-1111-111111111111",
+  "readiness": "NOT_READY",
+  "status": "IN_PROGRESS",
+  "progress": {
+    "completed": 2,
+    "pending": 2,
+    "blockers": 1,
+    "total": 5
+  },
+  "fields": [
+    {
+      "key": "investment_objective",
+      "label": "Investment Objective",
+      "status": "SATISFIED",
+      "value": "Long-term Wealth Creation",
+      "display_value": "Long-term Wealth Creation",
+      "explanation": "Investment profile mapped",
+      "mandatory": true
+    },
+    {
+      "key": "fatca_declaration",
+      "label": "FATCA & Tax Residency Declaration",
+      "status": "BLOCKED",
+      "explanation": "Mandatory tax declaration for SEBI compliance",
+      "resolve_action_id": "SUBMIT_FATCA",
+      "mandatory": true
+    }
+  ],
+  "available_actions": ["SUBMIT_FATCA"],
+  "history_summary": "Investment journey initialized.",
+  "created_at": "2026-09-12T10:00:00Z",
+  "updated_at": "2026-09-12T10:00:00Z",
+  "resume_screen": "STATUS"
+}

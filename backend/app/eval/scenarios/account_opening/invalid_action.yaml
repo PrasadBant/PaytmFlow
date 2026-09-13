@@ -1,0 +1,23 @@
+pack: ACCOUNT_OPENING
+family: INVALID_ACTION
+description: "Verifies rejection of invalid actions and ensures journey integrity"
+initial_goal:
+  account_type: DIGITAL_SAVINGS
+  initial_deposit: 5000
+
+steps:
+  - type: action
+    action_id: accept_banking_terms
+    expected_status_code: 422
+    expected_error_code: ACTION_INVALID
+
+  - type: action
+    action_id: complete_video_kyc
+    expected_status_code: 422
+    expected_error_code: ACTION_INVALID
+
+  - type: action
+    action_id: verify_pan_for_banking
+    expected_status_code: 200
+    expected_version: 2
+    expected_completed_count: 2

@@ -1,0 +1,42 @@
+{
+  "journey_id": "11111111-1111-1111-1111-111111111111",
+  "session_id": "00000000-0000-0000-0000-000000000001",
+  "journey_type": "LENDING",
+  "version_number": 3,
+  "snapshot_id": "eeeeeeee-5555-5555-5555-555555555555",
+  "readiness": "DEAD_END",
+  "status": "COMPLETED",
+  "progress": {
+    "completed": 2,
+    "pending": 0,
+    "blockers": 2,
+    "total": 7
+  },
+  "fields": [
+    {
+      "key": "monthly_income",
+      "label": "Verified Monthly Income",
+      "status": "BLOCKED",
+      "value": 4000,
+      "display_value": "₹4,000",
+      "explanation": "Monthly income is below the minimum partner lender threshold of ₹15,000.",
+      "mandatory": true
+    },
+    {
+      "key": "cibil_score",
+      "label": "Bureau Record",
+      "status": "BLOCKED",
+      "explanation": "Active defaults detected on external bureau register.",
+      "mandatory": true
+    }
+  ],
+  "available_actions": [],
+  "history_summary": "Application cannot proceed with current parameters due to regulatory/lender constraints.",
+  "created_at": "2026-09-12T10:00:00Z",
+  "updated_at": "2026-09-12T10:12:00Z",
+  "ui_labels": {
+    "status_heading": "Application Unable to Proceed",
+    "status_subtext": "You may explore alternative entry-level products or reapply after 90 days."
+  },
+  "resume_screen": "STATUS"
+}

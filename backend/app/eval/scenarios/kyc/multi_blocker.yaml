@@ -1,0 +1,44 @@
+pack: KYC
+family: MULTI_BLOCKER
+description: "Resolves biometric, document, and database verification blockers"
+initial_goal:
+  kyc_purpose: LIMIT_UPGRADE
+
+steps:
+  - type: check_recommendation
+    expected_recommended_action_id:
+      - link_pan_record
+      - upload_passport_ovd
+      - upload_voter_id_ovd
+      - capture_liveness_selfie
+
+  - type: action
+    action_id: capture_liveness_selfie
+    expected_status_code: 200
+    expected_version: 2
+    expected_completed_count: 2
+
+  - type: action
+    action_id: validate_gps_location
+    expected_status_code: 200
+    expected_version: 3
+    expected_completed_count: 3
+
+  - type: action
+    action_id: upload_passport_ovd
+    expected_status_code: 200
+    expected_version: 4
+    expected_completed_count: 4
+
+  - type: action
+    action_id: link_pan_record
+    expected_status_code: 200
+    expected_version: 5
+    expected_completed_count: 5
+
+  - type: action
+    action_id: sign_rekyc_undertaking
+    expected_status_code: 200
+    expected_version: 6
+    expected_readiness: READY
+    expected_completed_count: 6

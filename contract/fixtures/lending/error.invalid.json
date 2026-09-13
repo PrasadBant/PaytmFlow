@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "ACTION_INVALID",
+    "message": "The selected action is not applicable in the current journey state",
+    "details": {
+      "action_id": "ACCEPT_LOAN_TERMS",
+      "reason": "Preconditions not satisfied: monthly_income and employment_type must be satisfied first"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+pack: LENDING
+family: GOLDEN
+description: "Golden happy path for Personal Loan journey from v1 to READY"
+initial_goal:
+  loan_amount: 200000
+  loan_purpose: HOME_RENOVATION
+  tenure_months: 24
+
+steps:
+  - type: action
+    action_id: UPLOAD_INCOME_PROOF
+    input:
+      monthly_income: 85000
+    expected_status_code: 200
+    expected_version: 2
+    expected_readiness: NOT_READY
+    expected_completed_count: 4
+
+  - type: action
+    action_id: SUBMIT_EMPLOYMENT_INFO
+    input:
+      employment_type: SALARIED
+    expected_status_code: 200
+    expected_version: 3
+    expected_readiness: NOT_READY
+    expected_completed_count: 5
+
+  - type: action
+    action_id: VERIFY_EMPLOYER_RECORD
+    input:
+      employer_name: Acme Technologies India Pvt Ltd
+    expected_status_code: 200
+    expected_version: 4
+    expected_readiness: NOT_READY
+    expected_completed_count: 6
+
+  - type: action
+    action_id: ACCEPT_LOAN_TERMS
+    input:
+      accept_terms: true
+    expected_status_code: 200
+    expected_version: 5
+    expected_readiness: READY
+    expected_completed_count: 7

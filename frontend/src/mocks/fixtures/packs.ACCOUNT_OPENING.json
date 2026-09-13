@@ -1,0 +1,27 @@
+{
+  "journey_type": "ACCOUNT_OPENING",
+  "display_name": "Savings Account",
+  "description": "Zero balance digital savings account onboarding.",
+  "icon": "bank",
+  "flagship_demo": false,
+  "lifecycle_status": "SUPPORTED",
+  "goal_schema": [
+    {
+      "key": "account_variant",
+      "type": "enum",
+      "label": "Account Type",
+      "required": true,
+      "options": ["Digital Savings Zero Balance", "Salary Advantage", "Premium Wealth Savings"]
+    },
+    {
+      "key": "nominee_required",
+      "type": "boolean",
+      "label": "Add Nominee Now",
+      "required": false
+    }
+  ],
+  "ui_labels": {
+    "goal_heading": "Savings Account Options",
+    "goal_subtext": "Select your account type and basic preferences."
+  }
+}

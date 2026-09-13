@@ -1,0 +1,35 @@
+{
+  "journey_type": "CREDIT_CARD",
+  "display_name": "Credit Card",
+  "description": "Instant card limit determination with income verification.",
+  "icon": "card",
+  "flagship_demo": false,
+  "lifecycle_status": "SUPPORTED",
+  "goal_schema": [
+    {
+      "key": "monthly_spend_estimate",
+      "type": "money",
+      "label": "Estimated Monthly Spend",
+      "required": true,
+      "placeholder": "e.g. 40,000"
+    },
+    {
+      "key": "preferred_reward_type",
+      "type": "enum",
+      "label": "Reward Preference",
+      "required": true,
+      "options": ["Cashback", "Travel & Air Miles", "Fuel Surcharge Waiver", "Shopping Vouchers"]
+    },
+    {
+      "key": "annual_income",
+      "type": "money",
+      "label": "Gross Annual Income",
+      "required": true,
+      "placeholder": "e.g. 9,00,000"
+    }
+  ],
+  "ui_labels": {
+    "goal_heading": "Credit Card Preferences",
+    "goal_subtext": "Choose your card category and specify your income profile."
+  }
+}

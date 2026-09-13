@@ -1,0 +1,44 @@
+pack: INVESTMENT
+family: MULTI_BLOCKER
+description: "Resolves KRA KYC, risk profile, and bank mandate in topological order"
+initial_goal:
+  investment_mode: ONE_TIME_LUMPSUM
+  target_amount: 25000
+
+steps:
+  - type: check_recommendation
+    expected_recommended_action_id:
+      - check_kra_status
+      - upload_cancelled_cheque
+      - link_upi_penny_drop
+
+  - type: action
+    action_id: upload_cancelled_cheque
+    expected_status_code: 200
+    expected_version: 2
+    expected_completed_count: 2
+
+  - type: action
+    action_id: register_enach_mandate
+    expected_status_code: 200
+    expected_version: 3
+    expected_completed_count: 3
+
+  - type: action
+    action_id: check_kra_status
+    expected_status_code: 200
+    expected_version: 4
+    expected_completed_count: 4
+
+  - type: action
+    action_id: complete_risk_questionnaire
+    expected_status_code: 200
+    expected_version: 5
+    expected_completed_count: 5
+
+  - type: action
+    action_id: sign_investment_declaration
+    expected_status_code: 200
+    expected_version: 6
+    expected_readiness: READY
+    expected_completed_count: 6

@@ -1,0 +1,44 @@
+pack: LENDING
+family: AMBIGUITY_CONFLICT
+description: "Handles ambiguity conflict via single-field clarification"
+initial_goal:
+  loan_amount: 200000
+  loan_purpose: HOME_RENOVATION
+  tenure_months: 24
+
+steps:
+  - type: action
+    action_id: UPLOAD_INCOME_PROOF
+    input:
+      monthly_income: 85000
+    expected_status_code: 200
+    expected_version: 2
+
+  - type: inject_ambiguity
+    ambiguity_id: EMPLOYER_UNVERIFIED
+    field: employer_name
+    reason: Employer organization name could not be automatically matched
+    question: Please confirm the registered corporate name of your employer
+    answer_type: TEXT
+
+  - type: clarification
+    ambiguity_id: EMPLOYER_UNVERIFIED
+    field: employer_name
+    answer: Acme Technologies India Pvt Ltd
+    expected_status_code: 200
+    expected_version: 4
+
+  - type: action
+    action_id: SUBMIT_EMPLOYMENT_INFO
+    input:
+      employment_type: SALARIED
+    expected_status_code: 200
+    expected_version: 5
+
+  - type: action
+    action_id: ACCEPT_LOAN_TERMS
+    input:
+      accept_terms: true
+    expected_status_code: 200
+    expected_version: 6
+    expected_readiness: READY

@@ -1,0 +1,87 @@
+{
+  "journey_id": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+  "journey_type": "LENDING",
+  "schema_version": "1.0.0",
+  "snapshot_id": "11111111-1111-4111-8111-111111111111",
+  "version_number": 1,
+  "readiness": "NOT_READY",
+  "status": "IN_PROGRESS",
+  "fields": [
+    {
+      "key": "kyc_verified",
+      "label": "Identity & KYC Status",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Verified",
+      "mandatory": true
+    },
+    {
+      "key": "pan_validated",
+      "label": "PAN Card Validation",
+      "status": "SATISFIED",
+      "value": "ABCDE1234F",
+      "display_value": "ABCDE1234F",
+      "mandatory": true
+    },
+    {
+      "key": "bank_account_linked",
+      "label": "Primary Bank Account",
+      "status": "SATISFIED",
+      "value": "HDFC0001234",
+      "display_value": "HDFC Bank ··· 1234",
+      "mandatory": true
+    },
+    {
+      "key": "monthly_income",
+      "label": "Monthly Net Income",
+      "status": "BLOCKED",
+      "value": null,
+      "display_value": "Pending",
+      "explanation": "Upload recent salary slip or bank statement showing regular salary credits",
+      "resolve_action_id": "UPLOAD_INCOME_PROOF",
+      "mandatory": true
+    },
+    {
+      "key": "employment_type",
+      "label": "Employment Category",
+      "status": "BLOCKED",
+      "value": null,
+      "display_value": "Pending",
+      "explanation": "Confirm salaried or self-employed status",
+      "resolve_action_id": "SUBMIT_EMPLOYMENT_INFO",
+      "mandatory": true
+    },
+    {
+      "key": "employer_name",
+      "label": "Current Employer",
+      "status": "BLOCKED",
+      "value": null,
+      "display_value": "Pending",
+      "explanation": "Depends on verified employment category",
+      "resolve_action_id": "SUBMIT_EMPLOYMENT_INFO",
+      "mandatory": true
+    },
+    {
+      "key": "loan_offer_accepted",
+      "label": "Final Loan Agreement",
+      "status": "BLOCKED",
+      "value": false,
+      "display_value": "Pending",
+      "explanation": "Accept loan terms once all prior verifications pass",
+      "resolve_action_id": "ACCEPT_LOAN_TERMS",
+      "mandatory": true
+    }
+  ],
+  "progress": {
+    "completed": 3,
+    "pending": 4,
+    "blockers": 3,
+    "total": 7
+  },
+  "pending_clarification": null,
+  "display": {
+    "title": "Personal Loan",
+    "summary": "₹2,00,000 · Home Renovation"
+  },
+  "updated_at": "2026-03-01T10:00:00Z"
+}

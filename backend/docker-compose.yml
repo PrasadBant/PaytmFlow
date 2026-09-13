@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: paytmflow-postgres
+    environment:
+      POSTGRES_DB: paytmflow
+      POSTGRES_USER: paytmflow
+      POSTGRES_PASSWORD: paytmflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paytmflow -d paytmflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: paytmflow-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://paytmflow:paytmflow@postgres:5432/paytmflow
+      APP_ENV: local
+      SESSION_SECRET: change-me-32-bytes-minimum-session-secret-key
+      DEMO_RESET_SECRET: change-me-demo-reset-secret
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+      AI_PROVIDER: mock
+      EVIDENCE_STORAGE_DIR: ./storage/evidence
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  postgres_data:
+  evidence_data:

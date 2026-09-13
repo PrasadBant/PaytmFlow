@@ -1,0 +1,23 @@
+pack: INVESTMENT
+family: INVALID_ACTION
+description: "Verifies rejection of invalid actions and ensures journey integrity"
+initial_goal:
+  investment_mode: MONTHLY_SIP
+  target_amount: 5000
+
+steps:
+  - type: action
+    action_id: sign_investment_declaration
+    expected_status_code: 422
+    expected_error_code: ACTION_INVALID
+
+  - type: action
+    action_id: register_enach_mandate
+    expected_status_code: 422
+    expected_error_code: ACTION_INVALID
+
+  - type: action
+    action_id: check_kra_status
+    expected_status_code: 200
+    expected_version: 2
+    expected_completed_count: 2

@@ -1,0 +1,32 @@
+{
+  "journey_type": "KYC",
+  "display_name": "Full KYC Re-verification",
+  "description": "RBI-mandated periodic customer identity update",
+  "icon": "id",
+  "flagship_demo": false,
+  "lifecycle_status": "SUPPORTED",
+  "schema_version": "1.0.0",
+  "goal_schema": [
+    {
+      "key": "kyc_purpose",
+      "type": "enum",
+      "label": "Purpose of Re-verification",
+      "required": true,
+      "options": [
+        { "value": "PERIODIC_UPDATE", "label": "Periodic Re-KYC Update" },
+        { "value": "LIMIT_UPGRADE", "label": "Wallet Limit Upgrade" },
+        { "value": "ADDRESS_CHANGE", "label": "Communication Address Change" }
+      ]
+    }
+  ],
+  "supports_natural_language": false,
+  "ui_labels": {
+    "goal_heading": "Start KYC Verification",
+    "status_heading": "Identity Verification Status",
+    "status_subtext": "Complete biometric / document verification steps",
+    "evidence_heading": "OVD Documents",
+    "ready_heading": "KYC Completed",
+    "ready_subtext": "Identity successfully verified",
+    "recommendation_heading": "Next Verification Item"
+  }
+}

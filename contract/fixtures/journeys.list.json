@@ -1,0 +1,112 @@
+{
+  "journeys": [
+    {
+      "journey_id": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+      "journey_type": "LENDING",
+      "display_name": "Personal Loan",
+      "icon": "rupee",
+      "title": "Personal Loan",
+      "summary": "₹2,00,000 · Home Renovation",
+      "status": "IN_PROGRESS",
+      "readiness": "NOT_READY",
+      "progress": {
+        "completed": 3,
+        "pending": 4,
+        "blockers": 3,
+        "total": 7
+      },
+      "updated_at": "2026-03-01T10:00:00Z",
+      "resume_screen": "STATUS"
+    },
+    {
+      "journey_id": "b1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+      "journey_type": "INSURANCE",
+      "display_name": "Health Insurance",
+      "icon": "shield",
+      "title": "Health Insurance Cover",
+      "summary": "₹5,00,000 · Individual Cover",
+      "status": "IN_PROGRESS",
+      "readiness": "NOT_READY",
+      "progress": {
+        "completed": 2,
+        "pending": 3,
+        "blockers": 2,
+        "total": 5
+      },
+      "updated_at": "2026-03-01T11:00:00Z",
+      "resume_screen": "RECOMMENDATION"
+    },
+    {
+      "journey_id": "c1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+      "journey_type": "CREDIT_CARD",
+      "display_name": "Credit Card",
+      "icon": "card",
+      "title": "Cashback Credit Card",
+      "summary": "Paytm Cashback Pro",
+      "status": "COMPLETED",
+      "readiness": "READY",
+      "progress": {
+        "completed": 5,
+        "pending": 0,
+        "blockers": 0,
+        "total": 5
+      },
+      "updated_at": "2026-03-01T12:25:00Z",
+      "resume_screen": "COMPLETE"
+    },
+    {
+      "journey_id": "d1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+      "journey_type": "KYC",
+      "display_name": "Full KYC Re-verification",
+      "icon": "id",
+      "title": "Full KYC Re-verification",
+      "summary": "Periodic Re-KYC Update",
+      "status": "IN_PROGRESS",
+      "readiness": "NEEDS_REVIEW",
+      "progress": {
+        "completed": 2,
+        "pending": 3,
+        "blockers": 2,
+        "total": 5
+      },
+      "updated_at": "2026-03-01T13:00:00Z",
+      "resume_screen": "NEEDS_REVIEW"
+    },
+    {
+      "journey_id": "e1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+      "journey_type": "ACCOUNT_OPENING",
+      "display_name": "Savings Account",
+      "icon": "bank",
+      "title": "Savings Bank Account",
+      "summary": "Digital Savings Account",
+      "status": "IN_PROGRESS",
+      "readiness": "NOT_READY",
+      "progress": {
+        "completed": 2,
+        "pending": 3,
+        "blockers": 2,
+        "total": 5
+      },
+      "updated_at": "2026-03-01T14:00:00Z",
+      "resume_screen": "STATUS"
+    },
+    {
+      "journey_id": "f1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+      "journey_type": "INVESTMENT",
+      "display_name": "Mutual Fund Investment",
+      "icon": "chart",
+      "title": "Mutual Fund Portfolio",
+      "summary": "Monthly SIP · ₹5,000",
+      "status": "COMPLETED",
+      "readiness": "READY",
+      "progress": {
+        "completed": 5,
+        "pending": 0,
+        "blockers": 0,
+        "total": 5
+      },
+      "updated_at": "2026-03-01T15:20:00Z",
+      "resume_screen": "COMPLETE"
+    }
+  ]
+}

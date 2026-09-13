@@ -1,0 +1,43 @@
+pack: INSURANCE
+family: MULTI_BLOCKER
+description: "Resolves parallel branches (mandate and medical declaration) systematically"
+initial_goal:
+  sum_insured: 1000000
+  policy_type: FAMILY_FLOATER
+
+steps:
+  - type: check_recommendation
+    expected_recommended_action_id:
+      - submit_medical_declaration
+      - setup_insurance_mandate
+
+  - type: action
+    action_id: setup_insurance_mandate
+    expected_status_code: 200
+    expected_version: 2
+    expected_completed_count: 2
+
+  - type: action
+    action_id: submit_medical_declaration
+    expected_status_code: 200
+    expected_version: 3
+    expected_completed_count: 3
+
+  - type: action
+    action_id: submit_ped_records
+    expected_status_code: 200
+    expected_version: 4
+    expected_completed_count: 4
+
+  - type: action
+    action_id: schedule_tele_mer
+    expected_status_code: 200
+    expected_version: 5
+    expected_completed_count: 5
+
+  - type: action
+    action_id: accept_insurance_policy
+    expected_status_code: 200
+    expected_version: 6
+    expected_readiness: READY
+    expected_completed_count: 6

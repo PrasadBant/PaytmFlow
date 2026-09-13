@@ -1,0 +1,43 @@
+{
+  "journey_type": "INSURANCE",
+  "display_name": "Health & Life Insurance",
+  "description": "Fast-track policy issuance by validating medical declarations.",
+  "icon": "shield",
+  "flagship_demo": false,
+  "lifecycle_status": "SUPPORTED",
+  "goal_schema": [
+    {
+      "key": "coverage_amount",
+      "type": "money",
+      "label": "Desired Coverage (Sum Insured)",
+      "required": true,
+      "placeholder": "e.g. 10,00,000",
+      "min": 100000,
+      "max": 50000000
+    },
+    {
+      "key": "policy_type",
+      "type": "enum",
+      "label": "Policy Type",
+      "required": true,
+      "options": ["Health Comprehensive", "Term Life", "Family Floater"]
+    },
+    {
+      "key": "tobacco_consumer",
+      "type": "boolean",
+      "label": "Tobacco or Nicotine Consumer in last 2 years",
+      "required": true
+    },
+    {
+      "key": "pin_code",
+      "type": "text",
+      "label": "Residential PIN Code",
+      "required": true,
+      "placeholder": "e.g. 110001"
+    }
+  ],
+  "ui_labels": {
+    "goal_heading": "Insurance Coverage Goal",
+    "goal_subtext": "Select your desired policy parameters to begin verification."
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "journey_id": "c1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+  "journey_type": "CREDIT_CARD",
+  "schema_version": "1.0.0",
+  "snapshot_id": "c5555555-5555-4555-8555-555555555555",
+  "version_number": 4,
+  "readiness": "READY",
+  "status": "COMPLETED",
+  "fields": [
+    {
+      "key": "kyc_verified",
+      "label": "Customer Identity",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Verified",
+      "mandatory": true
+    },
+    {
+      "key": "pan_validated",
+      "label": "PAN Verification",
+      "status": "SATISFIED",
+      "value": "ABCDE1234F",
+      "display_value": "ABCDE1234F",
+      "mandatory": true
+    },
+    {
+      "key": "income_verified",
+      "label": "Income & Bureau Check",
+      "status": "SATISFIED",
+      "value": 75000,
+      "display_value": "₹75,000",
+      "mandatory": true
+    },
+    {
+      "key": "delivery_address_confirmed",
+      "label": "Card Delivery Address",
+      "status": "SATISFIED",
+      "value": "402, Lotus Heights, Bengaluru - 560001",
+      "display_value": "402, Lotus Heights, Bengaluru - 560001",
+      "mandatory": true
+    },
+    {
+      "key": "card_activation_consent",
+      "label": "Terms & Card Setup Consent",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Accepted",
+      "mandatory": true
+    }
+  ],
+  "progress": {
+    "completed": 5,
+    "pending": 0,
+    "blockers": 0,
+    "total": 5
+  },
+  "pending_clarification": null,
+  "display": {
+    "title": "Cashback Credit Card",
+    "summary": "Paytm Cashback Pro"
+  },
+  "updated_at": "2026-03-01T12:25:00Z"
+}

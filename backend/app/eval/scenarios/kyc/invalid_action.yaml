@@ -1,0 +1,22 @@
+pack: KYC
+family: INVALID_ACTION
+description: "Verifies rejection of invalid actions and ensures journey integrity"
+initial_goal:
+  kyc_purpose: PERIODIC_UPDATE
+
+steps:
+  - type: action
+    action_id: sign_rekyc_undertaking
+    expected_status_code: 422
+    expected_error_code: ACTION_INVALID
+
+  - type: action
+    action_id: validate_gps_location
+    expected_status_code: 422
+    expected_error_code: ACTION_INVALID
+
+  - type: action
+    action_id: link_pan_record
+    expected_status_code: 200
+    expected_version: 2
+    expected_completed_count: 2

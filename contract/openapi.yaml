@@ -1,0 +1,721 @@
+openapi: 3.1.0
+info:
+  title: PaytmFlow API
+  version: "1.0.0"
+  description: >
+    Canonical API contract for PaytmFlow (spec v4.2).
+    FROZEN at T+3. Changes require the contract-change protocol in SHARED_CONTRACT.md §9.
+    Dev2 owns this file. Dev1 generates TypeScript types from it and must never hand-edit them.
+
+servers:
+  - url: http://localhost:8000
+    description: Local
+  - url: /
+    description: Deployed (same origin via proxy)
+
+tags:
+  - name: system
+  - name: packs
+  - name: journeys
+  - name: evidence
+  - name: demo
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [system]
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: Service health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, db, packs_loaded, ai_provider]
+                properties:
+                  status: { type: string, enum: [ok, degraded] }
+                  db: { type: boolean }
+                  packs_loaded: { type: integer }
+                  packs_supported: { type: integer }
+                  ai_provider: { type: string, enum: [mock, llm] }
+                  git_sha: { type: string }
+
+  /api/v1/session:
+    get:
+      tags: [system]
+      operationId: getSession
+      description: >
+        Issues an anonymous session cookie if none is present, and returns the current
+        session id. Dev1 calls this once on app boot before any other request.
+      responses:
+        "200":
+          description: Current session
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+              description: pf_session=<opaque>; HttpOnly; SameSite=Lax; Secure; Path=/
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session_id, created]
+                properties:
+                  session_id: { type: string }
+                  created: { type: boolean, description: true if newly issued this request }
+
+  /api/v1/journey-packs:
+    get:
+      tags: [packs]
+      operationId: listJourneyPacks
+      description: Drives Screen 2 (Journey Selection).
+      responses:
+        "200":
+          description: All journey packs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packs]
+                properties:
+                  packs:
+                    type: array
+                    items: { $ref: "#/components/schemas/JourneyPackSummary" }
+
+  /api/v1/journey-packs/{journey_type}:
+    get:
+      tags: [packs]
+      operationId: getJourneyPack
+      description: >
+        Returns the goal schema and display labels for one pack. Drives Screen 3
+        (Goal & Basic Info), which renders its form dynamically from goal_schema.
+      parameters:
+        - $ref: "#/components/parameters/JourneyTypePath"
+      responses:
+        "200":
+          description: Pack detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JourneyPackDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/journeys:
+    get:
+      tags: [journeys]
+      operationId: listJourneys
+      description: Drives Screen 10 (My Journeys). Scoped to the caller's session.
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/JourneyStatus" }
+        - name: journey_type
+          in: query
+          schema: { $ref: "#/components/schemas/JourneyType" }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+      responses:
+        "200":
+          description: Journeys for this session, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [journeys]
+                properties:
+                  journeys:
+                    type: array
+                    items: { $ref: "#/components/schemas/JourneyListItem" }
+    post:
+      tags: [journeys]
+      operationId: createJourney
+      description: >
+        Creates a journey and its v1 snapshot. Called by Screen 3 on Continue.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [journey_type, goal]
+              properties:
+                journey_type: { $ref: "#/components/schemas/JourneyType" }
+                goal:
+                  type: object
+                  additionalProperties: true
+                  description: >
+                    Key/value map matching the pack's goal_schema. Keys and value types are
+                    validated server-side against that schema; unknown keys are rejected.
+                natural_language:
+                  type: string
+                  maxLength: 2000
+                  description: Optional secondary input, parsed by AI into the same goal map.
+      responses:
+        "201":
+          description: Journey created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JourneyStateResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/journeys/{journey_id}:
+    get:
+      tags: [journeys]
+      operationId: getJourney
+      description: Drives Screen 4 (Current Status) and rehydration on resume.
+      parameters: [{ $ref: "#/components/parameters/JourneyIdPath" }]
+      responses:
+        "200":
+          description: Current journey state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JourneyStateResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/journeys/{journey_id}/recommendation:
+    get:
+      tags: [journeys]
+      operationId: getRecommendation
+      description: Drives Screen 5. Recomputed on every call from the current snapshot.
+      parameters: [{ $ref: "#/components/parameters/JourneyIdPath" }]
+      responses:
+        "200":
+          description: One recommendation plus valid alternatives
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecommendationResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/journeys/{journey_id}/evidence:
+    post:
+      tags: [evidence]
+      operationId: uploadEvidence
+      description: >
+        Stores and interprets evidence and returns a DETERMINISTIC consequence preview.
+        Creates NO snapshot. Drives Screen 6 -> Screen 7.
+      parameters: [{ $ref: "#/components/parameters/JourneyIdPath" }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [doc_type, expected_snapshot_id]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF/JPEG/PNG, max 10 MB. Omit when using manual_fields.
+                manual_fields:
+                  type: string
+                  description: JSON object, used by the "Enter Details" tab instead of a file.
+                doc_type: { type: string, example: SALARY_SLIP }
+                expected_snapshot_id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Interpretation plus preview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EvidenceResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "409": { $ref: "#/components/responses/StaleAction" }
+        "413":
+          description: File too large
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /api/v1/journeys/{journey_id}/actions:
+    post:
+      tags: [journeys]
+      operationId: applyAction
+      description: >
+        THE ONLY MUTATION ENDPOINT. Runs Deterministic Check, then atomically creates a
+        snapshot, an audit event and a diff. Drives Screen 7 Continue -> Screen 8.
+      parameters: [{ $ref: "#/components/parameters/JourneyIdPath" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action_id, expected_snapshot_id, idempotency_key]
+              properties:
+                action_id: { type: string, example: UPLOAD_INCOME_PROOF }
+                expected_snapshot_id: { type: string, format: uuid }
+                idempotency_key: { type: string, format: uuid }
+                input:
+                  type: object
+                  additionalProperties: true
+                  description: Matches the action's input_schema; { evidence_id } for EVIDENCE actions.
+      responses:
+        "200":
+          description: Action applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActionResponse" }
+        "409": { $ref: "#/components/responses/StaleAction" }
+        "422": { $ref: "#/components/responses/InvalidAction" }
+
+  /api/v1/journeys/{journey_id}/clarifications:
+    post:
+      tags: [journeys]
+      operationId: submitClarification
+      description: >
+        Resolves one AMBIGUOUS field. Updates ONLY the targeted field, snapshots, recomputes.
+      parameters: [{ $ref: "#/components/parameters/JourneyIdPath" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ambiguity_id, field, answer, expected_snapshot_id]
+              properties:
+                ambiguity_id: { type: string, example: INCOME_MISMATCH }
+                field: { type: string, example: monthly_income }
+                answer: {}
+                expected_snapshot_id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Clarification applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ActionResponse" }
+        "409": { $ref: "#/components/responses/StaleAction" }
+        "422": { $ref: "#/components/responses/InvalidAction" }
+
+  /api/v1/journeys/{journey_id}/diff:
+    get:
+      tags: [journeys]
+      operationId: getDiff
+      parameters:
+        - { $ref: "#/components/parameters/JourneyIdPath" }
+        - { name: from, in: query, required: true, schema: { type: integer } }
+        - { name: to, in: query, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Diff between two snapshot versions
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JourneyDiff" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/demo/reset:
+    post:
+      tags: [demo]
+      operationId: resetDemo
+      description: Wipes journey data and re-seeds packs, scenarios and the demo session.
+      security:
+        - demoSecret: []
+      responses:
+        "200":
+          description: Reset complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reset: { type: boolean }
+                  elapsed_ms: { type: integer }
+        "401": { description: Bad or missing demo secret }
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: pf_session
+    demoSecret:
+      type: apiKey
+      in: header
+      name: X-Demo-Secret
+
+  parameters:
+    JourneyIdPath:
+      name: journey_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    JourneyTypePath:
+      name: journey_type
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/JourneyType" }
+
+  responses:
+    NotFound:
+      description: Not found, or not owned by this session (deliberately indistinguishable)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    ValidationError:
+      description: VALIDATION_ERROR or INVALID_JOURNEY_TYPE
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    StaleAction:
+      description: ACTION_STALE. No mutation occurred. Client must refetch and recompute.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    InvalidAction:
+      description: ACTION_INVALID. No mutation occurred.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  schemas:
+    JourneyType:
+      type: string
+      enum: [LENDING, INSURANCE, CREDIT_CARD, KYC, ACCOUNT_OPENING, INVESTMENT]
+
+    Readiness:
+      type: string
+      enum: [READY, NOT_READY, NEEDS_REVIEW, DEAD_END]
+      description: Deterministic enum. There is no readiness score anywhere in this API.
+
+    JourneyStatus:
+      type: string
+      enum: [IN_PROGRESS, COMPLETED, NEEDS_REVIEW]
+
+    FieldStatus:
+      type: string
+      enum: [SATISFIED, BLOCKED, AMBIGUOUS]
+
+    ErrorCode:
+      type: string
+      enum:
+        - INVALID_JOURNEY_TYPE
+        - VALIDATION_ERROR
+        - ACTION_INVALID
+        - ACTION_STALE
+        - NEEDS_REVIEW
+        - DEAD_END
+        - AI_TIMEOUT
+        - AI_MALFORMED_OUTPUT
+        - EVIDENCE_CONFLICT
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { $ref: "#/components/schemas/ErrorCode" }
+            message:
+              type: string
+              description: Human-readable and safe to render directly to the user.
+            details:
+              type: object
+              additionalProperties: true
+            current_snapshot_id:
+              type: string
+              format: uuid
+              description: Present on ACTION_STALE so the client can resync without a second call.
+
+    JourneyPackSummary:
+      type: object
+      required: [journey_type, display_name, description, icon, flagship_demo, lifecycle_status]
+      properties:
+        journey_type: { $ref: "#/components/schemas/JourneyType" }
+        display_name: { type: string, example: "Loan / Lending" }
+        description: { type: string, example: "Complete your loan application" }
+        icon:
+          type: string
+          enum: [rupee, shield, card, id, bank, chart]
+          description: Dev1 maps these six tokens to icon components.
+        flagship_demo: { type: boolean }
+        lifecycle_status: { type: string, enum: [DRAFT, VALIDATED, SUPPORTED] }
+
+    GoalFieldSpec:
+      type: object
+      required: [key, type, label, required]
+      properties:
+        key: { type: string }
+        type: { type: string, enum: [enum, money, number, text, date, boolean] }
+        label: { type: string }
+        required: { type: boolean }
+        placeholder: { type: string }
+        help_text: { type: string }
+        min: { type: number }
+        max: { type: number }
+        options:
+          type: array
+          items:
+            type: object
+            required: [value, label]
+            properties:
+              value: {}
+              label: { type: string }
+
+    JourneyPackDetail:
+      allOf:
+        - $ref: "#/components/schemas/JourneyPackSummary"
+        - type: object
+          required: [schema_version, goal_schema, ui_labels, supports_natural_language]
+          properties:
+            schema_version: { type: string }
+            goal_schema:
+              type: array
+              items: { $ref: "#/components/schemas/GoalFieldSpec" }
+            supports_natural_language: { type: boolean }
+            ui_labels:
+              type: object
+              additionalProperties: { type: string }
+              description: >
+                Journey-specific copy. Known keys: goal_heading, status_heading,
+                status_subtext, evidence_heading, ready_heading, ready_subtext,
+                recommendation_heading. Dev1 falls back to a default if a key is absent.
+
+    FieldState:
+      type: object
+      required: [key, label, status]
+      properties:
+        key: { type: string }
+        label: { type: string, example: "Income verification" }
+        status: { $ref: "#/components/schemas/FieldStatus" }
+        value: {}
+        display_value: { type: string, description: Pre-formatted for display, e.g. "₹85,000" }
+        explanation:
+          type: string
+          description: Why this is blocked. Rendered on the blocker card.
+        resolve_action_id:
+          type: string
+          description: The action that resolves this field. Powers the "Resolve ->" button.
+        mandatory: { type: boolean }
+        ambiguity:
+          type: object
+          nullable: true
+          properties:
+            ambiguity_id: { type: string }
+            reason: { type: string }
+            question: { type: string }
+            answer_type: { type: string, enum: [CHOICE, MONEY, NUMBER, TEXT, DATE, BOOLEAN] }
+            choices:
+              type: array
+              items:
+                type: object
+                properties:
+                  value: {}
+                  label: { type: string }
+
+    ProgressCounts:
+      type: object
+      required: [completed, pending, blockers, total]
+      description: >
+        Journey progress only. NOT readiness, approval, eligibility or a score.
+        Dev1 renders this as "3/7 Completed". Never render it as a percentage or gauge.
+      properties:
+        completed: { type: integer }
+        pending: { type: integer }
+        blockers: { type: integer }
+        total: { type: integer }
+
+    JourneyStateResponse:
+      type: object
+      required: [journey_id, journey_type, schema_version, snapshot_id, version_number,
+                 readiness, status, fields, progress, display]
+      properties:
+        journey_id: { type: string, format: uuid }
+        journey_type: { $ref: "#/components/schemas/JourneyType" }
+        schema_version: { type: string }
+        snapshot_id: { type: string, format: uuid }
+        version_number: { type: integer }
+        readiness: { $ref: "#/components/schemas/Readiness" }
+        status: { $ref: "#/components/schemas/JourneyStatus" }
+        fields:
+          type: array
+          items: { $ref: "#/components/schemas/FieldState" }
+          description: Ordered for display. Only fields with display=true and not NOT_APPLICABLE.
+        progress: { $ref: "#/components/schemas/ProgressCounts" }
+        pending_clarification:
+          allOf: [{ $ref: "#/components/schemas/FieldState" }]
+          nullable: true
+          description: Present when readiness is NEEDS_REVIEW. Exactly one at a time.
+        display:
+          type: object
+          required: [title, summary]
+          properties:
+            title: { type: string, example: "Personal Loan" }
+            summary: { type: string, example: "₹5,00,000 · Home Renovation" }
+        updated_at: { type: string, format: date-time }
+
+    ActionOption:
+      type: object
+      required: [action_id, title, kind, unlocks]
+      properties:
+        action_id: { type: string }
+        title: { type: string }
+        kind:
+          type: string
+          enum: [EVIDENCE, FORM, CLARIFICATION]
+          description: >
+            Tells Dev1 which UI to open. EVIDENCE -> Screen 6.
+            FORM -> generic action modal rendered from input_schema.
+            CLARIFICATION -> NeedsReviewCard.
+        why: { type: string }
+        unlocks:
+          type: array
+          items: { type: string }
+        accepts:
+          type: array
+          items: { type: string }
+          description: Allowed doc_type values for EVIDENCE actions.
+        input_schema:
+          type: array
+          items: { $ref: "#/components/schemas/GoalFieldSpec" }
+          description: Field specs for FORM actions. Same renderer as the goal form.
+
+    RecommendationResponse:
+      type: object
+      required: [snapshot_id, readiness, recommendation, alternatives, minimum_path_length]
+      properties:
+        snapshot_id: { type: string, format: uuid }
+        readiness: { $ref: "#/components/schemas/Readiness" }
+        recommendation:
+          allOf: [{ $ref: "#/components/schemas/ActionOption" }]
+          nullable: true
+          description: Null when readiness is READY or DEAD_END.
+        alternatives:
+          type: array
+          items: { $ref: "#/components/schemas/ActionOption" }
+          description: Deterministically valid actions only. Safe to render as selectable.
+        minimum_path_length: { type: integer }
+        source:
+          type: string
+          enum: [AI_RANKED, PLANNER_FALLBACK]
+          description: Diagnostic. Dev1 may show it in a dev-only badge, never in demo UI.
+
+    SimulationPreview:
+      type: object
+      required: [newly_satisfied, newly_unlocked, predicted_readiness, progress_before, progress_after]
+      description: Output of deterministic simulation. Screen 7's "Expected Outcome" renders THIS, never AI text.
+      properties:
+        newly_satisfied:
+          type: array
+          items: { type: object, properties: { key: {type: string}, label: {type: string} } }
+        newly_unlocked:
+          type: array
+          items: { type: object, properties: { action_id: {type: string}, title: {type: string} } }
+        still_blocked:
+          type: array
+          items: { type: object, properties: { key: {type: string}, label: {type: string} } }
+        predicted_readiness: { $ref: "#/components/schemas/Readiness" }
+        progress_before: { $ref: "#/components/schemas/ProgressCounts" }
+        progress_after: { $ref: "#/components/schemas/ProgressCounts" }
+
+    JourneyDiff:
+      type: object
+      required: [from_version, to_version, fields_changed, actions_unlocked, actions_removed, readiness, progress]
+      properties:
+        from_version: { type: integer }
+        to_version: { type: integer }
+        fields_changed:
+          type: array
+          items:
+            type: object
+            required: [key, label, from_status, to_status]
+            properties:
+              key: { type: string }
+              label: { type: string }
+              from_status: { $ref: "#/components/schemas/FieldStatus" }
+              to_status: { $ref: "#/components/schemas/FieldStatus" }
+              display_value: { type: string }
+              cause: { type: string, example: "ACTION:UPLOAD_INCOME_PROOF" }
+              cascaded: { type: boolean, description: true if changed by cascade, not directly by the action }
+        actions_unlocked: { type: array, items: { type: string } }
+        actions_removed: { type: array, items: { type: string } }
+        readiness:
+          type: object
+          properties:
+            from: { $ref: "#/components/schemas/Readiness" }
+            to: { $ref: "#/components/schemas/Readiness" }
+        progress:
+          type: object
+          properties:
+            from: { $ref: "#/components/schemas/ProgressCounts" }
+            to: { $ref: "#/components/schemas/ProgressCounts" }
+
+    EvidenceResponse:
+      type: object
+      required: [evidence_id, filename, uploaded_at, interpretation, requires_review]
+      properties:
+        evidence_id: { type: string, format: uuid }
+        filename: { type: string }
+        uploaded_at: { type: string, format: date-time }
+        size_bytes: { type: integer }
+        interpretation:
+          type: object
+          required: [verified, confidence, detected, summary, conflicts]
+          properties:
+            verified:
+              type: boolean
+              description: confidence >= the pack mapping's threshold AND no conflicts.
+            confidence: { type: number, minimum: 0, maximum: 1 }
+            detected:
+              type: array
+              items:
+                type: object
+                properties:
+                  key: { type: string }
+                  label: { type: string }
+                  display_value: { type: string, example: "₹85,000" }
+            summary:
+              type: string
+              description: AI-written, plain text, never rendered as HTML.
+            conflicts:
+              type: array
+              items:
+                type: object
+                properties:
+                  ambiguity_id: { type: string }
+                  field: { type: string }
+                  message: { type: string }
+        proposed_action_id: { type: string, nullable: true }
+        consequence_preview:
+          allOf: [{ $ref: "#/components/schemas/SimulationPreview" }]
+          nullable: true
+        diff_preview:
+          allOf: [{ $ref: "#/components/schemas/JourneyDiff" }]
+          nullable: true
+        requires_review:
+          type: boolean
+          description: When true, Dev1 shows NeedsReviewCard instead of the Continue button.
+
+    ActionResponse:
+      type: object
+      required: [journey, diff]
+      properties:
+        journey: { $ref: "#/components/schemas/JourneyStateResponse" }
+        diff: { $ref: "#/components/schemas/JourneyDiff" }
+        next_recommendation:
+          allOf: [{ $ref: "#/components/schemas/RecommendationResponse" }]
+          nullable: true
+          description: Saves Dev1 a round trip after every action.
+
+    JourneyListItem:
+      type: object
+      required: [journey_id, journey_type, display_name, icon, title, summary, status, readiness, updated_at]
+      properties:
+        journey_id: { type: string, format: uuid }
+        journey_type: { $ref: "#/components/schemas/JourneyType" }
+        display_name: { type: string }
+        icon: { type: string }
+        title: { type: string }
+        summary: { type: string }
+        status: { $ref: "#/components/schemas/JourneyStatus" }
+        readiness: { $ref: "#/components/schemas/Readiness" }
+        progress: { $ref: "#/components/schemas/ProgressCounts" }
+        updated_at: { type: string, format: date-time }
+        resume_screen:
+          type: string
+          enum: [STATUS, RECOMMENDATION, NEEDS_REVIEW, COMPLETE]
+          description: Where Dev1 should route on resume. Server decides, client obeys.
+
+security:
+  - sessionCookie: []

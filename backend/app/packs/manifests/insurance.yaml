@@ -1,0 +1,219 @@
+metadata:
+  journey_type: INSURANCE
+  schema_version: "1.0.0"
+  display_name: Health Insurance
+  description: Comprehensive health cover with cashless hospitalization
+  icon: shield
+  flagship_demo: false
+  lifecycle_status: SUPPORTED
+  supports_natural_language: false
+
+goal_schema:
+  - key: sum_insured
+    type: money
+    label: Sum Insured (₹)
+    required: true
+    min: 300000
+    max: 5000000
+  - key: policy_type
+    type: enum
+    label: Policy Type
+    required: true
+    options:
+      - value: INDIVIDUAL
+        label: Individual Cover
+      - value: FAMILY_FLOATER
+        label: Family Floater
+      - value: GROUP
+        label: Group Cover
+
+state_schema:
+  - key: kyc_verified
+    label: Identity Verification
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: SATISFIED
+  - key: medical_history_declared
+    label: Medical History Declaration
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: ped_declaration_submitted
+    label: Pre-existing Disease Clearance
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: tele_underwriting_scheduled
+    label: Medical Underwriting Call
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: bank_mandate_registered
+    label: Premium Auto-Debit Mandate
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: policy_terms_accepted
+    label: Policy Confirmation & Consent
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+
+dependencies:
+  - source: kyc_verified
+    target: medical_history_declared
+  - source: medical_history_declared
+    target: ped_declaration_submitted
+  - source: ped_declaration_submitted
+    target: tele_underwriting_scheduled
+  - source: tele_underwriting_scheduled
+    target: policy_terms_accepted
+  - source: kyc_verified
+    target: bank_mandate_registered
+  - source: bank_mandate_registered
+    target: policy_terms_accepted
+
+actions:
+  - action_id: submit_medical_declaration
+    title: Declare Medical History
+    kind: FORM
+    why: Insurer requires self-declaration of past health conditions
+    satisfies:
+      - medical_history_declared
+    preconditions:
+      - kyc_verified
+
+  - action_id: submit_ped_records
+    title: Upload Medical Records
+    kind: EVIDENCE
+    why: Past hospitalization records required for underwriting
+    satisfies:
+      - ped_declaration_submitted
+    preconditions:
+      - medical_history_declared
+    accepts:
+      - application/pdf
+      - image/jpeg
+      - image/png
+    action_group: ped_satisfaction
+
+  - action_id: submit_ped_exemption
+    title: No Pre-Existing Conditions Declaration
+    kind: FORM
+    why: Sign zero pre-existing condition confirmation
+    satisfies:
+      - ped_declaration_submitted
+    preconditions:
+      - medical_history_declared
+    action_group: ped_satisfaction
+
+  - action_id: schedule_tele_mer
+    title: Schedule Doctor Underwriting Call
+    kind: FORM
+    why: Select time slot for tele-medical consultation
+    satisfies:
+      - tele_underwriting_scheduled
+    preconditions:
+      - ped_declaration_submitted
+
+  - action_id: setup_insurance_mandate
+    title: Set Up Auto-Debit Mandate
+    kind: FORM
+    why: Automatic annual renewal premium payment setup
+    satisfies:
+      - bank_mandate_registered
+    preconditions:
+      - kyc_verified
+
+  - action_id: accept_insurance_policy
+    title: Confirm Policy & Issue
+    kind: FORM
+    why: Final agreement to policy terms and premium schedule
+    satisfies:
+      - policy_terms_accepted
+    preconditions:
+      - tele_underwriting_scheduled
+      - bank_mandate_registered
+
+action_groups:
+  ped_satisfaction:
+    primary: submit_ped_records
+    members:
+      - submit_ped_records
+      - submit_ped_exemption
+
+evidence_mappings:
+  - doc_type: MEDICAL_DISCHARGE_SUMMARY
+    target_field: ped_declaration_submitted
+    confidence_threshold: 0.85
+    action_id: submit_ped_records
+  - doc_type: HEALTH_CHECKUP_REPORT
+    target_field: ped_declaration_submitted
+    confidence_threshold: 0.80
+    action_id: submit_ped_records
+  - doc_type: PREVIOUS_POLICY_COPY
+    target_field: ped_declaration_submitted
+    confidence_threshold: 0.80
+    action_id: submit_ped_records
+
+ambiguity_rules:
+  - ambiguity_id: AMB_PRE_EXISTING_ILLNESS
+    field: ped_declaration_submitted
+    reason: Discharge summary indicates past inpatient treatment
+    question: Was the past hospitalization a one-time resolved condition or ongoing chronic illness?
+    answer_type: CHOICE
+    choices:
+      - value: RESOLVED_ACUTE
+        label: One-Time Acute Event (Resolved)
+      - value: CHRONIC_MAINTENANCE
+        label: Chronic Condition (Ongoing Treatment)
+
+  - ambiguity_id: AMB_SMOKING_STATUS
+    field: medical_history_declared
+    reason: Clarification needed on lifestyle declaration
+    question: Have you consumed any nicotine or tobacco products in the last 24 months?
+    answer_type: CHOICE
+    choices:
+      - value: "YES"
+        label: "Yes"
+      - value: "NO"
+        label: "No"
+
+readiness_rules:
+  mandatory_fields:
+    - kyc_verified
+    - medical_history_declared
+    - ped_declaration_submitted
+    - tele_underwriting_scheduled
+    - bank_mandate_registered
+    - policy_terms_accepted
+
+ui_labels:
+  goal_heading: Select Health Cover Options
+  status_heading: Health Policy Underwriting Checklist
+  status_subtext: Provide declaration and medical history to issue policy
+  evidence_heading: Medical & Identity Proofs
+  ready_heading: Health Cover Ready
+  ready_subtext: All declarations verified
+  recommendation_heading: Next Verification Item
+
+prohibited_claims: []
+
+simulation_defaults:
+  medical_history_declared: true
+  ped_declaration_submitted: true
+  tele_underwriting_scheduled: true
+  bank_mandate_registered: true
+  policy_terms_accepted: true

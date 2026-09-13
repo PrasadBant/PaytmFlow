@@ -1,0 +1,221 @@
+metadata:
+  journey_type: CREDIT_CARD
+  schema_version: "1.0.0"
+  display_name: Credit Card
+  description: Co-branded cashback credit card with zero annual fee
+  icon: card
+  flagship_demo: false
+  lifecycle_status: SUPPORTED
+  supports_natural_language: false
+
+goal_schema:
+  - key: card_variant
+    type: enum
+    label: Card Variant
+    required: true
+    options:
+      - value: CASHBACK
+        label: Paytm Cashback Pro
+      - value: REWARDS
+        label: Paytm Rewards Max
+      - value: TRAVEL
+        label: Paytm Travel Elite
+  - key: credit_limit_preference
+    type: money
+    label: Desired Limit (₹)
+    required: false
+    min: 25000
+    max: 1000000
+
+state_schema:
+  - key: kyc_verified
+    label: Identity Verification
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: SATISFIED
+  - key: income_verified
+    label: Income Eligibility Verification
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: employment_verified
+    label: Employment & Company Verification
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: current_address_verified
+    label: Residential Address Verification
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: delivery_address_confirmed
+    label: Card Dispatch Address Confirmation
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: card_agreement_signed
+    label: Digital Cardholder Consent
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+
+dependencies:
+  - source: kyc_verified
+    target: income_verified
+  - source: kyc_verified
+    target: employment_verified
+  - source: kyc_verified
+    target: current_address_verified
+  - source: current_address_verified
+    target: delivery_address_confirmed
+  - source: income_verified
+    target: card_agreement_signed
+  - source: employment_verified
+    target: card_agreement_signed
+  - source: delivery_address_confirmed
+    target: card_agreement_signed
+
+actions:
+  - action_id: upload_salary_statement
+    title: Upload Bank Salary Statement
+    kind: EVIDENCE
+    why: Validate 3-month salary credits for limit assignment
+    satisfies:
+      - income_verified
+    preconditions:
+      - kyc_verified
+    accepts:
+      - application/pdf
+    action_group: income_proof_satisfaction
+
+  - action_id: upload_it_return
+    title: Upload Income Tax Return
+    kind: EVIDENCE
+    why: Alternate income verification via ITR-V filing
+    satisfies:
+      - income_verified
+    preconditions:
+      - kyc_verified
+    accepts:
+      - application/pdf
+    action_group: income_proof_satisfaction
+
+  - action_id: verify_employment_details
+    title: Submit Employment Details
+    kind: FORM
+    why: Card issuer requires verified employment and employer details
+    satisfies:
+      - employment_verified
+    preconditions:
+      - kyc_verified
+
+  - action_id: verify_utility_bill
+    title: Upload Current Address Proof
+    kind: EVIDENCE
+    why: Proof of physical residence for card courier delivery
+    satisfies:
+      - current_address_verified
+    preconditions:
+      - kyc_verified
+    accepts:
+      - application/pdf
+      - image/jpeg
+      - image/png
+
+  - action_id: confirm_dispatch_address
+    title: Confirm Delivery Location
+    kind: FORM
+    why: Confirm whether card is delivered to office or residence
+    satisfies:
+      - delivery_address_confirmed
+    preconditions:
+      - current_address_verified
+
+  - action_id: sign_cardholder_agreement
+    title: Sign Digital Agreement
+    kind: FORM
+    why: Accept schedule of charges and MITC terms
+    satisfies:
+      - card_agreement_signed
+    preconditions:
+      - income_verified
+      - employment_verified
+      - delivery_address_confirmed
+
+action_groups:
+  income_proof_satisfaction:
+    primary: upload_salary_statement
+    members:
+      - upload_salary_statement
+      - upload_it_return
+
+evidence_mappings:
+  - doc_type: SALARY_SLIP
+    target_field: income_verified
+    confidence_threshold: 0.85
+    action_id: upload_salary_statement
+  - doc_type: ITR_V_ACKNOWLEDGEMENT
+    target_field: income_verified
+    confidence_threshold: 0.80
+    action_id: upload_it_return
+  - doc_type: UTILITY_BILL_ELECTRICITY
+    target_field: current_address_verified
+    confidence_threshold: 0.80
+    action_id: verify_utility_bill
+
+ambiguity_rules:
+  - ambiguity_id: AMB_EMPLOYER_ALIAS
+    field: employment_verified
+    reason: Payroll entity name differs from declared company
+    question: Confirm if your salary is disbursed by a third-party payroll entity
+    answer_type: TEXT
+
+  - ambiguity_id: AMB_ADDRESS_MATCH
+    field: current_address_verified
+    reason: Address proof document name differs from applicant
+    question: Is the utility bill in the name of your spouse or family member?
+    answer_type: CHOICE
+    choices:
+      - value: FAMILY_OWNED
+        label: Family Owned (Spouse / Parent)
+      - value: RENTED
+        label: Rented Accommodation
+
+readiness_rules:
+  mandatory_fields:
+    - kyc_verified
+    - income_verified
+    - employment_verified
+    - current_address_verified
+    - delivery_address_confirmed
+    - card_agreement_signed
+
+ui_labels:
+  goal_heading: Choose Your Credit Card
+  status_heading: Card Issuance Status
+  status_subtext: Verify income and address to complete card onboarding
+  evidence_heading: Income & Address Proof
+  ready_heading: Card Ready for Dispatch
+  ready_subtext: All criteria met
+  recommendation_heading: Next Step
+
+prohibited_claims: []
+
+simulation_defaults:
+  income_verified: true
+  employment_verified: true
+  current_address_verified: true
+  delivery_address_confirmed: true
+  card_agreement_signed: true

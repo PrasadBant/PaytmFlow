@@ -1,0 +1,46 @@
+:root {
+  /* Paytm Brand Palette */
+  --pf-color-paytm-blue: #002e6e;
+  --pf-color-paytm-blue-action: #005bf5;
+  --pf-color-paytm-blue-action-hover: #0047cc;
+  --pf-color-paytm-blue-50: #f0f5ff;
+  --pf-color-paytm-blue-100: #e5edff;
+  --pf-color-paytm-blue-600: #005bf5;
+  --pf-color-paytm-blue-700: #002e6e;
+  --pf-color-paytm-cyan: #00baf2;
+  --pf-color-paytm-cyan-light: #e6f8fe;
+  --pf-color-paytm-green: #00b972;
+  --pf-color-paytm-green-light: #e6f9f1;
+  --pf-color-paytm-green-dark: #008753;
+  --pf-color-paytm-amber: #ff9900;
+  --pf-color-paytm-amber-light: #fff5e6;
+  --pf-color-paytm-amber-dark: #cc7a00;
+  --pf-color-paytm-red: #e53935;
+  --pf-color-paytm-red-light: #fdecec;
+  --pf-color-paytm-red-dark: #b71c1c;
+
+  /* Surface Neutrals */
+  --pf-color-surface: #ffffff;
+  --pf-color-surface-muted: #f8fafc;
+  --pf-color-surface-subtle: #f1f5f9;
+  --pf-color-surface-border: #e2e8f0;
+  --pf-color-surface-hover: #f1f5f9;
+
+  /* Content Neutrals */
+  --pf-color-content-primary: #0f172a;
+  --pf-color-content-secondary: #475569;
+  --pf-color-content-tertiary: #94a3b8;
+  --pf-color-content-inverted: #ffffff;
+
+  /* Border Radii */
+  --pf-radius-sm: 4px;
+  --pf-radius-md: 8px;
+  --pf-radius-lg: 12px;
+  --pf-radius-xl: 16px;
+  --pf-radius-full: 9999px;
+
+  /* Spacing & Layout */
+  --pf-width-sidebar: 260px;
+  --pf-height-header: 64px;
+  --pf-max-width-page: 1200px;
+}

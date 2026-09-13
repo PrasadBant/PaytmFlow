@@ -1,0 +1,42 @@
+pack: INSURANCE
+family: AMBIGUITY_CONFLICT
+description: "Resolves pre-existing illness ambiguity via targeted clarification"
+initial_goal:
+  sum_insured: 500000
+  policy_type: INDIVIDUAL
+
+steps:
+  - type: action
+    action_id: submit_medical_declaration
+    expected_status_code: 200
+    expected_version: 2
+
+  - type: inject_ambiguity
+    ambiguity_id: AMB_PRE_EXISTING_ILLNESS
+    field: ped_declaration_submitted
+    reason: Discharge summary indicates past inpatient treatment
+    question: Was the past hospitalization a one-time resolved condition or ongoing chronic illness?
+    answer_type: CHOICE
+
+  - type: clarification
+    ambiguity_id: AMB_PRE_EXISTING_ILLNESS
+    field: ped_declaration_submitted
+    answer: RESOLVED_ACUTE
+    expected_status_code: 200
+    expected_version: 4
+
+  - type: action
+    action_id: setup_insurance_mandate
+    expected_status_code: 200
+    expected_version: 5
+
+  - type: action
+    action_id: schedule_tele_mer
+    expected_status_code: 200
+    expected_version: 6
+
+  - type: action
+    action_id: accept_insurance_policy
+    expected_status_code: 200
+    expected_version: 7
+    expected_readiness: READY

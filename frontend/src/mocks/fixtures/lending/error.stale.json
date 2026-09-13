@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "ACTION_STALE",
+    "message": "This journey has moved on — refreshing",
+    "current_snapshot_id": "bbbbbbbb-2222-2222-2222-222222222222",
+    "details": {
+      "reason": "Expected snapshot aaaaaaaa-1111-1111-1111-111111111111 does not match current snapshot bbbbbbbb-2222-2222-2222-222222222222"
+    }
+  }
+}

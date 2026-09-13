@@ -1,0 +1,215 @@
+metadata:
+  journey_type: KYC
+  schema_version: "1.0.0"
+  display_name: Full KYC Re-verification
+  description: RBI-mandated periodic customer identity update
+  icon: id
+  flagship_demo: false
+  lifecycle_status: SUPPORTED
+  supports_natural_language: false
+
+goal_schema:
+  - key: kyc_purpose
+    type: enum
+    label: Purpose of Re-verification
+    required: true
+    options:
+      - value: PERIODIC_UPDATE
+        label: Periodic Re-KYC Update
+      - value: LIMIT_UPGRADE
+        label: Wallet Limit Upgrade
+      - value: ADDRESS_CHANGE
+        label: Communication Address Change
+
+state_schema:
+  - key: aadhaar_authenticated
+    label: Aadhaar OTP Authentication
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: SATISFIED
+  - key: pan_linked
+    label: PAN Database Verification
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: ovd_document_uploaded
+    label: Officially Valid Document (OVD)
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: live_photo_captured
+    label: Liveness & Face Match Check
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: geo_tag_validated
+    label: Indian Territory Geolocation
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: rekyc_declaration_signed
+    label: Digital Re-KYC Undertaking
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+
+dependencies:
+  - source: aadhaar_authenticated
+    target: pan_linked
+  - source: aadhaar_authenticated
+    target: ovd_document_uploaded
+  - source: aadhaar_authenticated
+    target: live_photo_captured
+  - source: live_photo_captured
+    target: geo_tag_validated
+  - source: pan_linked
+    target: rekyc_declaration_signed
+  - source: ovd_document_uploaded
+    target: rekyc_declaration_signed
+  - source: geo_tag_validated
+    target: rekyc_declaration_signed
+
+actions:
+  - action_id: link_pan_record
+    title: Validate PAN Number
+    kind: FORM
+    why: Verification against NSDL / Income Tax database
+    satisfies:
+      - pan_linked
+    preconditions:
+      - aadhaar_authenticated
+
+  - action_id: upload_passport_ovd
+    title: Upload Passport Copy
+    kind: EVIDENCE
+    why: Secondary address and identity verification via Indian Passport
+    satisfies:
+      - ovd_document_uploaded
+    preconditions:
+      - aadhaar_authenticated
+    accepts:
+      - application/pdf
+      - image/jpeg
+      - image/png
+    action_group: ovd_satisfaction
+
+  - action_id: upload_voter_id_ovd
+    title: Upload Voter ID Card
+    kind: EVIDENCE
+    why: Secondary address and identity verification via Voter Identity Card
+    satisfies:
+      - ovd_document_uploaded
+    preconditions:
+      - aadhaar_authenticated
+    accepts:
+      - application/pdf
+      - image/jpeg
+      - image/png
+    action_group: ovd_satisfaction
+
+  - action_id: capture_liveness_selfie
+    title: Capture Liveness Video/Photo
+    kind: FORM
+    why: Real-time anti-spoofing facial verification
+    satisfies:
+      - live_photo_captured
+    preconditions:
+      - aadhaar_authenticated
+
+  - action_id: validate_gps_location
+    title: Validate Geo-Location
+    kind: FORM
+    why: RBI guidelines mandate verification within national borders
+    satisfies:
+      - geo_tag_validated
+    preconditions:
+      - live_photo_captured
+
+  - action_id: sign_rekyc_undertaking
+    title: Sign KYC Consent Undertaking
+    kind: FORM
+    why: Submit digital declaration of accuracy for customer records
+    satisfies:
+      - rekyc_declaration_signed
+    preconditions:
+      - pan_linked
+      - ovd_document_uploaded
+      - geo_tag_validated
+
+action_groups:
+  ovd_satisfaction:
+    primary: upload_passport_ovd
+    members:
+      - upload_passport_ovd
+      - upload_voter_id_ovd
+
+evidence_mappings:
+  - doc_type: PASSPORT_SCAN
+    target_field: ovd_document_uploaded
+    confidence_threshold: 0.85
+    action_id: upload_passport_ovd
+  - doc_type: VOTER_ID_CARD
+    target_field: ovd_document_uploaded
+    confidence_threshold: 0.80
+    action_id: upload_voter_id_ovd
+  - doc_type: DRIVING_LICENCE
+    target_field: ovd_document_uploaded
+    confidence_threshold: 0.80
+    action_id: upload_passport_ovd
+
+ambiguity_rules:
+  - ambiguity_id: AMB_NAME_DISCREPANCY
+    field: pan_linked
+    reason: Middle name expanded in Aadhaar but abbreviated on PAN
+    question: Confirm your canonical full name for banking records
+    answer_type: TEXT
+
+  - ambiguity_id: AMB_EXPIRED_DOCUMENT
+    field: ovd_document_uploaded
+    reason: OVD document issue date is more than 10 years old
+    question: Is your official document still active and valid?
+    answer_type: CHOICE
+    choices:
+      - value: VALID
+        label: Document is active and valid
+      - value: RENEWAL_PENDING
+        label: Renewal application pending
+
+readiness_rules:
+  mandatory_fields:
+    - aadhaar_authenticated
+    - pan_linked
+    - ovd_document_uploaded
+    - live_photo_captured
+    - geo_tag_validated
+    - rekyc_declaration_signed
+
+ui_labels:
+  goal_heading: Start KYC Verification
+  status_heading: Identity Verification Status
+  status_subtext: Complete biometric / document verification steps
+  evidence_heading: OVD Documents
+  ready_heading: KYC Completed
+  ready_subtext: Identity successfully verified
+  recommendation_heading: Next Verification Item
+
+prohibited_claims: []
+
+simulation_defaults:
+  pan_linked: true
+  ovd_document_uploaded: true
+  live_photo_captured: true
+  geo_tag_validated: true
+  rekyc_declaration_signed: true

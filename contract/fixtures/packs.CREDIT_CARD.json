@@ -1,0 +1,40 @@
+{
+  "journey_type": "CREDIT_CARD",
+  "display_name": "Credit Card",
+  "description": "Co-branded cashback credit card with zero annual fee",
+  "icon": "card",
+  "flagship_demo": false,
+  "lifecycle_status": "SUPPORTED",
+  "schema_version": "1.0.0",
+  "goal_schema": [
+    {
+      "key": "card_variant",
+      "type": "enum",
+      "label": "Card Variant",
+      "required": true,
+      "options": [
+        { "value": "CASHBACK", "label": "Paytm Cashback Pro" },
+        { "value": "REWARDS", "label": "Paytm Rewards Max" },
+        { "value": "TRAVEL", "label": "Paytm Travel Elite" }
+      ]
+    },
+    {
+      "key": "credit_limit_preference",
+      "type": "money",
+      "label": "Desired Limit (₹)",
+      "required": false,
+      "min": 25000,
+      "max": 1000000
+    }
+  ],
+  "supports_natural_language": false,
+  "ui_labels": {
+    "goal_heading": "Choose Your Credit Card",
+    "status_heading": "Card Issuance Status",
+    "status_subtext": "Verify income and address to complete card onboarding",
+    "evidence_heading": "Income & Address Proof",
+    "ready_heading": "Card Ready for Dispatch",
+    "ready_subtext": "All criteria met",
+    "recommendation_heading": "Next Step"
+  }
+}

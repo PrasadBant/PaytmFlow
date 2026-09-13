@@ -1,0 +1,47 @@
+pack: ACCOUNT_OPENING
+family: AMBIGUITY_CONFLICT
+description: "Resolves nominee relation ambiguity for minor nominee designation"
+initial_goal:
+  account_type: DIGITAL_SAVINGS
+  initial_deposit: 10000
+
+steps:
+  - type: action
+    action_id: declare_account_nominee
+    expected_status_code: 200
+    expected_version: 2
+
+  - type: inject_ambiguity
+    ambiguity_id: AMB_NOMINEE_RELATION
+    field: nominee_declared
+    reason: Minor nominee requires guardian designation
+    question: Confirm guardian full name and relation for minor nominee
+    answer_type: TEXT
+
+  - type: clarification
+    ambiguity_id: AMB_NOMINEE_RELATION
+    field: nominee_declared
+    answer: Sunita Sharma - Mother
+    expected_status_code: 200
+    expected_version: 4
+
+  - type: action
+    action_id: verify_pan_for_banking
+    expected_status_code: 200
+    expected_version: 5
+
+  - type: action
+    action_id: upload_wet_signature
+    expected_status_code: 200
+    expected_version: 6
+
+  - type: action
+    action_id: complete_video_kyc
+    expected_status_code: 200
+    expected_version: 7
+
+  - type: action
+    action_id: accept_banking_terms
+    expected_status_code: 200
+    expected_version: 8
+    expected_readiness: READY

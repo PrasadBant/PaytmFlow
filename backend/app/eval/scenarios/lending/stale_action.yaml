@@ -1,0 +1,31 @@
+pack: LENDING
+family: STALE_ACTION
+description: "Verifies 409 rejection on stale snapshot ID and state preservation"
+initial_goal:
+  loan_amount: 200000
+  loan_purpose: HOME_RENOVATION
+  tenure_months: 24
+
+steps:
+  - type: action
+    action_id: UPLOAD_INCOME_PROOF
+    input:
+      monthly_income: 85000
+    expected_status_code: 200
+    expected_version: 2
+
+  - type: action
+    action_id: SUBMIT_EMPLOYMENT_INFO
+    input:
+      employment_type: SALARIED
+    use_stale_snapshot: true
+    expected_status_code: 409
+    expected_error_code: ACTION_STALE
+
+  - type: action
+    action_id: SUBMIT_EMPLOYMENT_INFO
+    input:
+      employment_type: SALARIED
+    use_stale_snapshot: false
+    expected_status_code: 200
+    expected_version: 3

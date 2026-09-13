@@ -1,0 +1,57 @@
+{
+  "snapshot_id": "b1111111-1111-4111-8111-111111111111",
+  "readiness": "NOT_READY",
+  "recommendation": {
+    "action_id": "SUBMIT_HEALTH_DECLARATION",
+    "title": "Submit Health & Medical Declaration",
+    "kind": "FORM",
+    "why": "Medical underwriting required to calculate final premium loading",
+    "unlocks": ["medical_declaration", "premium_payment_setup"],
+    "accepts": null,
+    "input_schema": [
+      {
+        "key": "has_pre_existing_conditions",
+        "type": "boolean",
+        "label": "Do you have any pre-existing medical conditions?",
+        "required": true
+      },
+      {
+        "key": "tobacco_consumer",
+        "type": "boolean",
+        "label": "Do you consume tobacco products?",
+        "required": true
+      }
+    ]
+  },
+  "alternatives": [
+    {
+      "action_id": "ADD_NOMINEE",
+      "title": "Add Policy Nominee",
+      "kind": "FORM",
+      "why": "Declare beneficiary details for the policy",
+      "unlocks": ["nominee_registered"],
+      "accepts": null,
+      "input_schema": [
+        {
+          "key": "nominee_name",
+          "type": "text",
+          "label": "Nominee Full Name",
+          "required": true
+        },
+        {
+          "key": "nominee_relation",
+          "type": "enum",
+          "label": "Relationship",
+          "required": true,
+          "options": [
+            { "value": "SPOUSE", "label": "Spouse" },
+            { "value": "CHILD", "label": "Child" },
+            { "value": "PARENT", "label": "Parent" }
+          ]
+        }
+      ]
+    }
+  ],
+  "minimum_path_length": 3,
+  "source": "AI_RANKED"
+}

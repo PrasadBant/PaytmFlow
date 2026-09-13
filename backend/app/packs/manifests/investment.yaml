@@ -1,0 +1,217 @@
+metadata:
+  journey_type: INVESTMENT
+  schema_version: "1.0.0"
+  display_name: Mutual Fund Investment
+  description: SIP and lump-sum investment portfolio setup
+  icon: chart
+  flagship_demo: false
+  lifecycle_status: SUPPORTED
+  supports_natural_language: false
+
+goal_schema:
+  - key: investment_mode
+    type: enum
+    label: Investment Mode
+    required: true
+    options:
+      - value: MONTHLY_SIP
+        label: Monthly Systematic Investment (SIP)
+      - value: ONE_TIME_LUMPSUM
+        label: One-Time Lump Sum
+  - key: target_amount
+    type: money
+    label: Investment Amount (₹)
+    required: true
+    min: 500
+    max: 1000000
+
+state_schema:
+  - key: pan_verified
+    label: PAN & Tax Identity Verification
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: SATISFIED
+  - key: kra_kyc_validated
+    label: SEBI KRA KYC Registration
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: risk_assessment_completed
+    label: Investor Risk Profiling
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: bank_account_verified
+    label: Verified Investment Bank Account
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: sip_mandate_approved
+    label: Auto-Debit Bank Mandate (eNACH)
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: nomination_and_fatca_signed
+    label: Nominee & FATCA Regulatory Consent
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+
+dependencies:
+  - source: pan_verified
+    target: kra_kyc_validated
+  - source: kra_kyc_validated
+    target: risk_assessment_completed
+  - source: pan_verified
+    target: bank_account_verified
+  - source: bank_account_verified
+    target: sip_mandate_approved
+  - source: risk_assessment_completed
+    target: nomination_and_fatca_signed
+  - source: sip_mandate_approved
+    target: nomination_and_fatca_signed
+
+actions:
+  - action_id: check_kra_status
+    title: Validate Mutual Fund KYC
+    kind: FORM
+    why: Verification against CVL / NDML KRA database
+    satisfies:
+      - kra_kyc_validated
+    preconditions:
+      - pan_verified
+
+  - action_id: complete_risk_questionnaire
+    title: Complete Risk Questionnaire
+    kind: FORM
+    why: Assess investment horizon and risk tolerance profile
+    satisfies:
+      - risk_assessment_completed
+    preconditions:
+      - kra_kyc_validated
+
+  - action_id: upload_cancelled_cheque
+    title: Upload Cancelled Cheque
+    kind: EVIDENCE
+    why: Proof of active bank account with IFSC and MICR details
+    satisfies:
+      - bank_account_verified
+    preconditions:
+      - pan_verified
+    accepts:
+      - application/pdf
+      - image/jpeg
+      - image/png
+    action_group: bank_verification_satisfaction
+
+  - action_id: link_upi_penny_drop
+    title: Verify Bank via Penny Drop
+    kind: FORM
+    why: Instant automated ₹1 test credit verification
+    satisfies:
+      - bank_account_verified
+    preconditions:
+      - pan_verified
+    action_group: bank_verification_satisfaction
+
+  - action_id: register_enach_mandate
+    title: Set Up Recurring SIP Mandate
+    kind: FORM
+    why: NPCI eNACH digital mandate for automatic monthly debits
+    satisfies:
+      - sip_mandate_approved
+    preconditions:
+      - bank_account_verified
+
+  - action_id: sign_investment_declaration
+    title: Sign Regulatory Declarations
+    kind: FORM
+    why: Accept SEBI investment terms and confirm FATCA/CRS status
+    satisfies:
+      - nomination_and_fatca_signed
+    preconditions:
+      - risk_assessment_completed
+      - sip_mandate_approved
+
+action_groups:
+  bank_verification_satisfaction:
+    primary: upload_cancelled_cheque
+    members:
+      - upload_cancelled_cheque
+      - link_upi_penny_drop
+
+evidence_mappings:
+  - doc_type: CANCELLED_CHEQUE
+    target_field: bank_account_verified
+    confidence_threshold: 0.85
+    action_id: upload_cancelled_cheque
+  - doc_type: BANK_STATEMENT_SUMMARY
+    target_field: bank_account_verified
+    confidence_threshold: 0.80
+    action_id: upload_cancelled_cheque
+  - doc_type: KRA_KYC_LETTER
+    target_field: kra_kyc_validated
+    confidence_threshold: 0.80
+    action_id: upload_cancelled_cheque
+
+ambiguity_rules:
+  - ambiguity_id: AMB_BANK_NAME_MISMATCH
+    field: bank_account_verified
+    reason: Account title printed on cheque leaf differs from investor records
+    question: Confirm if you are the primary or secondary holder on this account
+    answer_type: CHOICE
+    choices:
+      - value: PRIMARY_HOLDER
+        label: Primary Account Holder
+      - value: JOINT_HOLDER
+        label: Joint Account Holder
+
+  - ambiguity_id: AMB_PEP_STATUS
+    field: nomination_and_fatca_signed
+    reason: Politically Exposed Person regulatory confirmation required
+    question: Are you or any immediate family member a Politically Exposed Person (PEP)?
+    answer_type: CHOICE
+    choices:
+      - value: "NO"
+        label: "No, not politically exposed"
+      - value: "YES"
+        label: "Yes, politically exposed"
+
+readiness_rules:
+  mandatory_fields:
+    - pan_verified
+    - kra_kyc_validated
+    - risk_assessment_completed
+    - bank_account_verified
+    - sip_mandate_approved
+    - nomination_and_fatca_signed
+
+ui_labels:
+  goal_heading: Set Investment Goal
+  status_heading: Investment Portfolio Readiness
+  status_subtext: Complete risk profile, mandate, and KYC to start investing
+  evidence_heading: Investor Proofs
+  ready_heading: Portfolio Ready to Transact
+  ready_subtext: Mandate and KYC verified
+  recommendation_heading: Next Step
+
+prohibited_claims: []
+
+simulation_defaults:
+  kra_kyc_validated: true
+  risk_assessment_completed: true
+  bank_account_verified: true
+  sip_mandate_approved: true
+  nomination_and_fatca_signed: true

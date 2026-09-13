@@ -1,0 +1,23 @@
+pack: INSURANCE
+family: INVALID_ACTION
+description: "Verifies rejection of invalid actions and ensures journey integrity"
+initial_goal:
+  sum_insured: 500000
+  policy_type: INDIVIDUAL
+
+steps:
+  - type: action
+    action_id: accept_insurance_policy
+    expected_status_code: 422
+    expected_error_code: ACTION_INVALID
+
+  - type: action
+    action_id: schedule_tele_mer
+    expected_status_code: 422
+    expected_error_code: ACTION_INVALID
+
+  - type: action
+    action_id: submit_medical_declaration
+    expected_status_code: 200
+    expected_version: 2
+    expected_completed_count: 2

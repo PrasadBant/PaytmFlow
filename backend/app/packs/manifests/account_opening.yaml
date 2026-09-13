@@ -1,0 +1,230 @@
+metadata:
+  journey_type: ACCOUNT_OPENING
+  schema_version: "1.0.0"
+  display_name: Savings Account
+  description: Digital zero-balance savings bank account
+  icon: bank
+  flagship_demo: false
+  lifecycle_status: SUPPORTED
+  supports_natural_language: false
+
+goal_schema:
+  - key: account_type
+    type: enum
+    label: Account Type
+    required: true
+    options:
+      - value: DIGITAL_SAVINGS
+        label: Digital Savings Account
+      - value: SALARY_ACCOUNT
+        label: Corporate Salary Account
+  - key: initial_deposit
+    type: money
+    label: Initial Deposit (₹)
+    required: false
+    min: 0
+    max: 100000
+
+state_schema:
+  - key: identity_verified
+    label: Mobile & Aadhaar Authentication
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: SATISFIED
+  - key: pan_authenticated
+    label: PAN Tax Status Validation
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: nominee_declared
+    label: Bank Account Nominee
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: signature_uploaded
+    label: Specimen Signature on White Paper
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: vkyc_completed
+    label: Video KYC with Bank Officer
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+  - key: account_agreement_accepted
+    label: Digital Savings Account Terms
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+
+dependencies:
+  - source: identity_verified
+    target: pan_authenticated
+  - source: identity_verified
+    target: nominee_declared
+  - source: pan_authenticated
+    target: signature_uploaded
+  - source: nominee_declared
+    target: vkyc_completed
+  - source: signature_uploaded
+    target: vkyc_completed
+  - source: vkyc_completed
+    target: account_agreement_accepted
+
+actions:
+  - action_id: verify_pan_for_banking
+    title: Link PAN Card
+    kind: FORM
+    why: Mandatory for opening Indian savings bank account
+    satisfies:
+      - pan_authenticated
+    preconditions:
+      - identity_verified
+
+  - action_id: declare_account_nominee
+    title: Add Account Nominee
+    kind: FORM
+    why: Nominee designation for bank account operations
+    satisfies:
+      - nominee_declared
+    preconditions:
+      - identity_verified
+    action_group: nominee_satisfaction
+
+  - action_id: opt_out_nominee
+    title: Opt-Out of Nominee
+    kind: FORM
+    why: Explicitly opt out of appointing a nominee at account opening
+    satisfies:
+      - nominee_declared
+    preconditions:
+      - identity_verified
+    action_group: nominee_satisfaction
+
+  - action_id: upload_wet_signature
+    title: Upload Specimen Signature
+    kind: EVIDENCE
+    why: Clear photograph of physical signature on plain white paper
+    satisfies:
+      - signature_uploaded
+    preconditions:
+      - pan_authenticated
+    accepts:
+      - application/pdf
+      - image/jpeg
+      - image/png
+    action_group: signature_satisfaction
+
+  - action_id: upload_digital_signature
+    title: Sign on Screen (Digital Pad)
+    kind: EVIDENCE
+    why: Draw digital signature directly on touchscreen
+    satisfies:
+      - signature_uploaded
+    preconditions:
+      - pan_authenticated
+    accepts:
+      - image/png
+    action_group: signature_satisfaction
+
+  - action_id: complete_video_kyc
+    title: Start Video KYC Session
+    kind: FORM
+    why: Live interactive agent verification per RBI guidelines
+    satisfies:
+      - vkyc_completed
+    preconditions:
+      - nominee_declared
+      - signature_uploaded
+
+  - action_id: accept_banking_terms
+    title: Accept Account Terms & Open
+    kind: FORM
+    why: Consent to schedule of banking charges and debit card issuance
+    satisfies:
+      - account_agreement_accepted
+    preconditions:
+      - vkyc_completed
+
+action_groups:
+  nominee_satisfaction:
+    primary: declare_account_nominee
+    members:
+      - declare_account_nominee
+      - opt_out_nominee
+  signature_satisfaction:
+    primary: upload_wet_signature
+    members:
+      - upload_wet_signature
+      - upload_digital_signature
+
+evidence_mappings:
+  - doc_type: SIGNATURE_SPECIMEN
+    target_field: signature_uploaded
+    confidence_threshold: 0.85
+    action_id: upload_wet_signature
+  - doc_type: PAN_CARD_IMAGE
+    target_field: pan_authenticated
+    confidence_threshold: 0.80
+    action_id: upload_wet_signature
+  - doc_type: AADHAAR_FRONT_BACK
+    target_field: signature_uploaded
+    confidence_threshold: 0.80
+    action_id: upload_digital_signature
+
+ambiguity_rules:
+  - ambiguity_id: AMB_NOMINEE_RELATION
+    field: nominee_declared
+    reason: Minor nominee requires guardian designation
+    question: Confirm guardian full name and relation for minor nominee
+    answer_type: TEXT
+
+  - ambiguity_id: AMB_FATCA_STATUS
+    field: identity_verified
+    reason: Foreign Account Tax Compliance declaration required
+    question: Are you a tax resident of any jurisdiction other than India?
+    answer_type: CHOICE
+    choices:
+      - value: "NO"
+        label: "No, Resident Indian only"
+      - value: "YES"
+        label: "Yes, Dual / Foreign Tax Resident"
+
+readiness_rules:
+  mandatory_fields:
+    - identity_verified
+    - pan_authenticated
+    - nominee_declared
+    - signature_uploaded
+    - vkyc_completed
+    - account_agreement_accepted
+
+ui_labels:
+  goal_heading: Open Savings Account
+  status_heading: Account Opening Checklist
+  status_subtext: Complete KYC and nominee details to generate account number
+  evidence_heading: Required Documents
+  ready_heading: Account Ready for Activation
+  ready_subtext: All verifications complete
+  recommendation_heading: Next Step
+
+prohibited_claims: []
+
+simulation_defaults:
+  pan_authenticated: true
+  nominee_declared: true
+  signature_uploaded: true
+  vkyc_completed: true
+  account_agreement_accepted: true

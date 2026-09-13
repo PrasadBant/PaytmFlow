@@ -1,0 +1,42 @@
+pack: ACCOUNT_OPENING
+family: GOLDEN
+description: "Golden path for Digital Savings Account opening to READY status"
+initial_goal:
+  account_type: DIGITAL_SAVINGS
+  initial_deposit: 5000
+
+steps:
+  - type: action
+    action_id: verify_pan_for_banking
+    expected_status_code: 200
+    expected_version: 2
+    expected_readiness: NOT_READY
+    expected_completed_count: 2
+
+  - type: action
+    action_id: declare_account_nominee
+    expected_status_code: 200
+    expected_version: 3
+    expected_readiness: NOT_READY
+    expected_completed_count: 3
+
+  - type: action
+    action_id: upload_wet_signature
+    expected_status_code: 200
+    expected_version: 4
+    expected_readiness: NOT_READY
+    expected_completed_count: 4
+
+  - type: action
+    action_id: complete_video_kyc
+    expected_status_code: 200
+    expected_version: 5
+    expected_readiness: NOT_READY
+    expected_completed_count: 5
+
+  - type: action
+    action_id: accept_banking_terms
+    expected_status_code: 200
+    expected_version: 6
+    expected_readiness: READY
+    expected_completed_count: 6

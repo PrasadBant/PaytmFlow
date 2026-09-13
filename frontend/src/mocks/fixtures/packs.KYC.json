@@ -1,0 +1,28 @@
+{
+  "journey_type": "KYC",
+  "display_name": "Video & Biometric KYC",
+  "description": "Resolve identity ambiguities across government registers.",
+  "icon": "id",
+  "flagship_demo": false,
+  "lifecycle_status": "SUPPORTED",
+  "goal_schema": [
+    {
+      "key": "aadhaar_number",
+      "type": "text",
+      "label": "Aadhaar Number (12 digits)",
+      "required": true,
+      "placeholder": "XXXX XXXX 1234"
+    },
+    {
+      "key": "kyc_purpose",
+      "type": "enum",
+      "label": "Verification Purpose",
+      "required": true,
+      "options": ["Wallet Upgrade", "Bank Account Opening", "Fastag KYC", "Lending Verification"]
+    }
+  ],
+  "ui_labels": {
+    "goal_heading": "Identity Verification Details",
+    "goal_subtext": "Provide identity credentials to verify KYC records."
+  }
+}

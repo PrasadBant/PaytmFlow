@@ -1,0 +1,53 @@
+{
+  "journey_type": "LENDING",
+  "display_name": "Personal Loan",
+  "description": "Instant unsecured personal loan up to ₹5,00,000",
+  "icon": "rupee",
+  "flagship_demo": true,
+  "lifecycle_status": "SUPPORTED",
+  "schema_version": "1.0.0",
+  "goal_schema": [
+    {
+      "key": "loan_amount",
+      "type": "money",
+      "label": "Loan Amount (₹)",
+      "required": true,
+      "placeholder": "e.g. 200000",
+      "help_text": "Enter required amount between ₹50,000 and ₹5,00,000",
+      "min": 50000,
+      "max": 500000
+    },
+    {
+      "key": "loan_purpose",
+      "type": "enum",
+      "label": "Purpose of Loan",
+      "required": true,
+      "options": [
+        { "value": "HOME_RENOVATION", "label": "Home Renovation" },
+        { "value": "MEDICAL_EXPENSES", "label": "Medical Expenses" },
+        { "value": "EDUCATION", "label": "Higher Education" },
+        { "value": "DEBT_CONSOLIDATION", "label": "Debt Consolidation" },
+        { "value": "OTHER", "label": "Other Personal Needs" }
+      ]
+    },
+    {
+      "key": "tenure_months",
+      "type": "number",
+      "label": "Tenure (Months)",
+      "required": true,
+      "min": 6,
+      "max": 60,
+      "placeholder": "e.g. 24"
+    }
+  ],
+  "supports_natural_language": true,
+  "ui_labels": {
+    "goal_heading": "Customize Your Loan Request",
+    "status_heading": "Loan Application Status",
+    "status_subtext": "Review current verification progress and unblock pending steps",
+    "evidence_heading": "Upload Verification Documents",
+    "ready_heading": "Application Complete & Ready for Final Submission",
+    "ready_subtext": "All verifications passed. Review your summary before submission.",
+    "recommendation_heading": "Recommended Next Step"
+  }
+}

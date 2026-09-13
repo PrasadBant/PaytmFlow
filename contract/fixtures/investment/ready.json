@@ -1,0 +1,63 @@
+{
+  "journey_id": "f1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+  "journey_type": "INVESTMENT",
+  "schema_version": "1.0.0",
+  "snapshot_id": "f5555555-5555-4555-8555-555555555555",
+  "version_number": 4,
+  "readiness": "READY",
+  "status": "COMPLETED",
+  "fields": [
+    {
+      "key": "pan_verified",
+      "label": "Investor PAN Record",
+      "status": "SATISFIED",
+      "value": "ABCDE1234F",
+      "display_value": "ABCDE1234F",
+      "mandatory": true
+    },
+    {
+      "key": "bank_mandate_linked",
+      "label": "Bank Auto-Debit Mandate",
+      "status": "SATISFIED",
+      "value": "HDFC0001234",
+      "display_value": "HDFC Bank ··· 1234",
+      "mandatory": true
+    },
+    {
+      "key": "kra_kyc_status_verified",
+      "label": "KRA Mutual Fund KYC",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "KRA Registered",
+      "mandatory": true
+    },
+    {
+      "key": "risk_profile_assessed",
+      "label": "Investor Risk Profile",
+      "status": "SATISFIED",
+      "value": "MODERATE",
+      "display_value": "Moderate Growth",
+      "mandatory": true
+    },
+    {
+      "key": "fatca_declaration_signed",
+      "label": "FATCA / CRS Declaration",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Signed",
+      "mandatory": true
+    }
+  ],
+  "progress": {
+    "completed": 5,
+    "pending": 0,
+    "blockers": 0,
+    "total": 5
+  },
+  "pending_clarification": null,
+  "display": {
+    "title": "Mutual Fund Portfolio",
+    "summary": "Monthly SIP · ₹5,000"
+  },
+  "updated_at": "2026-03-01T15:20:00Z"
+}

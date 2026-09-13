@@ -1,0 +1,63 @@
+{
+  "journey_id": "e1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+  "journey_type": "ACCOUNT_OPENING",
+  "schema_version": "1.0.0",
+  "snapshot_id": "e5555555-5555-4555-8555-555555555555",
+  "version_number": 4,
+  "readiness": "READY",
+  "status": "COMPLETED",
+  "fields": [
+    {
+      "key": "kyc_reference_satisfied",
+      "label": "Central KYC Identifier",
+      "status": "SATISFIED",
+      "value": "CKYC-9988776655",
+      "display_value": "CKYC Verified",
+      "mandatory": true
+    },
+    {
+      "key": "personal_profile_completed",
+      "label": "Account Holder Profile",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Complete",
+      "mandatory": true
+    },
+    {
+      "key": "nominee_added",
+      "label": "Account Nominee",
+      "status": "SATISFIED",
+      "value": "Pooja Verma",
+      "display_value": "Pooja Verma",
+      "mandatory": true
+    },
+    {
+      "key": "debit_card_customized",
+      "label": "Virtual Debit Card Setup",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Configured",
+      "mandatory": true
+    },
+    {
+      "key": "initial_funding_recorded",
+      "label": "Initial Funding Deposit",
+      "status": "SATISFIED",
+      "value": 1000,
+      "display_value": "₹1,000 via UPI",
+      "mandatory": true
+    }
+  ],
+  "progress": {
+    "completed": 5,
+    "pending": 0,
+    "blockers": 0,
+    "total": 5
+  },
+  "pending_clarification": null,
+  "display": {
+    "title": "Savings Bank Account",
+    "summary": "Digital Savings Account"
+  },
+  "updated_at": "2026-03-01T14:20:00Z"
+}

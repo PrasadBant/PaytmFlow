@@ -1,0 +1,43 @@
+{
+  "snapshot_id": "22222222-2222-4222-8222-222222222222",
+  "readiness": "NOT_READY",
+  "recommendation": {
+    "action_id": "SUBMIT_EMPLOYMENT_INFO",
+    "title": "Declare Employment Details",
+    "kind": "FORM",
+    "why": "Confirm salaried status and employer to satisfy employment category",
+    "unlocks": ["employment_type", "employer_name"],
+    "accepts": null,
+    "input_schema": [
+      {
+        "key": "employment_type",
+        "type": "enum",
+        "label": "Employment Type",
+        "required": true,
+        "options": [
+          { "value": "SALARIED", "label": "Salaried" },
+          { "value": "SELF_EMPLOYED", "label": "Self Employed" }
+        ]
+      },
+      {
+        "key": "employer_name",
+        "type": "text",
+        "label": "Employer Name",
+        "required": true
+      }
+    ]
+  },
+  "alternatives": [
+    {
+      "action_id": "UPLOAD_BANK_STATEMENT",
+      "title": "Upload 6-Month Bank Statement",
+      "kind": "EVIDENCE",
+      "why": "Alternative verification for employer credits and regular deposits",
+      "unlocks": ["employer_name"],
+      "accepts": ["BANK_STATEMENT"],
+      "input_schema": null
+    }
+  ],
+  "minimum_path_length": 2,
+  "source": "AI_RANKED"
+}

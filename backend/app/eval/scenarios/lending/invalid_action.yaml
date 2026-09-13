@@ -1,0 +1,36 @@
+pack: LENDING
+family: INVALID_ACTION
+description: "Verifies rejection of invalid actions and ensures zero state corruption"
+initial_goal:
+  loan_amount: 200000
+  loan_purpose: HOME_RENOVATION
+  tenure_months: 24
+
+steps:
+  - type: action
+    action_id: ACCEPT_LOAN_TERMS
+    input:
+      accept_terms: true
+    expected_status_code: 422
+    expected_error_code: ACTION_INVALID
+
+  - type: action
+    action_id: UNKNOWN_ACTION_XYZ
+    input: {}
+    expected_status_code: 422
+    expected_error_code: ACTION_INVALID
+
+  - type: action
+    action_id: SUBMIT_EMPLOYMENT_INFO
+    input:
+      employment_type: INVALID_ENUM_VALUE
+    expected_status_code: 400
+    expected_error_code: VALIDATION_ERROR
+
+  - type: action
+    action_id: UPLOAD_INCOME_PROOF
+    input:
+      monthly_income: 85000
+    expected_status_code: 200
+    expected_version: 2
+    expected_completed_count: 4

@@ -1,0 +1,268 @@
+metadata:
+  journey_type: LENDING
+  schema_version: "1.0.0"
+  display_name: Personal Loan
+  description: Instant unsecured personal loan up to ₹5,00,000
+  icon: rupee
+  flagship_demo: true
+  lifecycle_status: SUPPORTED
+  supports_natural_language: true
+
+goal_schema:
+  - key: loan_amount
+    type: money
+    label: Loan Amount (₹)
+    required: true
+    placeholder: e.g. 200000
+    help_text: Enter required amount between ₹50,000 and ₹5,00,000
+    min: 50000
+    max: 500000
+  - key: loan_purpose
+    type: enum
+    label: Purpose of Loan
+    required: true
+    options:
+      - value: HOME_RENOVATION
+        label: Home Renovation
+      - value: MEDICAL_EXPENSES
+        label: Medical Expenses
+      - value: EDUCATION
+        label: Higher Education
+      - value: DEBT_CONSOLIDATION
+        label: Debt Consolidation
+      - value: OTHER
+        label: Other Personal Needs
+  - key: tenure_months
+    type: number
+    label: Tenure (Months)
+    required: true
+    min: 6
+    max: 60
+    placeholder: e.g. 24
+
+state_schema:
+  - key: kyc_verified
+    label: Identity & KYC Status
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: SATISFIED
+  - key: pan_validated
+    label: PAN Card Validation
+    type: text
+    mandatory: true
+    derived: false
+    display: true
+    default_status: SATISFIED
+  - key: bank_account_linked
+    label: Primary Bank Account
+    type: text
+    mandatory: true
+    derived: false
+    display: true
+    default_status: SATISFIED
+  - key: monthly_income
+    label: Monthly Net Income
+    type: money
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+    explanation: Upload recent salary slip or bank statement showing regular salary credits
+  - key: employment_type
+    label: Employment Category
+    type: enum
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+    explanation: Confirm salaried or self-employed status
+  - key: employer_name
+    label: Current Employer
+    type: text
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+    explanation: Depends on verified employment category
+  - key: loan_offer_accepted
+    label: Final Loan Agreement
+    type: boolean
+    mandatory: true
+    derived: false
+    display: true
+    default_status: BLOCKED
+    explanation: Accept loan terms once all prior verifications pass
+
+dependencies:
+  - source: kyc_verified
+    target: monthly_income
+  - source: kyc_verified
+    target: employment_type
+  - source: employment_type
+    target: employer_name
+  - source: monthly_income
+    target: loan_offer_accepted
+  - source: employer_name
+    target: loan_offer_accepted
+
+actions:
+  - action_id: UPLOAD_INCOME_PROOF
+    title: Upload Income Proof
+    kind: EVIDENCE
+    why: Verifying your monthly income unblocks loan offer calculation
+    satisfies:
+      - monthly_income
+    preconditions:
+      - kyc_verified
+    accepts:
+      - SALARY_SLIP
+      - BANK_STATEMENT
+    action_group: INCOME_VERIFICATION_GROUP
+
+  - action_id: LINK_AA_ACCOUNT
+    title: Link Bank via Account Aggregator
+    kind: FORM
+    why: Automated digital fetch of bank statement with instant verification
+    satisfies:
+      - monthly_income
+    preconditions:
+      - kyc_verified
+    input_schema:
+      - key: consent_handle
+        type: text
+        label: Account Aggregator Handle
+        required: true
+    action_group: INCOME_VERIFICATION_GROUP
+
+  - action_id: SUBMIT_EMPLOYMENT_INFO
+    title: Declare Employment Details
+    kind: FORM
+    why: Confirm employment category to unblock employer verification
+    satisfies:
+      - employment_type
+    preconditions:
+      - kyc_verified
+    input_schema:
+      - key: employment_type
+        type: enum
+        label: Employment Type
+        required: true
+        options:
+          - value: SALARIED
+            label: Salaried
+          - value: SELF_EMPLOYED
+            label: Self Employed
+
+  - action_id: VERIFY_EMPLOYER_RECORD
+    title: Declare Employer Details
+    kind: FORM
+    why: Provide current organization name
+    satisfies:
+      - employer_name
+    preconditions:
+      - employment_type
+    input_schema:
+      - key: employer_name
+        type: text
+        label: Employer Organization Name
+        required: true
+    action_group: EMPLOYER_VERIFICATION_GROUP
+
+  - action_id: UPLOAD_WORK_ID
+    title: Upload Work Identity Document
+    kind: EVIDENCE
+    why: Verify employer organization using office badge or official document
+    satisfies:
+      - employer_name
+    preconditions:
+      - employment_type
+    accepts:
+      - OFFICE_ID_CARD
+      - OFFER_LETTER
+    action_group: EMPLOYER_VERIFICATION_GROUP
+
+  - action_id: ACCEPT_LOAN_TERMS
+    title: Accept Loan Agreement Terms
+    kind: FORM
+    why: Accept customized loan terms to finalize application
+    satisfies:
+      - loan_offer_accepted
+    preconditions:
+      - monthly_income
+      - employer_name
+    input_schema:
+      - key: accept_terms
+        type: boolean
+        label: I agree to the loan agreement and repayment terms
+        required: true
+
+action_groups:
+  INCOME_VERIFICATION_GROUP:
+    primary: UPLOAD_INCOME_PROOF
+    members:
+      - UPLOAD_INCOME_PROOF
+      - LINK_AA_ACCOUNT
+  EMPLOYER_VERIFICATION_GROUP:
+    primary: VERIFY_EMPLOYER_RECORD
+    members:
+      - VERIFY_EMPLOYER_RECORD
+      - UPLOAD_WORK_ID
+
+evidence_mappings:
+  - doc_type: SALARY_SLIP
+    target_field: monthly_income
+    confidence_threshold: 0.85
+    action_id: UPLOAD_INCOME_PROOF
+  - doc_type: BANK_STATEMENT
+    target_field: monthly_income
+    confidence_threshold: 0.80
+    action_id: UPLOAD_INCOME_PROOF
+  - doc_type: OFFICE_ID_CARD
+    target_field: employer_name
+    confidence_threshold: 0.90
+    action_id: UPLOAD_WORK_ID
+  - doc_type: OFFER_LETTER
+    target_field: employer_name
+    confidence_threshold: 0.85
+    action_id: UPLOAD_WORK_ID
+
+ambiguity_rules:
+  - ambiguity_id: INCOME_MISMATCH
+    field: monthly_income
+    reason: Bank statement credit differs from salary slip
+    question: Which monthly income figure should be used for assessment?
+    answer_type: MONEY
+  - ambiguity_id: EMPLOYER_UNVERIFIED
+    field: employer_name
+    reason: Employer organization name could not be automatically matched in database
+    question: Please confirm the registered corporate name of your employer
+    answer_type: TEXT
+
+readiness_rules:
+  mandatory_fields:
+    - kyc_verified
+    - pan_validated
+    - bank_account_linked
+    - monthly_income
+    - employment_type
+    - employer_name
+    - loan_offer_accepted
+
+ui_labels:
+  goal_heading: Customize Your Loan Request
+  status_heading: Loan Application Status
+  status_subtext: Review current verification progress and unblock pending steps
+  evidence_heading: Upload Verification Documents
+  ready_heading: Application Complete & Ready for Final Submission
+  ready_subtext: All verifications passed. Review your summary before submission.
+  recommendation_heading: Recommended Next Step
+
+prohibited_claims: []
+
+simulation_defaults:
+  monthly_income: 85000
+  employment_type: SALARIED
+  employer_name: Acme Technologies India Pvt Ltd
+  loan_offer_accepted: true

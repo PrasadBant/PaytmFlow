@@ -1,0 +1,34 @@
+# --- Frontend (Node / Vite) ---
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+frontend/coverage/
+frontend/.vite/
+frontend/*.tsbuildinfo
+frontend/.env.local
+
+# --- Backend (Python / FastAPI) ---
+backend/.venv/
+backend/__pycache__/
+**/__pycache__/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/.import_linter_cache/
+backend/*.egg-info/
+backend/storage/evidence/*
+!backend/storage/evidence/.gitkeep
+backend/.env
+
+# --- Agent / tooling scratch (not part of the product) ---
+.agents/
+.planning/
+graphify-out/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+nul
+.vscode/
+.idea/

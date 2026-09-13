@@ -1,0 +1,46 @@
+pack: KYC
+family: AMBIGUITY_CONFLICT
+description: "Resolves expired document ambiguity via explicit validity clarification"
+initial_goal:
+  kyc_purpose: ADDRESS_CHANGE
+
+steps:
+  - type: action
+    action_id: upload_passport_ovd
+    expected_status_code: 200
+    expected_version: 2
+
+  - type: inject_ambiguity
+    ambiguity_id: AMB_EXPIRED_DOCUMENT
+    field: ovd_document_uploaded
+    reason: OVD document issue date is more than 10 years old
+    question: Is your official document still active and valid?
+    answer_type: CHOICE
+
+  - type: clarification
+    ambiguity_id: AMB_EXPIRED_DOCUMENT
+    field: ovd_document_uploaded
+    answer: VALID
+    expected_status_code: 200
+    expected_version: 4
+
+  - type: action
+    action_id: link_pan_record
+    expected_status_code: 200
+    expected_version: 5
+
+  - type: action
+    action_id: capture_liveness_selfie
+    expected_status_code: 200
+    expected_version: 6
+
+  - type: action
+    action_id: validate_gps_location
+    expected_status_code: 200
+    expected_version: 7
+
+  - type: action
+    action_id: sign_rekyc_undertaking
+    expected_status_code: 200
+    expected_version: 8
+    expected_readiness: READY

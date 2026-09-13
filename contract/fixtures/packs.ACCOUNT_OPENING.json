@@ -1,0 +1,39 @@
+{
+  "journey_type": "ACCOUNT_OPENING",
+  "display_name": "Savings Account",
+  "description": "Digital zero-balance savings bank account",
+  "icon": "bank",
+  "flagship_demo": false,
+  "lifecycle_status": "SUPPORTED",
+  "schema_version": "1.0.0",
+  "goal_schema": [
+    {
+      "key": "account_type",
+      "type": "enum",
+      "label": "Account Type",
+      "required": true,
+      "options": [
+        { "value": "DIGITAL_SAVINGS", "label": "Digital Savings Account" },
+        { "value": "SALARY_ACCOUNT", "label": "Corporate Salary Account" }
+      ]
+    },
+    {
+      "key": "initial_deposit",
+      "type": "money",
+      "label": "Initial Deposit (₹)",
+      "required": false,
+      "min": 0,
+      "max": 100000
+    }
+  ],
+  "supports_natural_language": false,
+  "ui_labels": {
+    "goal_heading": "Open Savings Account",
+    "status_heading": "Account Opening Checklist",
+    "status_subtext": "Complete KYC and nominee details to generate account number",
+    "evidence_heading": "Required Documents",
+    "ready_heading": "Account Ready for Activation",
+    "ready_subtext": "All verifications complete",
+    "recommendation_heading": "Next Step"
+  }
+}

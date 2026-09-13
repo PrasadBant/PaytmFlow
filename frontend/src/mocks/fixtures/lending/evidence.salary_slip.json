@@ -1,0 +1,102 @@
+{
+  "evidence_id": "22222222-2222-2222-2222-222222222222",
+  "filename": "payslip_august_2026.pdf",
+  "uploaded_at": "2026-09-12T10:05:00Z",
+  "size_bytes": 1428500,
+  "interpretation": {
+    "verified": true,
+    "confidence": 0.96,
+    "detected": [
+      {
+        "key": "monthly_income",
+        "label": "Net Monthly Salary",
+        "display_value": "₹85,000"
+      },
+      {
+        "key": "employer_name",
+        "label": "Employer Organization",
+        "display_value": "Paytm Technologies Ltd"
+      }
+    ],
+    "summary": "Verified August 2026 salary slip confirming net in-hand credit of ₹85,000 from Paytm Technologies Ltd.",
+    "conflicts": []
+  },
+  "proposed_action_id": "UPLOAD_INCOME_PROOF",
+  "consequence_preview": {
+    "newly_satisfied": [
+      {
+        "key": "monthly_income",
+        "label": "Verified Monthly Income"
+      }
+    ],
+    "newly_unlocked": [
+      {
+        "action_id": "UPLOAD_BANK_STATEMENT",
+        "title": "Upload Bank Statement"
+      }
+    ],
+    "still_blocked": [
+      {
+        "key": "bank_statement",
+        "label": "Salary Account Verification"
+      },
+      {
+        "key": "pan_verification",
+        "label": "PAN Card Verification"
+      },
+      {
+        "key": "current_address",
+        "label": "Current Residential Address"
+      }
+    ],
+    "predicted_readiness": "NOT_READY",
+    "progress_before": {
+      "completed": 3,
+      "pending": 3,
+      "blockers": 1,
+      "total": 7
+    },
+    "progress_after": {
+      "completed": 4,
+      "pending": 2,
+      "blockers": 1,
+      "total": 7
+    }
+  },
+  "diff_preview": {
+    "from_version": 1,
+    "to_version": 2,
+    "fields_changed": [
+      {
+        "key": "monthly_income",
+        "label": "Verified Monthly Income",
+        "from_status": "BLOCKED",
+        "to_status": "SATISFIED",
+        "display_value": "₹85,000",
+        "cause": "ACTION:UPLOAD_INCOME_PROOF",
+        "cascaded": false
+      }
+    ],
+    "actions_unlocked": ["UPLOAD_BANK_STATEMENT"],
+    "actions_removed": ["UPLOAD_INCOME_PROOF"],
+    "readiness": {
+      "from": "NOT_READY",
+      "to": "NOT_READY"
+    },
+    "progress": {
+      "from": {
+        "completed": 3,
+        "pending": 3,
+        "blockers": 1,
+        "total": 7
+      },
+      "to": {
+        "completed": 4,
+        "pending": 2,
+        "blockers": 1,
+        "total": 7
+      }
+    }
+  },
+  "requires_review": false
+}

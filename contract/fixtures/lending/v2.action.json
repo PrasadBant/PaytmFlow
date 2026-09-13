@@ -1,0 +1,155 @@
+{
+  "journey": {
+    "journey_id": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+    "journey_type": "LENDING",
+    "schema_version": "1.0.0",
+    "snapshot_id": "22222222-2222-4222-8222-222222222222",
+    "version_number": 2,
+    "readiness": "NOT_READY",
+    "status": "IN_PROGRESS",
+    "fields": [
+      {
+        "key": "kyc_verified",
+        "label": "Identity & KYC Status",
+        "status": "SATISFIED",
+        "value": true,
+        "display_value": "Verified",
+        "mandatory": true
+      },
+      {
+        "key": "pan_validated",
+        "label": "PAN Card Validation",
+        "status": "SATISFIED",
+        "value": "ABCDE1234F",
+        "display_value": "ABCDE1234F",
+        "mandatory": true
+      },
+      {
+        "key": "bank_account_linked",
+        "label": "Primary Bank Account",
+        "status": "SATISFIED",
+        "value": "HDFC0001234",
+        "display_value": "HDFC Bank ··· 1234",
+        "mandatory": true
+      },
+      {
+        "key": "monthly_income",
+        "label": "Monthly Net Income",
+        "status": "SATISFIED",
+        "value": 85000,
+        "display_value": "₹85,000",
+        "mandatory": true
+      },
+      {
+        "key": "employment_type",
+        "label": "Employment Category",
+        "status": "BLOCKED",
+        "value": null,
+        "display_value": "Pending",
+        "explanation": "Confirm salaried or self-employed status",
+        "resolve_action_id": "SUBMIT_EMPLOYMENT_INFO",
+        "mandatory": true
+      },
+      {
+        "key": "employer_name",
+        "label": "Current Employer",
+        "status": "BLOCKED",
+        "value": null,
+        "display_value": "Pending",
+        "explanation": "Depends on verified employment category",
+        "resolve_action_id": "SUBMIT_EMPLOYMENT_INFO",
+        "mandatory": true
+      },
+      {
+        "key": "loan_offer_accepted",
+        "label": "Final Loan Agreement",
+        "status": "BLOCKED",
+        "value": false,
+        "display_value": "Pending",
+        "explanation": "Accept loan terms once all prior verifications pass",
+        "resolve_action_id": "ACCEPT_LOAN_TERMS",
+        "mandatory": true
+      }
+    ],
+    "progress": {
+      "completed": 4,
+      "pending": 3,
+      "blockers": 2,
+      "total": 7
+    },
+    "pending_clarification": null,
+    "display": {
+      "title": "Personal Loan",
+      "summary": "₹2,00,000 · Home Renovation"
+    },
+    "updated_at": "2026-03-01T10:06:00Z"
+  },
+  "diff": {
+    "from_version": 1,
+    "to_version": 2,
+    "fields_changed": [
+      {
+        "key": "monthly_income",
+        "label": "Monthly Net Income",
+        "from_status": "BLOCKED",
+        "to_status": "SATISFIED",
+        "display_value": "₹85,000",
+        "cause": "ACTION:UPLOAD_INCOME_PROOF",
+        "cascaded": false
+      }
+    ],
+    "actions_unlocked": ["SUBMIT_EMPLOYMENT_INFO"],
+    "actions_removed": ["UPLOAD_INCOME_PROOF"],
+    "readiness": {
+      "from": "NOT_READY",
+      "to": "NOT_READY"
+    },
+    "progress": {
+      "from": {
+        "completed": 3,
+        "pending": 4,
+        "blockers": 3,
+        "total": 7
+      },
+      "to": {
+        "completed": 4,
+        "pending": 3,
+        "blockers": 2,
+        "total": 7
+      }
+    }
+  },
+  "next_recommendation": {
+    "snapshot_id": "22222222-2222-4222-8222-222222222222",
+    "readiness": "NOT_READY",
+    "recommendation": {
+      "action_id": "SUBMIT_EMPLOYMENT_INFO",
+      "title": "Declare Employment Details",
+      "kind": "FORM",
+      "why": "Confirm salaried status and employer to satisfy employment category",
+      "unlocks": ["employment_type", "employer_name"],
+      "accepts": null,
+      "input_schema": [
+        {
+          "key": "employment_type",
+          "type": "enum",
+          "label": "Employment Type",
+          "required": true,
+          "options": [
+            { "value": "SALARIED", "label": "Salaried" },
+            { "value": "SELF_EMPLOYED", "label": "Self Employed" }
+          ]
+        },
+        {
+          "key": "employer_name",
+          "type": "text",
+          "label": "Employer Name",
+          "required": true
+        }
+      ]
+    },
+    "alternatives": [],
+    "minimum_path_length": 2,
+    "source": "AI_RANKED"
+  }
+}

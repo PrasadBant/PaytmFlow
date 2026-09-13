@@ -1,0 +1,29 @@
+{
+  "evidence_id": "e2222222-3333-4444-8555-666666666666",
+  "filename": "hdfc_bank_statement_jan_feb.pdf",
+  "uploaded_at": "2026-03-01T10:10:00Z",
+  "size_bytes": 524288,
+  "interpretation": {
+    "verified": false,
+    "confidence": 0.81,
+    "detected": [
+      {
+        "key": "monthly_income",
+        "label": "Average Monthly Inflow",
+        "display_value": "₹62,000"
+      }
+    ],
+    "summary": "Bank statement reflects ₹62,000 average monthly credit, which differs from declared ₹85,000 salary slip.",
+    "conflicts": [
+      {
+        "ambiguity_id": "INCOME_MISMATCH",
+        "field": "monthly_income",
+        "message": "Bank statement credit of ₹62,000 conflicts with previously verified salary slip ₹85,000"
+      }
+    ]
+  },
+  "proposed_action_id": null,
+  "consequence_preview": null,
+  "diff_preview": null,
+  "requires_review": true
+}

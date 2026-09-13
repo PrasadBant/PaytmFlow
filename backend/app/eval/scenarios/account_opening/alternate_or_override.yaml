@@ -1,0 +1,38 @@
+pack: ACCOUNT_OPENING
+family: ALTERNATE_OR_OVERRIDE
+description: "Uses nominee opt-out and touchscreen digital signature alternatives"
+initial_goal:
+  account_type: DIGITAL_SAVINGS
+  initial_deposit: 5000
+
+steps:
+  - type: action
+    action_id: verify_pan_for_banking
+    expected_status_code: 200
+    expected_version: 2
+    expected_completed_count: 2
+
+  - type: action
+    action_id: opt_out_nominee
+    expected_status_code: 200
+    expected_version: 3
+    expected_completed_count: 3
+
+  - type: action
+    action_id: upload_digital_signature
+    expected_status_code: 200
+    expected_version: 4
+    expected_completed_count: 4
+
+  - type: action
+    action_id: complete_video_kyc
+    expected_status_code: 200
+    expected_version: 5
+    expected_completed_count: 5
+
+  - type: action
+    action_id: accept_banking_terms
+    expected_status_code: 200
+    expected_version: 6
+    expected_readiness: READY
+    expected_completed_count: 6

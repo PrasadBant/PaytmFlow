@@ -1,0 +1,47 @@
+pack: INVESTMENT
+family: AMBIGUITY_CONFLICT
+description: "Resolves bank account title mismatch ambiguity via explicit clarification"
+initial_goal:
+  investment_mode: MONTHLY_SIP
+  target_amount: 10000
+
+steps:
+  - type: action
+    action_id: upload_cancelled_cheque
+    expected_status_code: 200
+    expected_version: 2
+
+  - type: inject_ambiguity
+    ambiguity_id: AMB_BANK_NAME_MISMATCH
+    field: bank_account_verified
+    reason: Account title printed on cheque leaf differs from investor records
+    question: Confirm if you are the primary or secondary holder on this account
+    answer_type: CHOICE
+
+  - type: clarification
+    ambiguity_id: AMB_BANK_NAME_MISMATCH
+    field: bank_account_verified
+    answer: PRIMARY_HOLDER
+    expected_status_code: 200
+    expected_version: 4
+
+  - type: action
+    action_id: register_enach_mandate
+    expected_status_code: 200
+    expected_version: 5
+
+  - type: action
+    action_id: check_kra_status
+    expected_status_code: 200
+    expected_version: 6
+
+  - type: action
+    action_id: complete_risk_questionnaire
+    expected_status_code: 200
+    expected_version: 7
+
+  - type: action
+    action_id: sign_investment_declaration
+    expected_status_code: 200
+    expected_version: 8
+    expected_readiness: READY

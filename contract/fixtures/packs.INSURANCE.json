@@ -1,0 +1,40 @@
+{
+  "journey_type": "INSURANCE",
+  "display_name": "Health Insurance",
+  "description": "Comprehensive health cover with cashless hospitalization",
+  "icon": "shield",
+  "flagship_demo": false,
+  "lifecycle_status": "SUPPORTED",
+  "schema_version": "1.0.0",
+  "goal_schema": [
+    {
+      "key": "sum_insured",
+      "type": "money",
+      "label": "Sum Insured (₹)",
+      "required": true,
+      "min": 300000,
+      "max": 5000000
+    },
+    {
+      "key": "policy_type",
+      "type": "enum",
+      "label": "Policy Type",
+      "required": true,
+      "options": [
+        { "value": "INDIVIDUAL", "label": "Individual Cover" },
+        { "value": "FAMILY_FLOATER", "label": "Family Floater" },
+        { "value": "GROUP", "label": "Group Cover" }
+      ]
+    }
+  ],
+  "supports_natural_language": false,
+  "ui_labels": {
+    "goal_heading": "Select Health Cover Options",
+    "status_heading": "Health Policy Underwriting Checklist",
+    "status_subtext": "Provide declaration and medical history to issue policy",
+    "evidence_heading": "Medical & Identity Proofs",
+    "ready_heading": "Health Cover Ready",
+    "ready_subtext": "All declarations verified",
+    "recommendation_heading": "Next Verification Item"
+  }
+}

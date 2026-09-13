@@ -1,0 +1,63 @@
+{
+  "journey_id": "d1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+  "journey_type": "KYC",
+  "schema_version": "1.0.0",
+  "snapshot_id": "d5555555-5555-4555-8555-555555555555",
+  "version_number": 4,
+  "readiness": "READY",
+  "status": "COMPLETED",
+  "fields": [
+    {
+      "key": "mobile_verified",
+      "label": "Registered Mobile OTP",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "+91 98765 43210",
+      "mandatory": true
+    },
+    {
+      "key": "pan_record",
+      "label": "PAN Verification Record",
+      "status": "SATISFIED",
+      "value": "ABCDE1234F",
+      "display_value": "ABCDE1234F",
+      "mandatory": true
+    },
+    {
+      "key": "aadhaar_xml_verified",
+      "label": "Aadhaar Paperless e-KYC",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "UIDAI Verified",
+      "mandatory": true
+    },
+    {
+      "key": "live_selfie_captured",
+      "label": "Liveness Face Match",
+      "status": "SATISFIED",
+      "value": 0.98,
+      "display_value": "Match 98%",
+      "mandatory": true
+    },
+    {
+      "key": "kyc_declaration_signed",
+      "label": "Customer Re-KYC Consent",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Signed",
+      "mandatory": true
+    }
+  ],
+  "progress": {
+    "completed": 5,
+    "pending": 0,
+    "blockers": 0,
+    "total": 5
+  },
+  "pending_clarification": null,
+  "display": {
+    "title": "Full KYC Re-verification",
+    "summary": "Periodic Re-KYC Update"
+  },
+  "updated_at": "2026-03-01T13:20:00Z"
+}

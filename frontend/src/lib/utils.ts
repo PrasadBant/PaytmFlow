@@ -1,0 +1,64 @@
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]): string {
+  return twMerge(clsx(inputs));
+}
+
+/**
+ * Formats a numeric value using the Indian numbering system (e.g. 500000 -> 5,00,000)
+ */
+export function formatIndianCurrency(value: number | string | undefined | null): string {
+  if (value === undefined || value === null || value === '') {
+    return '';
+  }
+  const numericValue = typeof value === 'number' ? value : Number(String(value).replace(/[^0-9.-]+/g, ''));
+  if (isNaN(numericValue)) {
+    return String(value);
+  }
+
+  // Format with en-IN locale
+  return new Intl.NumberFormat('en-IN').format(numericValue);
+}
+
+/**
+ * Formats an ISO date string into human-readable relative time (e.g. "2h ago", "3d ago")
+ */
+export function formatRelativeTime(dateInput: string | Date | undefined | null): string {
+  if (!dateInput) return '';
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  if (isNaN(date.getTime())) return '';
+
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) {
+    return 'Just now';
+  }
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes}m ago`;
+  }
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) {
+    return `${diffInHours}h ago`;
+  }
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 30) {
+    return `${diffInDays}d ago`;
+  }
+  return date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+}
+
+/**
+ * Parses Indian currency string (e.g. "₹ 5,00,000" or "5,00,000") back to a raw number.
+ */
+export function parseIndianCurrency(value: string): number | null {
+  const cleaned = value.replace(/[^0-9.-]+/g, '');
+  if (!cleaned) return null;
+  const num = Number(cleaned);
+  return isNaN(num) ? null : num;
+}
+
+
+

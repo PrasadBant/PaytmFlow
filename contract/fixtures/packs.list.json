@@ -1,0 +1,52 @@
+{
+  "packs": [
+    {
+      "journey_type": "LENDING",
+      "display_name": "Personal Loan",
+      "description": "Instant unsecured personal loan up to ₹5,00,000",
+      "icon": "rupee",
+      "flagship_demo": true,
+      "lifecycle_status": "SUPPORTED"
+    },
+    {
+      "journey_type": "INSURANCE",
+      "display_name": "Health Insurance",
+      "description": "Comprehensive health cover with cashless hospitalization",
+      "icon": "shield",
+      "flagship_demo": false,
+      "lifecycle_status": "SUPPORTED"
+    },
+    {
+      "journey_type": "CREDIT_CARD",
+      "display_name": "Credit Card",
+      "description": "Co-branded cashback credit card with zero annual fee",
+      "icon": "card",
+      "flagship_demo": false,
+      "lifecycle_status": "SUPPORTED"
+    },
+    {
+      "journey_type": "KYC",
+      "display_name": "Full KYC Re-verification",
+      "description": "RBI-mandated periodic customer identity update",
+      "icon": "id",
+      "flagship_demo": false,
+      "lifecycle_status": "SUPPORTED"
+    },
+    {
+      "journey_type": "ACCOUNT_OPENING",
+      "display_name": "Savings Account",
+      "description": "Digital zero-balance savings bank account",
+      "icon": "bank",
+      "flagship_demo": false,
+      "lifecycle_status": "SUPPORTED"
+    },
+    {
+      "journey_type": "INVESTMENT",
+      "display_name": "Mutual Fund Investment",
+      "description": "SIP and lump-sum investment portfolio setup",
+      "icon": "chart",
+      "flagship_demo": false,
+      "lifecycle_status": "SUPPORTED"
+    }
+  ]
+}

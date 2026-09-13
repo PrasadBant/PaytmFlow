@@ -1,0 +1,8 @@
+[importlinter]
+root_package = app
+
+[importlinter:contract:core-is-pure]
+name = Deterministic core must not import AI, DB or API
+type = forbidden
+source_modules = app.core
+forbidden_modules = app.ai, app.db, app.api, app.services, app.evidence
