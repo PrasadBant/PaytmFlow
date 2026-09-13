@@ -143,6 +143,23 @@ export function Screen03GoalBasicInfo(): ReactElement {
 
       {/* Goal Form Card */}
       <Card className="p-6 md:p-8 shadow-xs border border-surface-border bg-white rounded-card">
+        {/* "I want to" context strip - the reference mockup shows this as a selectable
+            field, but the real goal_schema has no such field/options for any pack
+            (verified against contract/openapi.yaml and every pack manifest). Rather
+            than fabricate a dropdown with invented choices, this renders the pack's
+            own real, already-fetched, contract-required `description` (JourneyPackSummary.
+            description) as a plain read-only line - same position and framing as the
+            reference, zero fabricated data, zero contract change. See visual audit
+            notes for the full mismatch writeup. */}
+        <div className="mb-5 space-y-1.5">
+          <p className="text-sm font-semibold text-content-primary">
+            I want to
+          </p>
+          <div className="w-full rounded-button bg-surface-subtle border border-surface-border px-3.5 py-2.5 text-sm text-content-secondary">
+            {pack.description}
+          </div>
+        </div>
+
         {/* Optional Natural Language Progressive Disclosure */}
         <div className="mb-6 border-b border-surface-border pb-6">
           <button

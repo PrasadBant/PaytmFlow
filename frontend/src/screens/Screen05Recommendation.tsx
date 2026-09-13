@@ -1,4 +1,4 @@
-import { useEffect, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { useRecommendation, type ActionOption } from '@/api/hooks/useRecommendation';
@@ -7,6 +7,8 @@ import { RecommendationCard } from '@/components/RecommendationCard';
 import { ActionList } from '@/components/ActionList';
 import { AssistantHelpCard } from '@/components/AssistantHelpCard';
 import { DeadEndState } from '@/components/DeadEndState';
+import { FormActionModal } from '@/components/FormActionModal';
+import type { ActionResponse } from '@/api/hooks/useApplyAction';
 import { Card } from '@/components/primitives/Card';
 import { Button } from '@/components/primitives/Button';
 import { Spinner } from '@/components/primitives/Spinner';
@@ -27,6 +29,13 @@ export function Screen05Recommendation(): ReactElement {
   } = useJourney(id);
 
   const isLoading = isRecLoading || isJourneyLoading;
+
+  // FORM-kind actions render inline as "a generic action modal rendered from
+  // input_schema" per contract (kind tells Dev1 which UI to open: EVIDENCE -> Screen 6,
+  // FORM -> generic action modal, CLARIFICATION -> NeedsReviewCard). Screen 5 already
+  // holds the full ActionOption (incl. input_schema) for both the recommendation and
+  // its alternatives, so it can open the modal directly instead of navigating away.
+  const [formModalAction, setFormModalAction] = useState<ActionOption | null>(null);
 
   // Auto-redirect if journey readiness is already READY (Contract rule: READY -> Screen 9)
   useEffect(() => {
@@ -81,7 +90,27 @@ export function Screen05Recommendation(): ReactElement {
   const subtext = 'Based on your application data, this is the best next action to move forward.';
 
   const handleActionSelect = (action: ActionOption): void => {
+    // CLARIFICATION-kind actions are a targeted ambiguity question, not something to
+    // "open" - per contract, kind tells Dev1 which UI to use: EVIDENCE -> Screen 6,
+    // FORM -> generic action modal, CLARIFICATION -> NeedsReviewCard. Screen 6 has no
+    // upload/form UI for a clarification (there is nothing to upload and no
+    // input_schema to fill), so route back to Screen 4 instead, which renders
+    // NeedsReviewCard for any AMBIGUOUS field.
+    if (action.kind === 'CLARIFICATION') {
+      navigate(`/j/${id}`);
+      return;
+    }
+    if (action.kind === 'FORM') {
+      setFormModalAction(action);
+      return;
+    }
     navigate(`/j/${id}/act/${action.action_id}`);
+  };
+
+  const handleFormActionSuccess = (response: ActionResponse): void => {
+    navigate(`/j/${id}/updated`, {
+      state: { actionResponse: response, journeyId: id },
+    });
   };
 
   return (
@@ -136,6 +165,15 @@ export function Screen05Recommendation(): ReactElement {
           <AssistantHelpCard />
         </div>
       </div>
+
+      <FormActionModal
+        isOpen={formModalAction !== null}
+        onClose={() => setFormModalAction(null)}
+        action={formModalAction}
+        journeyId={id || ''}
+        expectedSnapshotId={recData.snapshot_id}
+        onSuccess={handleFormActionSuccess}
+      />
     </div>
   );
 }

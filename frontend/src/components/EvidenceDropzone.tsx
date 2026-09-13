@@ -206,7 +206,7 @@ export function EvidenceDropzone({
             'relative rounded-2xl border-2 border-dashed p-8 md:p-10 text-center cursor-pointer transition-all duration-150 select-none flex flex-col items-center justify-center gap-3',
             isDragging
               ? 'border-paytm-blue bg-paytm-blue-50/50 scale-[1.01]'
-              : 'border-slate-300 bg-white hover:border-paytm-blue/60 hover:bg-slate-50/60',
+              : 'border-paytm-blue-action/60 bg-white hover:border-paytm-blue-action hover:bg-paytm-blue-50/30',
             activeError && 'border-paytm-red bg-paytm-red-light/30',
             (disabled || isUploading) && 'opacity-60 cursor-not-allowed bg-surface-muted',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paytm-cyan focus-visible:border-paytm-cyan'

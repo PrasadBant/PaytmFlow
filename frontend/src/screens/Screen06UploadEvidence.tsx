@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, UploadCloud, FileEdit, HelpCircle, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useJourney } from '@/api/hooks/useJourney';
@@ -87,23 +87,56 @@ export const Screen06UploadEvidence: React.FC = () => {
   const currentSnapshotId = locationState.snapshotId || journey?.snapshot_id || '';
   const docType = action?.accepts?.[0] || (actionId ? actionId.replace(/^UPLOAD_/, '') : 'DOCUMENT');
 
-  const tabs: TabItem[] = [
-    {
-      id: 'upload',
-      label: 'Upload File',
-      icon: <UploadCloud className="w-4 h-4" aria-hidden="true" />,
-    },
-    {
-      id: 'manual',
-      label: 'Enter Details',
-      icon: <FileEdit className="w-4 h-4" aria-hidden="true" />,
-    },
-    {
-      id: 'help',
-      label: 'How it helps',
-      icon: <HelpCircle className="w-4 h-4" aria-hidden="true" />,
-    },
-  ];
+  // This route serves every resolve_action_id on Screen 4/5, for every action kind,
+  // across all six packs - not just LENDING's income-proof upload. The screen must
+  // present differently for a document upload (EVIDENCE) vs. a plain field submission
+  // (FORM); there is nothing to "upload" for e.g. ACCEPT_LOAN_TERMS or
+  // SUBMIT_EMPLOYMENT_INFO, so that tab (and its evidence-specific copy) is only
+  // offered for EVIDENCE-kind actions.
+  const isFormAction = action?.kind === 'FORM';
+  const screenTitle = action?.title || (isFormAction ? 'Complete This Step' : 'Upload Evidence');
+
+  const tabs: TabItem[] = isFormAction
+    ? [
+        {
+          id: 'manual',
+          label: 'Enter Details',
+          icon: <FileEdit className="w-4 h-4" aria-hidden="true" />,
+        },
+      ]
+    : [
+        {
+          id: 'upload',
+          label: 'Upload File',
+          icon: <UploadCloud className="w-4 h-4" aria-hidden="true" />,
+        },
+        {
+          id: 'manual',
+          label: 'Enter Details',
+          icon: <FileEdit className="w-4 h-4" aria-hidden="true" />,
+        },
+        {
+          id: 'help',
+          label: 'How it helps',
+          icon: <HelpCircle className="w-4 h-4" aria-hidden="true" />,
+        },
+      ];
+
+  // activeTab's own default ('upload') predates knowing the action's kind (it's set
+  // before the journey/recommendation queries resolve); clamp it to the one tab a
+  // FORM action actually offers so the tab bar and the panel shown never disagree.
+  const effectiveTab = isFormAction ? 'manual' : activeTab;
+
+  // Defensive guard: this route has no UI for a CLARIFICATION-kind action (per contract,
+  // that kind maps to NeedsReviewCard, not Screen 6's upload/form flow). Screen 5 already
+  // routes CLARIFICATION elsewhere, but a stale link, bookmark, or manual URL edit could
+  // still land here directly - bounce back to Screen 4, which renders NeedsReviewCard for
+  // any AMBIGUOUS field, instead of showing a nonsensical upload/form screen for it.
+  useEffect(() => {
+    if (journeyId && action?.kind === 'CLARIFICATION') {
+      navigate(`/j/${journeyId}`, { replace: true });
+    }
+  }, [journeyId, action?.kind, navigate]);
 
   const handleFileUpload = async (): Promise<void> => {
     if (!selectedFile || !journeyId || !currentSnapshotId) return;
@@ -218,6 +251,19 @@ export const Screen06UploadEvidence: React.FC = () => {
     );
   }
 
+  if (action?.kind === 'CLARIFICATION') {
+    // Mid-redirect (see the guard effect above) - render nothing rather than flashing
+    // the wrong screen while navigate() takes effect.
+    return (
+      <div
+        data-testid="screen-06-loading"
+        className="min-h-[400px] flex flex-col items-center justify-center p-8 space-y-4"
+      >
+        <Spinner size="lg" className="text-paytm-blue" />
+      </div>
+    );
+  }
+
   const manualSchema = action?.input_schema && action.input_schema.length > 0
     ? action.input_schema
     : DEFAULT_MANUAL_SCHEMA;
@@ -238,14 +284,16 @@ export const Screen06UploadEvidence: React.FC = () => {
         </Button>
 
         <h1 className="text-2xl sm:text-3xl font-bold text-content-primary tracking-tight">
-          Upload Income Proof
+          {screenTitle}
         </h1>
       </div>
 
-      {/* 3 Tabs Header */}
+      {/* Tabs Header - FORM actions get a single "Enter Details" tab (no upload/help
+          copy, which is only meaningful for EVIDENCE actions); EVIDENCE actions keep
+          all 3 tabs. */}
       <Tabs
         tabs={tabs}
-        activeTab={activeTab}
+        activeTab={effectiveTab}
         onChange={(tabId) => {
           setActiveTab(tabId as 'upload' | 'manual' | 'help');
           setSubmitError(null);
@@ -266,7 +314,7 @@ export const Screen06UploadEvidence: React.FC = () => {
       )}
 
       {/* Tab Panels */}
-      {activeTab === 'upload' && (
+      {effectiveTab === 'upload' && (
         <div
           id="tabpanel-upload"
           role="tabpanel"
@@ -285,7 +333,7 @@ export const Screen06UploadEvidence: React.FC = () => {
             />
 
             {/* Why we need this checklist */}
-            <div className="pt-4 border-t border-surface-border space-y-3">
+            <div className="p-4 rounded-card bg-surface-subtle border border-surface-border space-y-3">
               <h3 className="text-sm font-bold text-content-primary">
                 Why we need this?
               </h3>
@@ -339,7 +387,7 @@ export const Screen06UploadEvidence: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'manual' && (
+      {effectiveTab === 'manual' && (
         <div
           id="tabpanel-manual"
           role="tabpanel"
@@ -350,10 +398,12 @@ export const Screen06UploadEvidence: React.FC = () => {
           <Card className="p-6 space-y-6">
             <div className="space-y-1">
               <h2 className="text-base font-semibold text-content-primary">
-                Enter Details Manually
+                {isFormAction ? 'Enter Details' : 'Enter Details Manually'}
               </h2>
               <p className="text-xs text-content-secondary">
-                Do not have the document handy? You can enter the required information directly below.
+                {isFormAction
+                  ? 'Fill in the information below to complete this step.'
+                  : 'Do not have the document handy? You can enter the required information directly below.'}
               </p>
             </div>
 
@@ -369,7 +419,7 @@ export const Screen06UploadEvidence: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'help' && (
+      {effectiveTab === 'help' && (
         <div
           id="tabpanel-help"
           role="tabpanel"

@@ -4,6 +4,7 @@ import { AlertCircle, ArrowRight, ArrowLeft, CheckCircle2, ChevronDown, ChevronU
 import { useJourney } from '@/api/hooks/useJourney';
 import { ProgressRing } from '@/components/ProgressRing';
 import { BlockerCard } from '@/components/BlockerCard';
+import { NeedsReviewCard } from '@/components/NeedsReviewCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Card } from '@/components/primitives/Card';
 import { Button } from '@/components/primitives/Button';
@@ -50,7 +51,15 @@ export function Screen04CurrentStatus(): ReactElement {
   const heading = 'Your Current Status';
   const subtext = "We've analyzed your application and found a few items that need your attention.";
 
-  const blockedFields = journey.fields.filter((f) => f.status !== 'SATISFIED');
+  // AMBIGUOUS fields need a targeted clarification question, not the generic
+  // "navigate to the original resolve action" flow BlockerCard offers - split them
+  // out so NeedsReviewCard (the real §5.1 Needs-Review UI) handles them instead.
+  // This is also the screen `resume_screen: NEEDS_REVIEW` sends the applicant back
+  // to, so it must work standalone, not only right after the action that caused it.
+  const ambiguousFields = journey.fields.filter((f) => f.status === 'AMBIGUOUS');
+  const blockedFields = journey.fields.filter(
+    (f) => f.status !== 'SATISFIED' && f.status !== 'AMBIGUOUS'
+  );
   const satisfiedFields = journey.fields.filter((f) => f.status === 'SATISFIED');
 
   const { completed, pending, blockers, total } = journey.progress;
@@ -95,38 +104,46 @@ export function Screen04CurrentStatus(): ReactElement {
           </div>
 
           {/* Legend */}
-          <div className="flex flex-col gap-3 min-w-[200px]">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-content-tertiary mb-1">
-              Progress Breakdown
-            </h3>
-
-            <div className="flex items-center justify-between gap-4 text-sm font-medium">
-              <div className="flex items-center gap-2.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-paytm-green shrink-0" aria-hidden="true" />
-                <span className="text-content-primary">{completed} Completed</span>
-              </div>
+          <div className="flex flex-col gap-3.5 min-w-[200px]">
+            <div className="flex items-center gap-3">
+              <span className="w-4 h-4 rounded-full bg-paytm-green shrink-0" aria-hidden="true" />
+              <span className="text-sm font-semibold text-content-primary">{completed} Completed</span>
             </div>
 
-            <div className="flex items-center justify-between gap-4 text-sm font-medium">
-              <div className="flex items-center gap-2.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" aria-hidden="true" />
-                <span className="text-content-secondary">{pending} Pending</span>
-              </div>
+            <div className="flex items-center gap-3">
+              <span className="w-4 h-4 rounded-full bg-slate-300 shrink-0" aria-hidden="true" />
+              <span className="text-sm font-semibold text-content-secondary">{pending} Pending</span>
             </div>
 
-            <div className="flex items-center justify-between gap-4 text-sm font-medium">
-              <div className="flex items-center gap-2.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-paytm-red shrink-0" aria-hidden="true" />
-                <span className="text-content-primary">{blockers} {blockers === 1 ? 'Blocker' : 'Blockers'}</span>
-              </div>
+            <div className="flex items-center gap-3">
+              <span
+                className="w-4 h-4 rounded-full bg-paytm-red shrink-0 flex items-center justify-center text-[9px] font-bold text-white leading-none"
+                aria-hidden="true"
+              >
+                !
+              </span>
+              <span className="text-sm font-semibold text-content-primary">{blockers} {blockers === 1 ? 'Blocker' : 'Blockers'}</span>
             </div>
           </div>
         </div>
       </Card>
 
+      {/* Needs Review: at least one field has a real AI-detected conflict awaiting
+          a targeted clarification. Shown here (not just right after the action that
+          caused it) so a resumed or freshly-navigated-to journey still surfaces it -
+          this is exactly the screen resume_screen: NEEDS_REVIEW points back to. */}
+      {ambiguousFields.length > 0 && (
+        <NeedsReviewCard
+          journeyId={journey.journey_id}
+          snapshotId={journey.snapshot_id}
+          fields={ambiguousFields}
+          onResolved={() => refetch()}
+        />
+      )}
+
       {/* Blocked Items Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
           <h2 className="text-lg font-bold text-content-primary tracking-tight">
             Blocked Items ({blockedFields.length})
           </h2>

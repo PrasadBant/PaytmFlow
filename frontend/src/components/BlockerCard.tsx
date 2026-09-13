@@ -25,6 +25,11 @@ export function BlockerCard({
   const isBlocked = field.status === 'BLOCKED';
   const isAmbiguous = field.status === 'AMBIGUOUS';
   const hasResolveAction = Boolean(field.resolve_action_id) && !isSatisfied;
+  // A BLOCKED field the server marked non-mandatory (field.mandatory === false) is a
+  // softer blocker than a mandatory one - reflect that with amber instead of red so
+  // severity is visible at a glance, same as the reference design. Never invented:
+  // `mandatory` is a real FieldState field, not a derived/hardcoded distinction.
+  const isSoftBlocked = isBlocked && field.mandatory === false;
 
   const handleResolveClick = () => {
     if (field.resolve_action_id) {
@@ -47,9 +52,14 @@ export function BlockerCard({
         {/* Left Status Icon */}
         <div className="shrink-0 mt-0.5">
           {isBlocked && (
-            <div className="w-8 h-8 rounded-full bg-red-50 text-paytm-red flex items-center justify-center">
+            <div
+              className={cn(
+                'w-8 h-8 rounded-full flex items-center justify-center',
+                isSoftBlocked ? 'bg-amber-50 text-paytm-amber' : 'bg-red-50 text-paytm-red'
+              )}
+            >
               <AlertCircle className="w-5 h-5" />
-              <span className="sr-only">Blocked</span>
+              <span className="sr-only">{isSoftBlocked ? 'Blocked (optional)' : 'Blocked'}</span>
             </div>
           )}
           {isAmbiguous && (

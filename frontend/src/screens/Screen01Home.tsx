@@ -1,8 +1,7 @@
 import type React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/primitives/Button';
-import { Card } from '@/components/primitives/Card';
-import { Compass, Sparkles, Shield, FileText, CheckCircle2, BarChart3 } from 'lucide-react';
+import { Wand2, ShieldCheck, Shield, FileText, CheckCircle2, BarChart3 } from 'lucide-react';
 
 export const Screen01Home: React.FC = () => {
   const navigate = useNavigate();
@@ -16,7 +15,7 @@ export const Screen01Home: React.FC = () => {
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-content-primary tracking-tight leading-[1.1]">
             Your Financial <br />
             Journey. <br />
-            <span className="text-paytm-blue">Back on Track.</span>
+            <span className="text-paytm-blue-action">Back on Track.</span>
           </h1>
 
           <p className="text-base sm:text-lg text-content-secondary max-w-lg leading-relaxed">
@@ -41,7 +40,7 @@ export const Screen01Home: React.FC = () => {
           data-testid="hero-illustration"
           role="img"
           aria-label="Financial journey recovery hero illustration"
-          className="relative flex items-center justify-center min-h-[320px] sm:min-h-[380px] lg:min-h-[420px] select-none"
+          className="relative flex items-center justify-center min-h-[320px] sm:min-h-[380px] lg:min-h-[440px] select-none overflow-hidden"
         >
           <span className="sr-only">Hero Illustration Area</span>
           {/* Soft background wave / gradient blob */}
@@ -49,112 +48,130 @@ export const Screen01Home: React.FC = () => {
             <div className="w-[280px] sm:w-[360px] h-[280px] sm:h-[360px] rounded-full bg-gradient-to-tr from-sky-100 via-blue-50 to-cyan-50 opacity-90 blur-xl" />
           </div>
 
-          {/* Floating Financial Icons */}
-          <div className="absolute top-6 left-4 sm:left-12 z-20 p-2.5 sm:p-3 rounded-2xl bg-white shadow-card border border-slate-100 flex items-center justify-center animate-bounce-subtle">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-paytm-blue flex items-center justify-center">
-              <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
+          {/* Floating Financial Icons - white "speech bubble" cards with a small
+              pointed tail, matching the reference's badge shape */}
+          <div className="absolute top-4 left-4 sm:left-10 z-20 flex flex-col items-center animate-bounce-subtle">
+            <div className="p-2.5 sm:p-3 rounded-2xl bg-white shadow-card border border-slate-100 flex items-center justify-center">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-paytm-blue flex items-center justify-center">
+                <FileText className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
             </div>
+            <div className="w-3 h-3 -mt-1.5 rotate-45 bg-white border-r border-b border-slate-100" />
           </div>
 
           <div
-            className="absolute bottom-16 left-2 sm:left-8 z-20 p-2.5 sm:p-3 rounded-2xl bg-white shadow-card border border-slate-100 flex items-center justify-center animate-bounce-subtle"
+            className="absolute bottom-20 left-2 sm:left-6 z-20 flex flex-col items-center animate-bounce-subtle"
             style={{ animationDelay: '0.4s' }}
           >
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 text-paytm-green flex items-center justify-center">
-              <Shield className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="p-2.5 sm:p-3 rounded-2xl bg-paytm-green shadow-card flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
           </div>
 
           <div
-            className="absolute top-8 right-4 sm:right-12 z-20 p-2.5 sm:p-3 rounded-2xl bg-white shadow-card border border-slate-100 flex items-center justify-center animate-bounce-subtle"
+            className="absolute top-6 right-2 sm:right-10 z-20 flex flex-col items-center animate-bounce-subtle"
             style={{ animationDelay: '0.2s' }}
           >
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-paytm-blue flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="p-2.5 sm:p-3 rounded-2xl bg-white shadow-card border border-slate-100 flex items-center justify-center">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-paytm-blue flex items-center justify-center">
+                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
             </div>
           </div>
 
           <div
-            className="absolute bottom-20 right-2 sm:right-10 z-20 p-2.5 sm:p-3 rounded-2xl bg-white shadow-card border border-slate-100 flex items-center justify-center animate-bounce-subtle"
+            className="absolute bottom-24 right-0 sm:right-6 z-20 flex flex-col items-center animate-bounce-subtle"
             style={{ animationDelay: '0.6s' }}
           >
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 text-paytm-green flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="p-2.5 sm:p-3 rounded-2xl bg-white shadow-card border border-slate-100 flex items-center justify-center">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 text-paytm-green flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
             </div>
           </div>
 
           {/* Character Illustration */}
           <svg
-            viewBox="0 0 360 380"
-            className="w-full max-w-[320px] sm:max-w-[360px] h-auto z-10 relative drop-shadow-sm"
+            viewBox="0 0 360 400"
+            className="w-full max-w-[340px] sm:max-w-[400px] h-auto z-10 relative"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
           >
-            {/* Wavy bottom ground/curve */}
+            {/* Layered wavy ground/curve - two soft bands for depth */}
             <path
-              d="M20 340C90 320 180 360 270 330C310 316 340 330 360 340V380H0V350C6 346 14 341 20 340Z"
-              fill="#E0F2FE"
+              d="M0 355C50 340 110 368 170 358C230 348 260 330 310 340C330 344 345 350 360 356V400H0V355Z"
+              fill="#DCEEFC"
             />
-            {/* Body / Blue Shirt */}
             <path
-              d="M110 380V270C110 245 130 225 155 225H205C230 225 250 245 250 270V380H110Z"
+              d="M20 372C90 356 180 388 270 364C305 355 335 362 360 372V400H0V378C6 376 14 373 20 372Z"
+              fill="#EAF4FD"
+            />
+
+            {/* Body / Blue Sweater - rounded shoulders */}
+            <path
+              d="M108 400V282C108 250 132 226 163 226H197C228 226 252 250 252 282V400H108Z"
               fill="#005BF5"
             />
             {/* Collar & Neck */}
-            <path d="M165 225V205H195V225H165Z" fill="#FBD5B5" />
-            <path d="M155 225L180 250L205 225H155Z" fill="#0047CC" />
+            <path d="M163 226V202H197V226H163Z" fill="#F4C9A4" />
+            <path d="M155 228C163 240 172 247 180 247C188 247 197 240 205 228L197 226H163L155 228Z" fill="#0047CC" />
 
             {/* Head / Face */}
-            <ellipse cx="180" cy="165" rx="36" ry="42" fill="#FBD5B5" />
-            {/* Hair */}
+            <ellipse cx="180" cy="163" rx="38" ry="43" fill="#F4C9A4" />
+
+            {/* Hair - side-swept with a couple of texture strands */}
             <path
-              d="M144 165C144 125 155 115 180 115C205 115 216 125 216 165C216 145 210 135 180 135C150 135 144 145 144 165Z"
-              fill="#1E293B"
+              d="M139 168C136 122 154 108 180 108C206 108 224 122 221 168C219 142 212 124 180 124C148 124 141 142 139 168Z"
+              fill="#101828"
             />
-            <path
-              d="M142 160C140 140 150 120 180 120C210 120 220 140 218 160C216 148 208 132 180 132C152 132 144 148 142 160Z"
-              fill="#0F172A"
-            />
-            {/* Eyebrows, Eyes, Smile */}
-            <path d="M162 155C166 153 170 153 174 155" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" />
-            <path d="M186 155C190 153 194 153 198 155" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="168" cy="164" r="3" fill="#1E293B" />
-            <circle cx="192" cy="164" r="3" fill="#1E293B" />
-            <path d="M174 180C177 184 183 184 186 180" stroke="#E11D48" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M218 140C222 150 222 160 219 168" stroke="#101828" strokeWidth="3" strokeLinecap="round" />
+            <path d="M150 122C160 116 170 113 180 113" stroke="#1E293B" strokeWidth="2" strokeLinecap="round" opacity="0.5" />
+
+            {/* Eyebrows, Eyes, blush, smile */}
+            <path d="M160 152C164 149 170 149 175 151" stroke="#101828" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M185 151C190 149 196 149 200 152" stroke="#101828" strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx="167" cy="162" r="3" fill="#101828" />
+            <circle cx="193" cy="162" r="3" fill="#101828" />
+            <circle cx="151" cy="175" r="6" fill="#F4A896" opacity="0.4" />
+            <circle cx="209" cy="175" r="6" fill="#F4A896" opacity="0.4" />
+            <path d="M172 179C175 184 185 184 188 179" stroke="#C2410C" strokeWidth="2.5" strokeLinecap="round" />
 
             {/* Arm & Hand holding Smartphone */}
-            <path d="M125 280L135 240L145 270L135 310Z" fill="#005BF5" />
-            <rect x="130" y="220" width="28" height="48" rx="6" fill="#0F172A" />
-            <rect x="133" y="224" width="22" height="40" rx="3" fill="#38BDF8" />
+            <path d="M122 288L133 244L146 276L136 320Z" fill="#005BF5" />
+            <rect x="128" y="222" width="26" height="50" rx="7" fill="#101828" />
+            <rect x="131" y="226" width="20" height="42" rx="3" fill="#1E293B" />
+            <circle cx="141" cy="230" r="1.5" fill="#475569" />
             {/* Hand fingers */}
-            <path d="M126 240C126 235 130 232 135 235L138 255C134 258 126 250 126 240Z" fill="#FBD5B5" />
+            <path d="M124 246C123 240 128 236 134 239L137 261C132 264 125 256 124 246Z" fill="#F4C9A4" />
           </svg>
         </div>
       </div>
 
-      {/* 3 Feature Cards in a Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 bg-white border border-surface-border shadow-xs hover:shadow-card transition-all text-left flex flex-col items-start gap-3 rounded-card">
+      {/* 3 Feature Columns - plain on the page background with a thin divider
+          between columns at desktop width, matching the reference (no boxed
+          cards here - the outer page provides all the framing this section needs). */}
+      <div className="grid grid-cols-1 md:grid-cols-3 md:divide-x md:divide-surface-border gap-8 md:gap-0">
+        <div className="flex flex-col items-center text-center gap-3 md:px-6">
           <div className="w-12 h-12 rounded-full bg-blue-50 text-paytm-blue flex items-center justify-center">
-            <Compass className="w-6 h-6" />
+            <Wand2 className="w-6 h-6" />
           </div>
           <div>
             <h2 className="font-bold text-base text-content-primary">Guided next steps</h2>
             <p className="text-xs text-content-secondary mt-1">Know exactly what to do next.</p>
           </div>
-        </Card>
+        </div>
 
-        <Card className="p-6 bg-white border border-surface-border shadow-xs hover:shadow-card transition-all text-left flex flex-col items-start gap-3 rounded-card">
+        <div className="flex flex-col items-center text-center gap-3 md:px-6">
           <div className="w-12 h-12 rounded-full bg-blue-50 text-paytm-blue flex items-center justify-center">
-            <Sparkles className="w-6 h-6" />
+            <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
             <h2 className="font-bold text-base text-content-primary">AI-powered insights</h2>
             <p className="text-xs text-content-secondary mt-1">Get personalized guidance.</p>
           </div>
-        </Card>
+        </div>
 
-        <Card className="p-6 bg-white border border-surface-border shadow-xs hover:shadow-card transition-all text-left flex flex-col items-start gap-3 rounded-card">
+        <div className="flex flex-col items-center text-center gap-3 md:px-6">
           <div className="w-12 h-12 rounded-full bg-blue-50 text-paytm-blue flex items-center justify-center">
             <Shield className="w-6 h-6" />
           </div>
@@ -162,7 +179,7 @@ export const Screen01Home: React.FC = () => {
             <h2 className="font-bold text-base text-content-primary">Secure & private</h2>
             <p className="text-xs text-content-secondary mt-1">Your data stays safe.</p>
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Bottom Summary Pill Banner */}

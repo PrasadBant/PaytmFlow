@@ -29,6 +29,10 @@ function renderScreen6(
             path="/j/:id/next"
             element={<div data-testid="screen-05-stub">Recommendation Stub</div>}
           />
+          <Route
+            path="/j/:id"
+            element={<div data-testid="screen-04-stub">Current Status Stub</div>}
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -127,5 +131,91 @@ describe('Screen06UploadEvidence (F19)', () => {
     expect(html).not.toMatch(/\bprobability\b/i);
     expect(html).not.toMatch(/\beligibility\b/i);
     expect(html).not.toMatch(/\bguaranteed\b/i);
+  });
+
+  describe('action-kind-aware rendering (regression)', () => {
+    // This screen previously hardcoded "Upload Income Proof" and always showed all 3
+    // evidence-oriented tabs, regardless of what resolve_action_id actually pointed to.
+    // Every BLOCKED field's resolve_action_id - Employment Category, Current Employer,
+    // Final Loan Agreement, etc. - opened this exact same upload UI. These tests prove
+    // the rendered UI is now genuinely different per ActionOption.kind.
+
+    it('EVIDENCE action: shows action title, and all 3 tabs including Upload File', async () => {
+      renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/UPLOAD_BANK_STATEMENT', {
+        action: {
+          action_id: 'UPLOAD_BANK_STATEMENT',
+          title: 'Upload Bank Statement',
+          kind: 'EVIDENCE',
+          why: 'Required to verify salary credits.',
+          unlocks: [],
+          accepts: ['BANK_STATEMENT'],
+        },
+        snapshotId: '33333333-3333-3333-3333-333333333333',
+      });
+
+      const heading = await screen.findByRole('heading', { level: 1 });
+      expect(heading).toHaveTextContent('Upload Bank Statement');
+      expect(heading).not.toHaveTextContent('Upload Income Proof');
+
+      expect(screen.getByRole('tab', { name: /Upload File/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /Enter Details/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /How it helps/i })).toBeInTheDocument();
+      expect(screen.getByTestId('tabpanel-upload')).toBeInTheDocument();
+      expect(screen.getByTestId('evidence-file-input')).toBeInTheDocument();
+    });
+
+    it('FORM action: shows action title, only 1 tab, and no upload UI at all', async () => {
+      renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/SUBMIT_EMPLOYMENT_INFO', {
+        action: {
+          action_id: 'SUBMIT_EMPLOYMENT_INFO',
+          title: 'Confirm Employment Category',
+          kind: 'FORM',
+          why: 'We need your current employment category to proceed.',
+          unlocks: [],
+          input_schema: [
+            {
+              key: 'employment_category',
+              type: 'text',
+              label: 'Employment Category',
+              required: true,
+            },
+          ],
+        },
+        snapshotId: '33333333-3333-3333-3333-333333333333',
+      });
+
+      const heading = await screen.findByRole('heading', { level: 1 });
+      expect(heading).toHaveTextContent('Confirm Employment Category');
+      expect(heading).not.toHaveTextContent('Upload Income Proof');
+
+      // Only one tab is offered - no Upload File / How it helps for a FORM action.
+      expect(screen.queryByRole('tab', { name: /Upload File/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: /How it helps/i })).not.toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /Enter Details/i })).toBeInTheDocument();
+
+      // The manual-entry panel is shown by default (no click needed), using the
+      // action's own input_schema, and with FORM-appropriate (non-upload) copy.
+      expect(await screen.findByTestId('tabpanel-manual')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Employment Category/i)).toBeInTheDocument();
+      expect(screen.queryByTestId('evidence-file-input')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Do not have the document handy/i)).not.toBeInTheDocument();
+    });
+
+    it('CLARIFICATION action: never renders the upload/form screen, redirects to Screen 4 instead', async () => {
+      renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/CLARIFY_MONTHLY_INCOME', {
+        action: {
+          action_id: 'CLARIFY_MONTHLY_INCOME',
+          title: 'Clarify Monthly Income',
+          kind: 'CLARIFICATION',
+          why: 'Salary credit amount does not match the declared income.',
+          unlocks: [],
+        },
+        snapshotId: '33333333-3333-3333-3333-333333333333',
+      });
+
+      // Never shows the upload/form screen for a clarification - it has no matching UI.
+      expect(screen.queryByTestId('screen-06-upload-evidence')).not.toBeInTheDocument();
+      expect(await screen.findByTestId('screen-04-stub')).toBeInTheDocument();
+    });
   });
 });
