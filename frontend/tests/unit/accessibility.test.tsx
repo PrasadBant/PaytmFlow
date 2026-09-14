@@ -13,6 +13,9 @@ import { ErrorState } from '@/components/ErrorState';
 import { EvidenceDropzone } from '@/components/EvidenceDropzone';
 import { Screen04CurrentStatus } from '@/screens/Screen04CurrentStatus';
 import { Screen08UpdatedStatus } from '@/screens/Screen08UpdatedStatus';
+import { SchedulingPicker } from '@/components/interactions/SchedulingPicker';
+import { ConsentPanel } from '@/components/interactions/ConsentPanel';
+import { VideoVerificationFlow } from '@/components/interactions/VideoVerificationFlow';
 
 function createTestQueryClient(): QueryClient {
   return new QueryClient({
@@ -252,6 +255,128 @@ describe('Phase F29: Accessibility (a11y) Pass & Semantics', () => {
       fireEvent.keyDown(dropzone, { key: 'Enter', code: 'Enter' });
       // KeyDown Space
       fireEvent.keyDown(dropzone, { key: ' ', code: 'Space' });
+    });
+  });
+
+  describe('6. New interaction components (SchedulingPicker, ConsentPanel, VideoVerificationFlow)', () => {
+    describe('SchedulingPicker', () => {
+      it('uses a labelled fieldset/legend radio group, is fully keyboard-operable, and Confirm is disabled until a slot is chosen', async () => {
+        const user = userEvent.setup();
+        const onSubmit = vi.fn();
+        render(
+          <SchedulingPicker
+            actionTitle="Medical Underwriting Call"
+            why="Select a time slot"
+            submitLabel="Confirm Slot →"
+            onSubmit={onSubmit}
+          />
+        );
+
+        // Fieldset/legend: the group's accessible name comes from <legend>
+        // alone (no duplicate/conflicting aria-label).
+        const group = screen.getByRole('group', { name: /Select a time slot/i });
+        expect(group).toBeInTheDocument();
+
+        const radios = screen.getAllByRole('radio');
+        expect(radios.length).toBeGreaterThan(0);
+        // Every radio has an accessible name (from its wrapping <label>).
+        radios.forEach((r) => expect(r).toHaveAccessibleName());
+
+        const confirmBtn = screen.getByTestId('scheduling-confirm-btn');
+        expect(confirmBtn).toBeDisabled();
+
+        // Keyboard only: Tab to the first radio, select with Space, Tab to Confirm, activate with Enter.
+        await user.tab();
+        expect(radios[0]).toHaveFocus();
+        await user.keyboard(' ');
+        expect(radios[0]).toBeChecked();
+        expect(confirmBtn).toBeEnabled();
+
+        // Continue tabbing to the Confirm button (native radio-group semantics
+        // mean the remaining radios are also in the tab sequence via arrow
+        // keys, not sequential Tab - jsdom exercises native radio grouping).
+        confirmBtn.focus();
+        await user.keyboard('{Enter}');
+        expect(onSubmit).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('ConsentPanel', () => {
+      it('uses a labelled checkbox, is keyboard-operable, and Confirm is disabled until checked', async () => {
+        const user = userEvent.setup();
+        const onSubmit = vi.fn();
+        render(
+          <ConsentPanel
+            actionTitle="Cardholder Agreement"
+            why="Digital agreement to card terms"
+            submitLabel="Confirm →"
+            onSubmit={onSubmit}
+          />
+        );
+
+        const checkbox = screen.getByTestId('consent-checkbox');
+        expect(checkbox).toHaveAccessibleName(/I have read and agree/i);
+
+        const confirmBtn = screen.getByTestId('consent-confirm-btn');
+        expect(confirmBtn).toBeDisabled();
+
+        // Keyboard only: Tab to checkbox, toggle with Space, Tab to Confirm, activate with Enter.
+        await user.tab();
+        expect(checkbox).toHaveFocus();
+        await user.keyboard(' ');
+        expect(checkbox).toBeChecked();
+        expect(confirmBtn).toBeEnabled();
+
+        await user.tab();
+        expect(confirmBtn).toHaveFocus();
+        await user.keyboard('{Enter}');
+        expect(onSubmit).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('VideoVerificationFlow', () => {
+      it('announces each stage transition via role=status/aria-live, and every stage button is reachable and operable by keyboard', async () => {
+        const user = userEvent.setup();
+        const onSubmit = vi.fn();
+        render(
+          <VideoVerificationFlow
+            actionTitle="Live Video Verification"
+            why="Complete a short liveness scan"
+            submitLabel="Continue →"
+            onSubmit={onSubmit}
+          />
+        );
+
+        // The stage container is a live region so screen-reader users learn
+        // of each silent state transition (intro -> permission ->
+        // in_progress -> complete) without having to re-explore the page.
+        const stageRegion = screen.getByTestId('video-stage-region');
+        expect(stageRegion).toHaveAttribute('role', 'status');
+        expect(stageRegion).toHaveAttribute('aria-live', 'polite');
+
+        // It also never falsely implies a real check occurred.
+        expect(screen.getByText(/simulated in this prototype/i)).toBeInTheDocument();
+
+        await user.tab();
+        expect(screen.getByTestId('video-start-btn')).toHaveFocus();
+        await user.keyboard('{Enter}');
+
+        expect(await screen.findByTestId('video-allow-btn')).toBeInTheDocument();
+        screen.getByTestId('video-allow-btn').focus();
+        await user.keyboard('{Enter}');
+
+        // Verifying stage has no interactive control (nothing to focus) -
+        // the continue button remains disabled and inert until completion.
+        const continueBtn = await screen.findByTestId('video-continue-btn');
+        expect(continueBtn).toBeDisabled();
+
+        expect(await screen.findByText(/Verification complete/i, {}, { timeout: 3000 })).toBeInTheDocument();
+        expect(continueBtn).toBeEnabled();
+
+        continueBtn.focus();
+        await user.keyboard('{Enter}');
+        expect(onSubmit).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });

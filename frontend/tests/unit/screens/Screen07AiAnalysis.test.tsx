@@ -101,6 +101,65 @@ describe('Screen07AiAnalysis (F20)', () => {
     expect(screen.getByTestId('continue-apply-btn')).toBeInTheDocument();
   });
 
+  it('Expected Outcome is driven exclusively by consequence_preview - changing AI prose cannot change it (regression)', async () => {
+    // 00_SHARED_CONTRACT.md §6 item 4: "Screen 7's Expected Outcome list
+    // renders THIS object [SimulationPreview], not interpretation.summary.
+    // The AI writes the sentence; the engine writes the outcome." This
+    // proves it structurally: two evidence responses share the exact same
+    // (deterministic) consequence_preview but have wildly different -
+    // including a deliberately wrong/misleading - AI summary sentence. The
+    // rendered Expected Outcome card must be byte-identical between them,
+    // while the AI summary card differs, because they are wired to
+    // different props (ConsequencePreview never receives `interpretation`
+    // at all - see ConsequencePreview.tsx's props type).
+    const misleadingSummaryResponse: EvidenceResponse = {
+      ...mockEvidenceResponse,
+      interpretation: {
+        ...mockEvidenceResponse.interpretation,
+        // Deliberately false/misleading prose relative to the real
+        // consequence_preview above (which still shows bank_statement
+        // blocked and NOT_READY) - if Expected Outcome ever read from this
+        // instead of consequence_preview, this test would catch it.
+        summary: 'Congratulations, your loan is fully approved and ready for disbursal!',
+      },
+    };
+
+    const { unmount } = renderScreen7(undefined, {
+      evidenceResponse: mockEvidenceResponse,
+      journeyId: '11111111-1111-1111-1111-111111111111',
+      actionId: 'UPLOAD_INCOME_PROOF',
+      snapshotId: '11111111-1111-1111-1111-111111111111',
+    });
+    await screen.findByTestId('consequence-preview-card');
+    const firstOutcomeHtml = screen.getByTestId('consequence-preview-card').innerHTML;
+    unmount();
+
+    renderScreen7(undefined, {
+      evidenceResponse: misleadingSummaryResponse,
+      journeyId: '11111111-1111-1111-1111-111111111111',
+      actionId: 'UPLOAD_INCOME_PROOF',
+      snapshotId: '11111111-1111-1111-1111-111111111111',
+    });
+    await screen.findByTestId('consequence-preview-card');
+    const secondOutcomeHtml = screen.getByTestId('consequence-preview-card').innerHTML;
+
+    // Expected Outcome is byte-identical regardless of what the AI wrote.
+    expect(secondOutcomeHtml).toBe(firstOutcomeHtml);
+    // The two responses' own consequence_preview is what differs matters
+    // are absent from Expected Outcome - the misleading prose text itself
+    // must never leak into the deterministic card.
+    expect(screen.getByTestId('consequence-preview-card')).not.toHaveTextContent(/approved|disbursal/i);
+    // It DOES still correctly show the real deterministic prediction: still
+    // blocked / NOT_READY - proving this isn't just an empty/stale render.
+    expect(screen.getByTestId('consequence-preview-card')).toHaveTextContent('Salary Account Verification');
+    expect(screen.getByTestId('consequence-preview-card')).toHaveTextContent('Still Blocked');
+
+    // Meanwhile the AI summary card DID pick up the different (if
+    // misleading) prose - confirming the two are wired to genuinely
+    // different data sources, not that summary is simply unused.
+    expect(screen.getByTestId('ai-summary-card')).toHaveTextContent(/approved and ready for disbursal/i);
+  });
+
   it('applies action on continue click and navigates to updated screen', async () => {
     const user = userEvent.setup();
     renderScreen7();

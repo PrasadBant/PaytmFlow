@@ -97,6 +97,48 @@ describe('Screen05Recommendation (F16)', () => {
     expect(screen.queryByTestId('act-screen')).not.toBeInTheDocument();
   });
 
+  it('a SCHEDULING/CONSENT/VIDEO_VERIFICATION-classified FORM action navigates to Screen 6, not the generic modal (consistency regression)', async () => {
+    // Bug: Screen 4's "Resolve" link already sends a SCHEDULE_*/SIGN_*/
+    // ACCEPT_*/*MANDATE*/*VIDEO* action to Screen 6's purpose-built
+    // SchedulingPicker/ConsentPanel/VideoVerificationFlow, but selecting the
+    // exact same action from HERE (Screen 5's recommendation/alternatives)
+    // used to always open the bare generic FormActionModal instead - the
+    // same action rendered two different, inconsistent UIs depending on
+    // which screen the user reached it from. Only a genuinely generic FORM
+    // action (like "Adjust Loan Tenure" above) should still open the modal.
+    server.use(
+      http.get('*/api/v1/journeys/:journey_id/recommendation', () =>
+        HttpResponse.json({
+          snapshot_id: 'aaaaaaaa-1111-1111-1111-111111111111',
+          readiness: 'NOT_READY',
+          recommendation: {
+            action_id: 'SCHEDULE_UNDERWRITING_CALL',
+            title: 'Medical Underwriting Call',
+            kind: 'FORM',
+            why: 'Select a time slot for the tele-medical consultation',
+            unlocks: ['tele_underwriting_scheduled'],
+          },
+          alternatives: [],
+          minimum_path_length: 1,
+          source: 'AI_RANKED',
+        })
+      )
+    );
+
+    const user = userEvent.setup();
+    renderWithProviders();
+
+    const ctaBtn = await screen.findByRole('button', {
+      name: /Take action: Medical Underwriting Call/i,
+    });
+    await user.click(ctaBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('act-screen')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('renders DeadEndState when scenario forces deadend', async () => {
     setOverrideScenario('deadend');
     renderWithProviders('/j/11111111-1111-1111-1111-111111111111/next');

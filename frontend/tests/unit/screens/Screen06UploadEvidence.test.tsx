@@ -30,6 +30,10 @@ function renderScreen6(
             element={<div data-testid="screen-05-stub">Recommendation Stub</div>}
           />
           <Route
+            path="/j/:id/updated"
+            element={<div data-testid="screen-08-stub">Updated Status Stub</div>}
+          />
+          <Route
             path="/j/:id"
             element={<div data-testid="screen-04-stub">Current Status Stub</div>}
           />
@@ -305,6 +309,92 @@ describe('Screen06UploadEvidence (F19)', () => {
       ).toBeInTheDocument();
       expect(screen.queryByText(/repayment capacity/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/financial criteria/i)).not.toBeInTheDocument();
+    });
+
+    it('SCHEDULING-classified FORM action (SCHEDULE_*): renders a slot picker, never a blank text field, and submits the chosen slot', async () => {
+      // Real financial workflows book a call rather than asking for a raw
+      // string in an empty box. Insurance's real "Schedule Doctor
+      // Underwriting Call" action (tele_underwriting_scheduled) exercises
+      // this on the actual Insurance journey/fixture, not a synthetic one.
+      const user = userEvent.setup();
+      renderScreen6('/j/22222222-2222-2222-2222-222222222222/act/SCHEDULE_UNDERWRITING_CALL', {
+        action: {
+          action_id: 'SCHEDULE_UNDERWRITING_CALL',
+          title: 'Medical Underwriting Call',
+          kind: 'FORM',
+          why: 'Select a time slot for the tele-medical consultation with the insurer’s doctor',
+          unlocks: ['tele_underwriting_scheduled'],
+        },
+        snapshotId: 'ffffffff-1111-1111-1111-111111111111',
+      });
+
+      expect(await screen.findByTestId('scheduling-picker')).toBeInTheDocument();
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+
+      const confirmBtn = screen.getByTestId('scheduling-confirm-btn');
+      expect(confirmBtn).toBeDisabled();
+
+      const firstSlot = screen.getAllByRole('radio')[0];
+      await user.click(firstSlot);
+      expect(confirmBtn).toBeEnabled();
+
+      await user.click(confirmBtn);
+      expect(await screen.findByTestId('screen-08-stub')).toBeInTheDocument();
+    });
+
+    it('CONSENT-classified FORM action (SIGN_*/ACCEPT_*/MANDATE): renders an explicit consent checkbox, not a text field, and requires it before submitting', async () => {
+      const user = userEvent.setup();
+      renderScreen6('/j/44444444-4444-4444-4444-444444444444/act/SIGN_CARD_AGREEMENT', {
+        action: {
+          action_id: 'SIGN_CARD_AGREEMENT',
+          title: 'Cardholder Agreement',
+          kind: 'FORM',
+          why: 'Digital agreement to card terms, fees and billing cycle required before dispatch',
+          unlocks: ['card_agreement_signed'],
+        },
+        snapshotId: 'hhhhhhhh-1111-1111-1111-111111111111',
+      });
+
+      expect(await screen.findByTestId('consent-panel')).toBeInTheDocument();
+      const confirmBtn = screen.getByTestId('consent-confirm-btn');
+      expect(confirmBtn).toBeDisabled();
+
+      await user.click(screen.getByTestId('consent-checkbox'));
+      expect(confirmBtn).toBeEnabled();
+
+      await user.click(confirmBtn);
+      expect(await screen.findByTestId('screen-08-stub')).toBeInTheDocument();
+    });
+
+    it('VIDEO_VERIFICATION-classified FORM action (*VIDEO*/*LIVENESS*): renders the simulated video flow, never a document upload, and clearly labels it simulated', async () => {
+      const user = userEvent.setup();
+      renderScreen6('/j/33333333-3333-3333-3333-333333333333/act/START_VIDEO_KYC', {
+        action: {
+          action_id: 'START_VIDEO_KYC',
+          title: 'Live Video Verification',
+          kind: 'FORM',
+          why: 'Complete a short agent-assisted video call or biometric liveness scan',
+          unlocks: ['video_kyc'],
+        },
+        snapshotId: 'gggggggg-1111-1111-1111-111111111111',
+      });
+
+      expect(await screen.findByTestId('video-verification-flow')).toBeInTheDocument();
+      expect(screen.queryByTestId('evidence-file-input')).not.toBeInTheDocument();
+      expect(screen.getByText(/simulated in this prototype/i)).toBeInTheDocument();
+
+      await user.click(screen.getByTestId('video-start-btn'));
+      await user.click(screen.getByTestId('video-allow-btn'));
+
+      const continueBtn = await screen.findByTestId('video-continue-btn');
+      expect(continueBtn).toBeDisabled();
+
+      // Simulated verification resolves on its own after a short delay.
+      expect(await screen.findByText(/Verification complete/i, {}, { timeout: 3000 })).toBeInTheDocument();
+      expect(continueBtn).toBeEnabled();
+
+      await user.click(continueBtn);
+      expect(await screen.findByTestId('screen-08-stub')).toBeInTheDocument();
     });
 
     it('CLARIFICATION action: never renders the upload/form screen, redirects to Screen 4 instead', async () => {

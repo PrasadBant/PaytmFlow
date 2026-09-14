@@ -8,6 +8,7 @@ import { ActionList } from '@/components/ActionList';
 import { AssistantHelpCard } from '@/components/AssistantHelpCard';
 import { DeadEndState } from '@/components/DeadEndState';
 import { FormActionModal } from '@/components/FormActionModal';
+import { classifyInteraction } from '@/lib/actionInteraction';
 import type { ActionResponse } from '@/api/hooks/useApplyAction';
 import { Card } from '@/components/primitives/Card';
 import { Button } from '@/components/primitives/Button';
@@ -100,7 +101,19 @@ export function Screen05Recommendation(): ReactElement {
       navigate(`/j/${id}`);
       return;
     }
-    if (action.kind === 'FORM') {
+    // A genuinely generic FORM action (a plain field or two) still opens the
+    // lightweight modal, per contract. But scheduling a call, giving
+    // mandate/agreement consent, or a video/liveness check are a different,
+    // richer interaction - Screen 4's "Resolve" link already sends these to
+    // Screen 6's purpose-built components (SchedulingPicker/ConsentPanel/
+    // VideoVerificationFlow), and the exact same action must render the
+    // exact same way no matter which screen the user reached it from. Without
+    // this, a FORM action selected here (instead of via Screen 4) fell back
+    // to a bare single-text-field modal for e.g. "Schedule Doctor
+    // Underwriting Call" - a real, user-visible inconsistency, not a
+    // contract violation (kind is still FORM -> a FORM-appropriate UI
+    // either way; this only chooses which one).
+    if (action.kind === 'FORM' && classifyInteraction(action) === 'FORM') {
       setFormModalAction(action);
       return;
     }
