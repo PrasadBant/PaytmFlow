@@ -115,10 +115,32 @@ describe('Screen09CompleteJourney (F23)', () => {
     expect(screen.getByText('All mandatory fields completed')).toBeInTheDocument();
     expect(screen.getByText('No blockers remaining')).toBeInTheDocument();
     expect(screen.getByText('Documents verified')).toBeInTheDocument();
-    expect(screen.getByText('Ready for provider submission')).toBeInTheDocument();
+    expect(screen.getByText('Ready for provider handoff')).toBeInTheDocument();
     expect(screen.queryByText('Verified Monthly Income')).not.toBeInTheDocument();
-    expect(screen.getByTestId('proceed-submit-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('proceed-handoff-btn')).toBeInTheDocument();
+    expect(screen.getByText('Proceed to Handoff')).toBeInTheDocument();
     expect(screen.getByTestId('review-app-btn')).toBeInTheDocument();
+  });
+
+  it('displays "Proceed to Handoff" and never "Proceed to Submit"', async () => {
+    const { container } = renderScreen9();
+
+    expect(await screen.findByTestId('proceed-handoff-btn')).toHaveTextContent('Proceed to Handoff');
+    expect(container.innerHTML).not.toMatch(/Proceed to Submit/i);
+  });
+
+  it('does not contain inappropriate submission-oriented language', async () => {
+    const { container } = renderScreen9();
+
+    await screen.findByTestId('completion-title');
+
+    const html = container.innerHTML;
+    // "submission" is permitted only inside the explicit disclaimer sentence
+    // stating that no submission takes place; it must not appear as an
+    // affirmative claim that PaytmFlow itself is submitting anything.
+    expect(html).not.toMatch(/proceed to submit/i);
+    expect(html).not.toMatch(/submit your application/i);
+    expect(html).not.toMatch(/ready for submission/i);
   });
 
   it('renders not ready guard banner when journey readiness is NOT_READY', async () => {
@@ -126,15 +148,15 @@ describe('Screen09CompleteJourney (F23)', () => {
 
     expect(await screen.findByTestId('not-ready-guard-banner')).toBeInTheDocument();
     expect(screen.getByText('Journey Not Ready for Completion')).toBeInTheDocument();
-    expect(screen.queryByTestId('proceed-submit-btn')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('proceed-handoff-btn')).not.toBeInTheDocument();
   });
 
   it('opens handoff modal explaining no submission occurs in this workspace and navigates to My Journeys', async () => {
     const user = userEvent.setup();
     renderScreen9();
 
-    const submitBtn = await screen.findByTestId('proceed-submit-btn');
-    await user.click(submitBtn);
+    const handoffBtn = await screen.findByTestId('proceed-handoff-btn');
+    await user.click(handoffBtn);
 
     expect(await screen.findByText('Application Package Ready for Handoff')).toBeInTheDocument();
     expect(screen.getByTestId('handoff-modal-content')).toHaveTextContent(
@@ -145,6 +167,36 @@ describe('Screen09CompleteJourney (F23)', () => {
     await user.click(doneBtn);
 
     expect(await screen.findByTestId('my-journeys-stub')).toBeInTheDocument();
+  });
+
+  it('closes the handoff modal via the Close button without navigating or changing state', async () => {
+    const user = userEvent.setup();
+    renderScreen9();
+
+    const handoffBtn = await screen.findByTestId('proceed-handoff-btn');
+    await user.click(handoffBtn);
+
+    expect(await screen.findByText('Application Package Ready for Handoff')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(screen.queryByText('Application Package Ready for Handoff')).not.toBeInTheDocument();
+    // Still on Screen 9 - closing the modal does not navigate away.
+    expect(screen.getByTestId('screen-09-complete-journey')).toBeInTheDocument();
+  });
+
+  it('closes the handoff modal on Escape key press', async () => {
+    const user = userEvent.setup();
+    renderScreen9();
+
+    const handoffBtn = await screen.findByTestId('proceed-handoff-btn');
+    await user.click(handoffBtn);
+
+    expect(await screen.findByText('Application Package Ready for Handoff')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByText('Application Package Ready for Handoff')).not.toBeInTheDocument();
   });
 
   it('navigates to journey overview on "Review Application" click', async () => {
@@ -172,7 +224,7 @@ describe('Screen09CompleteJourney (F23)', () => {
     expect(screen.getByText('All mandatory fields completed')).toBeInTheDocument();
     expect(screen.getByText('No blockers remaining')).toBeInTheDocument();
     expect(screen.getByText('Documents verified')).toBeInTheDocument();
-    expect(screen.getByText('Ready for provider submission')).toBeInTheDocument();
+    expect(screen.getByText('Ready for provider handoff')).toBeInTheDocument();
     expect(screen.queryByText('Aadhaar Verification')).not.toBeInTheDocument();
   });
 

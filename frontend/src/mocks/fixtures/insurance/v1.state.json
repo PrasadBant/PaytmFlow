@@ -7,10 +7,10 @@
   "readiness": "NEEDS_REVIEW",
   "status": "NEEDS_REVIEW",
   "progress": {
-    "completed": 2,
+    "completed": 3,
     "pending": 1,
-    "blockers": 2,
-    "total": 5
+    "blockers": 4,
+    "total": 8
   },
   "fields": [
     {
@@ -24,7 +24,7 @@
     },
     {
       "key": "policy_type",
-      "label": "Policy Category",
+      "label": "Policy Type",
       "status": "SATISFIED",
       "value": "Health Comprehensive",
       "display_value": "Health Comprehensive",
@@ -32,39 +32,72 @@
       "mandatory": true
     },
     {
-      "key": "medical_declaration",
+      "key": "kyc_verified",
+      "label": "Identity Verification",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Verified",
+      "explanation": "Identity already verified via existing Paytm KYC",
+      "mandatory": true
+    },
+    {
+      "key": "medical_history_declared",
       "label": "Medical History Declaration",
       "status": "AMBIGUOUS",
-      "explanation": "Declared health questionnaire conflicts with a prior medical record on file",
+      "explanation": "Health questionnaire answer conflicts with underwriting records on file",
       "mandatory": true,
       "ambiguity": {
-        "ambiguity_id": "MEDICAL_HISTORY_CONFLICT",
-        "reason": "The submitted health questionnaire indicates no pre-existing conditions, but an earlier record on file lists a declared condition.",
-        "question": "Do you have any pre-existing medical conditions to declare for this policy?",
-        "answer_type": "BOOLEAN",
-        "choices": null
+        "ambiguity_id": "AMB_SMOKING_STATUS",
+        "reason": "You declared no tobacco or nicotine use in the goal questionnaire, but a linked health record indicates a past tobacco-use flag.",
+        "question": "Have you consumed any nicotine or tobacco products in the last 24 months?",
+        "answer_type": "CHOICE",
+        "choices": [
+          { "value": "YES", "label": "Yes" },
+          { "value": "NO", "label": "No" }
+        ]
       }
     },
     {
-      "key": "identity_proof",
-      "label": "Government ID Proof",
+      "key": "ped_declaration_submitted",
+      "label": "Pre-existing Disease Clearance",
       "status": "BLOCKED",
-      "explanation": "Aadhaar or Passport verification required",
-      "resolve_action_id": "UPLOAD_KYC_DOC",
+      "explanation": "Past hospitalization or treatment records required for underwriting",
+      "resolve_action_id": "UPLOAD_MEDICAL_RECORDS",
       "mandatory": true
     },
     {
-      "key": "nominee_details",
-      "label": "Nominee Declaration",
+      "key": "tele_underwriting_scheduled",
+      "label": "Medical Underwriting Call",
       "status": "BLOCKED",
-      "explanation": "Nominee assignment required for policy issuance",
-      "resolve_action_id": "ADD_NOMINEE",
+      "explanation": "Select a time slot for the tele-medical consultation with the insurer's doctor",
+      "resolve_action_id": "SCHEDULE_UNDERWRITING_CALL",
+      "mandatory": true
+    },
+    {
+      "key": "bank_mandate_registered",
+      "label": "Premium Auto-Debit Mandate",
+      "status": "BLOCKED",
+      "explanation": "Set up automatic annual premium payment for policy renewal",
+      "resolve_action_id": "SETUP_PREMIUM_MANDATE",
+      "mandatory": true
+    },
+    {
+      "key": "policy_terms_accepted",
+      "label": "Policy Confirmation & Consent",
+      "status": "BLOCKED",
+      "explanation": "Final agreement to policy terms and premium schedule required before issuance",
+      "resolve_action_id": "CONFIRM_POLICY_TERMS",
       "mandatory": true
     }
   ],
-  "available_actions": ["UPLOAD_KYC_DOC", "ADD_NOMINEE"],
-  "display": { "title": "Insurance", "summary": "₹10,00,000 · Health Comprehensive" },
-  "history_summary": "Insurance journey initialized.",
+  "available_actions": [
+    "UPLOAD_MEDICAL_RECORDS",
+    "SCHEDULE_UNDERWRITING_CALL",
+    "SETUP_PREMIUM_MANDATE",
+    "CONFIRM_POLICY_TERMS"
+  ],
+  "display": { "title": "Health Insurance", "summary": "₹10,00,000 · Health Comprehensive" },
+  "history_summary": "Insurance journey initialized with coverage goal.",
   "created_at": "2026-09-12T10:00:00Z",
   "updated_at": "2026-09-12T10:00:00Z",
   "resume_screen": "STATUS"

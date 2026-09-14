@@ -45,10 +45,14 @@ describe('Screen04CurrentStatus (F14)', () => {
     expect(screen.getByTestId('progress-ring-count')).toHaveTextContent('3/7');
     expect(screen.getByTestId('progress-ring-label')).toHaveTextContent('Completed');
 
-    // Verify Legend
+    // Verify Legend. These must match the fixture's `fields` array 1:1 (3
+    // SATISFIED, 4 BLOCKED, 0 otherwise) - regression coverage for a fixture
+    // authoring bug where `progress` mislabeled 3 of the 4 actually-BLOCKED
+    // fields as "pending", contradicting the "Blocked Items (4)" list
+    // rendered from the same fields array on the same screen.
     expect(screen.getByText('3 Completed')).toBeInTheDocument();
-    expect(screen.getByText('3 Pending')).toBeInTheDocument();
-    expect(screen.getByText('1 Blocker')).toBeInTheDocument();
+    expect(screen.getByText('0 Pending')).toBeInTheDocument();
+    expect(screen.getByText('4 Blockers')).toBeInTheDocument();
   });
 
   it('renders blocked items with Resolve buttons', async () => {

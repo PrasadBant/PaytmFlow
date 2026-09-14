@@ -8,8 +8,8 @@
   "status": "IN_PROGRESS",
   "progress": {
     "completed": 3,
-    "pending": 3,
-    "blockers": 1,
+    "pending": 0,
+    "blockers": 4,
     "total": 7
   },
   "fields": [

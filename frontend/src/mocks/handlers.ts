@@ -158,7 +158,27 @@ function buildGenericRecommendation(journey: MockJourney): Record<string, unknow
   const blocked = journey.fields.filter((f) => f.status === 'BLOCKED' && f.resolve_action_id);
   const ambiguous = journey.fields.find((f) => f.status === 'AMBIGUOUS');
 
+  // Dedupe by action_id (two fields can share one resolve_action_id) - needed
+  // by both branches below.
+  const seen = new Set<string>();
+  const options = blocked.filter((f) => {
+    if (seen.has(f.resolve_action_id as string)) return false;
+    seen.add(f.resolve_action_id as string);
+    return true;
+  });
+
   if (ambiguous) {
+    // The clarification is the PRIMARY recommendation, but every other
+    // already-blocked field must remain independently resolvable - it still
+    // has its own Resolve button on Screen 4, and that button navigates
+    // straight to /act/<its resolve_action_id>. Screen06 (the action screen)
+    // resolves its title/why/input_schema by matching `recommendation` OR
+    // `alternatives` against the actionId in the URL; leaving `alternatives`
+    // empty here (as this used to) meant that match always failed whenever a
+    // journey had a pending clarification, so those fields' action screens
+    // silently fell back to a generic placeholder title instead of their
+    // real one (Screen06 itself now shows a safe "not available" state,
+    // never invented fields, whenever `action` can't be resolved at all).
     return {
       snapshot_id: journey.snapshot_id,
       readiness: 'NEEDS_REVIEW',
@@ -171,8 +191,8 @@ function buildGenericRecommendation(journey: MockJourney): Record<string, unknow
         accepts: null,
         input_schema: null,
       },
-      alternatives: [],
-      minimum_path_length: 1,
+      alternatives: options.map(buildGenericActionOption),
+      minimum_path_length: 1 + options.length,
       source: 'PLANNER_FALLBACK',
     };
   }
@@ -187,14 +207,6 @@ function buildGenericRecommendation(journey: MockJourney): Record<string, unknow
       source: 'AI_RANKED',
     };
   }
-
-  // Dedupe by action_id (two fields can share one resolve_action_id).
-  const seen = new Set<string>();
-  const options = blocked.filter((f) => {
-    if (seen.has(f.resolve_action_id as string)) return false;
-    seen.add(f.resolve_action_id as string);
-    return true;
-  });
 
   return {
     snapshot_id: journey.snapshot_id,

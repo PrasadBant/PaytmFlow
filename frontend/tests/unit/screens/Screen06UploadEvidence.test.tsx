@@ -78,7 +78,15 @@ describe('Screen06UploadEvidence (F19)', () => {
     expect(await screen.findByTestId('screen-07-stub')).toBeInTheDocument();
   });
 
-  it('switches to Enter Details tab and submits manual schema form', async () => {
+  it('EVIDENCE action with no input_schema: Enter Details tab shows the safe "not available" state, never invented fields (regression)', async () => {
+    // Bug: an EVIDENCE action with no input_schema (true of every EVIDENCE
+    // action on every pack - the contract never gives one) fell back to a
+    // hardcoded "Net Monthly Income" / "Employer or Organization Name" form.
+    // That is Lending-specific business content with no relationship to
+    // whatever document is actually being requested, and it could appear on
+    // ANY journey's manual-entry path. The default route here
+    // (UPLOAD_INCOME_PROOF) is itself a real EVIDENCE action with no
+    // input_schema, so this exercises the exact previously-broken path.
     const user = userEvent.setup();
     renderScreen6();
 
@@ -87,19 +95,62 @@ describe('Screen06UploadEvidence (F19)', () => {
     const manualTab = screen.getByRole('tab', { name: /Enter Details/i });
     await user.click(manualTab);
 
+    expect(await screen.findByTestId('manual-entry-unavailable')).toBeInTheDocument();
+    expect(screen.getByText(/Details entry isn't available for this document yet\./i)).toBeInTheDocument();
+
+    // No Lending-specific (or any invented) fields anywhere on the panel.
+    expect(screen.queryByLabelText(/Net Monthly Income/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Employer.*Organization Name/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/85,?000/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Submit Details/i })).not.toBeInTheDocument();
+
+    // Recovery controls are present and functional.
+    expect(screen.getByTestId('manual-unavailable-back-to-upload-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('manual-unavailable-return-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('manual-unavailable-cancel-btn')).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('manual-unavailable-back-to-upload-btn'));
+    expect(await screen.findByTestId('tabpanel-upload')).toBeInTheDocument();
+  });
+
+  it('EVIDENCE action with a genuine input_schema: renders and submits that schema dynamically, never a substituted one (regression)', async () => {
+    // The inverse of the above: when the contract DOES provide a real schema
+    // for an EVIDENCE action, it must render and submit that schema - never
+    // fall back to the generic message, and never substitute another
+    // action's fields.
+    const user = userEvent.setup();
+    renderScreen6('/j/22222222-2222-2222-2222-222222222222/act/UPLOAD_MEDICAL_RECORDS', {
+      action: {
+        action_id: 'UPLOAD_MEDICAL_RECORDS',
+        title: 'Pre-existing Disease Clearance',
+        kind: 'EVIDENCE',
+        why: 'Past hospitalization or treatment records required for underwriting',
+        unlocks: [],
+        accepts: ['MEDICAL_RECORDS'],
+        input_schema: [
+          {
+            key: 'condition_summary',
+            type: 'text',
+            label: 'Condition Summary',
+            required: true,
+          },
+        ],
+      },
+      snapshotId: '33333333-3333-3333-3333-333333333333',
+    });
+
+    await screen.findByRole('heading', { level: 1 });
+    await user.click(screen.getByRole('tab', { name: /Enter Details/i }));
+
     expect(await screen.findByTestId('tabpanel-manual')).toBeInTheDocument();
-    expect(screen.getByLabelText(/Net Monthly Income/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Employer or Organization Name/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('manual-entry-unavailable')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Condition Summary/i)).toBeInTheDocument();
+    // Never the Lending fallback, and never another pack's field.
+    expect(screen.queryByLabelText(/Net Monthly Income/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Employer.*Organization Name/i)).not.toBeInTheDocument();
 
-    const incomeInput = screen.getByLabelText(/Net Monthly Income/i);
-    const employerInput = screen.getByLabelText(/Employer or Organization Name/i);
-
-    await user.clear(incomeInput);
-    await user.type(incomeInput, '85000');
-    await user.type(employerInput, 'Paytm Technologies Ltd');
-
-    const submitBtn = screen.getByRole('button', { name: /Submit Details/i });
-    await user.click(submitBtn);
+    await user.type(screen.getByLabelText(/Condition Summary/i), 'Fully resolved, one-time event');
+    await user.click(screen.getByRole('button', { name: /Submit Details/i }));
 
     expect(await screen.findByTestId('screen-07-stub')).toBeInTheDocument();
   });
@@ -199,6 +250,61 @@ describe('Screen06UploadEvidence (F19)', () => {
       expect(screen.getByLabelText(/Employment Category/i)).toBeInTheDocument();
       expect(screen.queryByTestId('evidence-file-input')).not.toBeInTheDocument();
       expect(screen.queryByText(/Do not have the document handy/i)).not.toBeInTheDocument();
+    });
+
+    it('FORM action with a missing input_schema (contract violation): shows the safe fallback state, never invented fields (defensive regression)', async () => {
+      // A FORM action should always carry an input_schema per contract, but
+      // if one is ever missing this must not silently render another
+      // action's schema (or the old Lending-specific fallback) - it must
+      // fail safely with the same generic "not available" state.
+      renderScreen6('/j/44444444-4444-4444-4444-444444444444/act/VERIFY_EMPLOYMENT', {
+        action: {
+          action_id: 'VERIFY_EMPLOYMENT',
+          title: 'Employment Verification',
+          kind: 'FORM',
+          why: 'Confirm current employer and employment type for underwriting',
+          unlocks: [],
+          input_schema: null,
+        },
+        snapshotId: '33333333-3333-3333-3333-333333333333',
+      });
+
+      expect(await screen.findByTestId('tabpanel-manual')).toBeInTheDocument();
+      expect(await screen.findByTestId('manual-entry-unavailable')).toBeInTheDocument();
+      expect(screen.getByText(/Details entry isn't available for this step yet\./i)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Net Monthly Income/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/Employer.*Organization Name/i)).not.toBeInTheDocument();
+      // No "Back to Upload" for a FORM action - there is no Upload tab to return to.
+      expect(screen.queryByTestId('manual-unavailable-back-to-upload-btn')).not.toBeInTheDocument();
+      expect(screen.getByTestId('manual-unavailable-return-btn')).toBeInTheDocument();
+      expect(screen.getByTestId('manual-unavailable-cancel-btn')).toBeInTheDocument();
+    });
+
+    it('EVIDENCE action: "Why we need this?" shows the action\'s own `why`, never the hardcoded loan-repayment copy (regression)', async () => {
+      // Bug: the Upload File tab's "Why we need this?" checklist was three
+      // hardcoded lines ("Verify your repayment capacity", "Satisfy required
+      // financial criteria", "Move to the next step") shown identically for
+      // EVERY action on EVERY pack - e.g. a health-insurance medical-records
+      // upload showed "repayment capacity" wording that has nothing to do
+      // with insurance underwriting.
+      renderScreen6('/j/22222222-2222-2222-2222-222222222222/act/UPLOAD_MEDICAL_RECORDS', {
+        action: {
+          action_id: 'UPLOAD_MEDICAL_RECORDS',
+          title: 'Pre-existing Disease Clearance',
+          kind: 'EVIDENCE',
+          why: 'Past hospitalization or treatment records required for underwriting',
+          unlocks: [],
+          accepts: ['MEDICAL_RECORDS'],
+        },
+        snapshotId: '33333333-3333-3333-3333-333333333333',
+      });
+
+      await screen.findByRole('heading', { level: 1 });
+      expect(
+        screen.getByText('Past hospitalization or treatment records required for underwriting')
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/repayment capacity/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/financial criteria/i)).not.toBeInTheDocument();
     });
 
     it('CLARIFICATION action: never renders the upload/form screen, redirects to Screen 4 instead', async () => {

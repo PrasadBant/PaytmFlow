@@ -38,7 +38,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ hideOnDesktop = false }) => {
         className={cn(
           'fixed inset-y-0 left-0 z-50 w-sidebar bg-surface border-r border-surface-border flex flex-col transition-transform duration-200 ease-in-out',
           hideOnDesktop ? 'hidden' : 'md:static md:translate-x-0',
-          isSidebarOpen ? 'translate-x-0 flex' : '-translate-x-full md:flex'
+          isSidebarOpen
+            ? 'translate-x-0 flex'
+            : hideOnDesktop
+              ? // No unscoped `md:flex` here: hideOnDesktop's `hidden` above must win
+                // at desktop widths. Tailwind-merge only dedupes classes within the
+                // same variant scope, so an unconditional `md:flex` bypasses it and
+                // the later `md:flex` rule wins the cascade at >=768px, leaving the
+                // sidebar `display:flex` (merely translated off-screen) instead of
+                // `display:none` - present in the DOM, in the tab order, and in the
+                // accessibility tree even though invisible. See shell.test.tsx.
+                '-translate-x-full'
+              : '-translate-x-full md:flex'
         )}
       >
         {/* Mobile Header (close button + mobile brand) */}

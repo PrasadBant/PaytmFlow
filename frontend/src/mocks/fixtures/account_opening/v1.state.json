@@ -7,10 +7,10 @@
   "readiness": "NOT_READY",
   "status": "IN_PROGRESS",
   "progress": {
-    "completed": 1,
+    "completed": 2,
     "pending": 0,
-    "blockers": 1,
-    "total": 2
+    "blockers": 5,
+    "total": 7
   },
   "fields": [
     {
@@ -23,16 +23,61 @@
       "mandatory": true
     },
     {
-      "key": "pan_record",
+      "key": "identity_verified",
+      "label": "Identity Verification",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Verified",
+      "explanation": "Identity already verified via existing Paytm KYC",
+      "mandatory": true
+    },
+    {
+      "key": "pan_authenticated",
       "label": "PAN Verification",
       "status": "BLOCKED",
-      "explanation": "PAN authentication required by RBI guidelines",
+      "explanation": "PAN authentication required by RBI guidelines before the account can be activated",
       "resolve_action_id": "VERIFY_PAN",
+      "mandatory": true
+    },
+    {
+      "key": "nominee_declared",
+      "label": "Nominee Declaration",
+      "status": "BLOCKED",
+      "explanation": "Add a nominee for this account, or explicitly opt out",
+      "resolve_action_id": "ADD_NOMINEE",
+      "mandatory": true
+    },
+    {
+      "key": "signature_uploaded",
+      "label": "Specimen Signature",
+      "status": "BLOCKED",
+      "explanation": "Upload or capture your specimen signature for the account record",
+      "resolve_action_id": "UPLOAD_SIGNATURE",
+      "mandatory": true
+    },
+    {
+      "key": "vkyc_completed",
+      "label": "Video KYC Session",
+      "status": "BLOCKED",
+      "explanation": "Complete a short agent-assisted video KYC session to activate the account",
+      "resolve_action_id": "START_VIDEO_KYC",
+      "mandatory": true
+    },
+    {
+      "key": "account_agreement_accepted",
+      "label": "Account Terms & Conditions",
+      "status": "BLOCKED",
+      "explanation": "Accept the savings account terms and conditions to generate your account number",
+      "resolve_action_id": "ACCEPT_ACCOUNT_TERMS",
       "mandatory": true
     }
   ],
   "available_actions": [
-    "VERIFY_PAN"
+    "VERIFY_PAN",
+    "ADD_NOMINEE",
+    "UPLOAD_SIGNATURE",
+    "START_VIDEO_KYC",
+    "ACCEPT_ACCOUNT_TERMS"
   ],
   "history_summary": "Account opening journey initialized.",
   "created_at": "2026-09-12T10:00:00Z",

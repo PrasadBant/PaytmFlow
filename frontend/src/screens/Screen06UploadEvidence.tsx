@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, UploadCloud, FileEdit, HelpCircle, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, UploadCloud, FileEdit, HelpCircle, ShieldCheck, CheckCircle2, AlertCircle, FileWarning } from 'lucide-react';
 import { useJourney } from '@/api/hooks/useJourney';
 import { useRecommendation } from '@/api/hooks/useRecommendation';
 import { useUploadEvidence } from '@/api/hooks/useUploadEvidence';
@@ -14,7 +14,6 @@ import { Spinner } from '@/components/primitives/Spinner';
 import { mapErrorToUxAction } from '@/api/errors';
 import type { components } from '@/api/types.gen';
 
-type GoalFieldSpec = components['schemas']['GoalFieldSpec'];
 type ActionOption = components['schemas']['ActionOption'];
 
 interface LocationState {
@@ -33,24 +32,15 @@ function generateIdempotencyKey(): string {
   });
 }
 
-const DEFAULT_MANUAL_SCHEMA: GoalFieldSpec[] = [
-  {
-    key: 'monthly_income',
-    type: 'money',
-    label: 'Net Monthly Income',
-    required: true,
-    placeholder: 'e.g. 85000',
-    help_text: 'Enter your monthly in-hand salary or regular business income',
-  },
-  {
-    key: 'employer_name',
-    type: 'text',
-    label: 'Employer or Organization Name',
-    required: true,
-    placeholder: 'e.g. Acme Corp',
-    help_text: 'Current registered employer or enterprise name',
-  },
-];
+// There is deliberately no fallback field list here. EVIDENCE-kind actions
+// never carry an input_schema at all (per contract - manual entry for a
+// document has no fixed shape the API can define), and a FORM-kind action
+// with a missing/empty input_schema is a genuine contract violation. Either
+// way, inventing fields to show anyway - the previous "Net Monthly Income" /
+// "Employer or Organization Name" fallback - meant every journey's manual-
+// entry path could show Lending-specific fields with no relationship to
+// what was actually being asked for. When there is no real schema, the
+// manual-entry panel must say so and offer a way back, never fabricate one.
 
 export const Screen06UploadEvidence: React.FC = () => {
   const { id: journeyId, actionId } = useParams<{ id: string; actionId: string }>();
@@ -266,7 +256,7 @@ export const Screen06UploadEvidence: React.FC = () => {
 
   const manualSchema = action?.input_schema && action.input_schema.length > 0
     ? action.input_schema
-    : DEFAULT_MANUAL_SCHEMA;
+    : null;
 
   return (
     <div data-testid="screen-06-upload-evidence" className="max-w-3xl mx-auto px-4 py-8 md:py-10 space-y-6">
@@ -332,7 +322,14 @@ export const Screen06UploadEvidence: React.FC = () => {
               isUploading={uploadEvidence.isPending}
             />
 
-            {/* Why we need this checklist */}
+            {/* Why we need this checklist. The specific reason (first line) must come
+                from the action's own `why` (the same field the "How it helps" tab
+                below already reads) - never a hardcoded loan-specific sentence,
+                which previously showed on every journey's every evidence upload
+                regardless of what was actually being requested (e.g. "Verify your
+                repayment capacity" under a health-insurance medical-records
+                upload). Only the two closing lines are journey-agnostic truths
+                that hold for any action on any pack. */}
             <div className="p-4 rounded-card bg-surface-subtle border border-surface-border space-y-3">
               <h3 className="text-sm font-bold text-content-primary">
                 Why we need this?
@@ -340,11 +337,11 @@ export const Screen06UploadEvidence: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2.5 text-xs sm:text-sm text-content-secondary">
                   <CheckCircle2 className="w-4 h-4 text-paytm-green shrink-0" />
-                  <span>Verify your repayment capacity</span>
+                  <span>{action?.why || 'Required to satisfy this journey’s verification criteria'}</span>
                 </div>
                 <div className="flex items-center gap-2.5 text-xs sm:text-sm text-content-secondary">
                   <CheckCircle2 className="w-4 h-4 text-paytm-green shrink-0" />
-                  <span>Satisfy required financial criteria</span>
+                  <span>Confirms this requirement is satisfied</span>
                 </div>
                 <div className="flex items-center gap-2.5 text-xs sm:text-sm text-content-secondary">
                   <CheckCircle2 className="w-4 h-4 text-paytm-green shrink-0" />
@@ -396,25 +393,76 @@ export const Screen06UploadEvidence: React.FC = () => {
           className="space-y-6"
         >
           <Card className="p-6 space-y-6">
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold text-content-primary">
-                {isFormAction ? 'Enter Details' : 'Enter Details Manually'}
-              </h2>
-              <p className="text-xs text-content-secondary">
-                {isFormAction
-                  ? 'Fill in the information below to complete this step.'
-                  : 'Do not have the document handy? You can enter the required information directly below.'}
-              </p>
-            </div>
+            {manualSchema ? (
+              <>
+                <div className="space-y-1">
+                  <h2 className="text-base font-semibold text-content-primary">
+                    {isFormAction ? 'Enter Details' : 'Enter Details Manually'}
+                  </h2>
+                  <p className="text-xs text-content-secondary">
+                    {isFormAction
+                      ? 'Fill in the information below to complete this step.'
+                      : 'Do not have the document handy? You can enter the required information directly below.'}
+                  </p>
+                </div>
 
-            <SchemaForm
-              schema={manualSchema}
-              submitLabel={
-                uploadEvidence.isPending || applyAction.isPending ? 'Submitting...' : 'Submit Details →'
-              }
-              onSubmit={handleManualSubmit}
-              isSubmitting={uploadEvidence.isPending || applyAction.isPending}
-            />
+                <SchemaForm
+                  schema={manualSchema}
+                  submitLabel={
+                    uploadEvidence.isPending || applyAction.isPending ? 'Submitting...' : 'Submit Details →'
+                  }
+                  onSubmit={handleManualSubmit}
+                  isSubmitting={uploadEvidence.isPending || applyAction.isPending}
+                />
+              </>
+            ) : (
+              <div data-testid="manual-entry-unavailable" className="flex flex-col items-center text-center gap-4 py-6">
+                <div className="w-12 h-12 rounded-full bg-surface-subtle text-content-tertiary flex items-center justify-center">
+                  <FileWarning className="w-6 h-6" />
+                </div>
+                <div className="space-y-1 max-w-sm">
+                  <h2 className="text-base font-semibold text-content-primary">
+                    Details entry isn&apos;t available for this {isFormAction ? 'step' : 'document'} yet.
+                  </h2>
+                  <p className="text-xs text-content-secondary">
+                    {isFormAction
+                      ? 'This step has no configured form yet. Please go back and try again later.'
+                      : 'Manual entry isn’t set up for this document type. Please upload the file instead, or come back to it later.'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 pt-2">
+                  {!isFormAction && (
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={() => {
+                        setActiveTab('upload');
+                        setSubmitError(null);
+                      }}
+                      data-testid="manual-unavailable-back-to-upload-btn"
+                    >
+                      Back to Upload
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant={isFormAction ? 'primary' : 'secondary'}
+                    onClick={() => navigate(`/j/${journeyId}`)}
+                    data-testid="manual-unavailable-return-btn"
+                  >
+                    Return to Journey Status
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => navigate(`/j/${journeyId}/next`)}
+                    data-testid="manual-unavailable-cancel-btn"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       )}
