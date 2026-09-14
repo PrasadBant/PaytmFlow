@@ -9,8 +9,8 @@
     "status": "IN_PROGRESS",
     "progress": {
       "completed": 4,
-      "pending": 2,
-      "blockers": 1,
+      "pending": 0,
+      "blockers": 3,
       "total": 7
     },
     "fields": [
@@ -104,14 +104,14 @@
     "progress": {
       "from": {
         "completed": 3,
-        "pending": 3,
-        "blockers": 1,
+        "pending": 0,
+        "blockers": 4,
         "total": 7
       },
       "to": {
         "completed": 4,
-        "pending": 2,
-        "blockers": 1,
+        "pending": 0,
+        "blockers": 3,
         "total": 7
       }
     }

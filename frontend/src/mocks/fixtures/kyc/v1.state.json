@@ -7,40 +7,66 @@
   "readiness": "NOT_READY",
   "status": "IN_PROGRESS",
   "progress": {
-    "completed": 1,
+    "completed": 2,
     "pending": 0,
-    "blockers": 2,
-    "total": 3
+    "blockers": 4,
+    "total": 6
   },
   "fields": [
     {
       "key": "aadhaar_number",
-      "label": "Aadhaar Card",
+      "label": "Aadhaar Number",
       "status": "SATISFIED",
       "display_value": "XXXX XXXX 1234",
       "explanation": "Aadhaar number provided",
       "mandatory": true
     },
     {
+      "key": "kyc_purpose",
+      "label": "Verification Purpose",
+      "status": "SATISFIED",
+      "display_value": "Wallet Upgrade",
+      "explanation": "Purpose of this KYC verification",
+      "mandatory": true
+    },
+    {
       "key": "pan_linkage",
       "label": "PAN-Aadhaar Link Status",
       "status": "BLOCKED",
-      "explanation": "PAN linkage verification required",
+      "explanation": "PAN must be linked to Aadhaar before this KYC can be authenticated",
       "resolve_action_id": "VERIFY_PAN_LINK",
+      "mandatory": true
+    },
+    {
+      "key": "identity_document",
+      "label": "Identity Document (OVD)",
+      "status": "BLOCKED",
+      "explanation": "Upload a valid officially valid document (passport or voter ID) as a secondary identity proof",
+      "resolve_action_id": "UPLOAD_OVD",
       "mandatory": true
     },
     {
       "key": "video_kyc",
       "label": "Live Video Verification",
       "status": "BLOCKED",
-      "explanation": "Agent video call or biometric scan required",
+      "explanation": "Complete a short agent-assisted video call or biometric liveness scan",
       "resolve_action_id": "START_VIDEO_KYC",
+      "mandatory": true
+    },
+    {
+      "key": "consent_declaration",
+      "label": "KYC Consent & Declaration",
+      "status": "BLOCKED",
+      "explanation": "Sign the consent undertaking authorizing this KYC verification",
+      "resolve_action_id": "SIGN_KYC_CONSENT",
       "mandatory": true
     }
   ],
   "available_actions": [
     "VERIFY_PAN_LINK",
-    "START_VIDEO_KYC"
+    "UPLOAD_OVD",
+    "START_VIDEO_KYC",
+    "SIGN_KYC_CONSENT"
   ],
   "history_summary": "KYC verification initialized.",
   "created_at": "2026-09-12T10:00:00Z",

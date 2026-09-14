@@ -6,15 +6,10 @@
       "display_name": "Personal Loan",
       "icon": "rupee",
       "title": "₹5,00,000 Personal Loan",
-      "summary": "4/7 steps completed — Income verified",
+      "summary": "3/7 steps completed — verification in progress",
       "status": "IN_PROGRESS",
       "readiness": "NOT_READY",
-      "progress": {
-        "completed": 4,
-        "pending": 2,
-        "blockers": 1,
-        "total": 7
-      },
+      "progress": { "completed": 3, "pending": 0, "blockers": 4, "total": 7 },
       "updated_at": "2026-09-12T10:06:00Z",
       "resume_screen": "STATUS"
     },
@@ -24,15 +19,10 @@
       "display_name": "Health & Life Insurance",
       "icon": "shield",
       "title": "₹10,00,000 Health Comprehensive",
-      "summary": "Medical declaration under review",
+      "summary": "Medical history declaration under review",
       "status": "NEEDS_REVIEW",
       "readiness": "NEEDS_REVIEW",
-      "progress": {
-        "completed": 2,
-        "pending": 1,
-        "blockers": 2,
-        "total": 5
-      },
+      "progress": { "completed": 3, "pending": 1, "blockers": 4, "total": 8 },
       "updated_at": "2026-09-11T16:30:00Z",
       "resume_screen": "NEEDS_REVIEW"
     },
@@ -45,13 +35,47 @@
       "summary": "PAN linkage and video verification pending",
       "status": "IN_PROGRESS",
       "readiness": "NOT_READY",
-      "progress": {
-        "completed": 1,
-        "pending": 0,
-        "blockers": 2,
-        "total": 3
-      },
+      "progress": { "completed": 2, "pending": 0, "blockers": 4, "total": 6 },
       "updated_at": "2026-09-10T09:15:00Z",
+      "resume_screen": "STATUS"
+    },
+    {
+      "journey_id": "44444444-4444-4444-4444-444444444444",
+      "journey_type": "CREDIT_CARD",
+      "display_name": "Credit Card",
+      "icon": "card",
+      "title": "₹9,00,000 income · Cashback rewards",
+      "summary": "Income and address verification pending",
+      "status": "IN_PROGRESS",
+      "readiness": "NOT_READY",
+      "progress": { "completed": 3, "pending": 0, "blockers": 4, "total": 7 },
+      "updated_at": "2026-09-09T14:20:00Z",
+      "resume_screen": "STATUS"
+    },
+    {
+      "journey_id": "55555555-5555-5555-5555-555555555555",
+      "journey_type": "ACCOUNT_OPENING",
+      "display_name": "Account Opening",
+      "icon": "bank",
+      "title": "Digital Savings Zero Balance",
+      "summary": "PAN, nominee and video KYC pending",
+      "status": "IN_PROGRESS",
+      "readiness": "NOT_READY",
+      "progress": { "completed": 2, "pending": 0, "blockers": 5, "total": 7 },
+      "updated_at": "2026-09-08T11:05:00Z",
+      "resume_screen": "STATUS"
+    },
+    {
+      "journey_id": "66666666-6666-6666-6666-666666666666",
+      "journey_type": "INVESTMENT",
+      "display_name": "Investment / Wealth",
+      "icon": "chart",
+      "title": "Long-term Wealth Creation",
+      "summary": "KRA KYC, risk profile and SIP mandate pending",
+      "status": "IN_PROGRESS",
+      "readiness": "NOT_READY",
+      "progress": { "completed": 2, "pending": 0, "blockers": 5, "total": 7 },
+      "updated_at": "2026-09-07T08:45:00Z",
       "resume_screen": "STATUS"
     }
   ]

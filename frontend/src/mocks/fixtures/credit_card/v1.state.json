@@ -7,41 +7,77 @@
   "readiness": "NOT_READY",
   "status": "IN_PROGRESS",
   "progress": {
-    "completed": 2,
+    "completed": 3,
     "pending": 0,
-    "blockers": 1,
-    "total": 3
+    "blockers": 4,
+    "total": 7
   },
   "fields": [
     {
-      "key": "monthly_spend_estimate",
-      "label": "Estimated Monthly Spend",
-      "status": "SATISFIED",
-      "value": 40000,
-      "display_value": "₹40,000",
-      "explanation": "Spend category mapped",
-      "mandatory": true
-    },
-    {
       "key": "annual_income",
-      "label": "Annual Income",
+      "label": "Declared Annual Income",
       "status": "SATISFIED",
       "value": 900000,
       "display_value": "₹9,00,000",
-      "explanation": "Self-declared income",
+      "explanation": "Self-declared income from application goal",
       "mandatory": true
     },
     {
-      "key": "itr_verification",
-      "label": "Income Tax Return (ITR)",
+      "key": "preferred_reward_type",
+      "label": "Reward Preference",
+      "status": "SATISFIED",
+      "value": "Cashback",
+      "display_value": "Cashback",
+      "explanation": "Selected reward category",
+      "mandatory": true
+    },
+    {
+      "key": "kyc_verified",
+      "label": "Identity Verification",
+      "status": "SATISFIED",
+      "value": true,
+      "display_value": "Verified",
+      "explanation": "Identity already verified via existing Paytm KYC",
+      "mandatory": true
+    },
+    {
+      "key": "income_verified",
+      "label": "Income Verification",
       "status": "BLOCKED",
-      "explanation": "Latest Form 16 / ITR required for credit limit setting",
+      "explanation": "Latest ITR or Form 16 required to confirm declared income and set credit limit",
       "resolve_action_id": "UPLOAD_ITR",
+      "mandatory": true
+    },
+    {
+      "key": "employment_verified",
+      "label": "Employment Verification",
+      "status": "BLOCKED",
+      "explanation": "Confirm current employer and employment type for underwriting",
+      "resolve_action_id": "VERIFY_EMPLOYMENT",
+      "mandatory": true
+    },
+    {
+      "key": "current_address_verified",
+      "label": "Current Address Proof",
+      "status": "BLOCKED",
+      "explanation": "Recent utility bill required to confirm current residential address",
+      "resolve_action_id": "UPLOAD_UTILITY_BILL",
+      "mandatory": true
+    },
+    {
+      "key": "card_agreement_signed",
+      "label": "Cardholder Agreement",
+      "status": "BLOCKED",
+      "explanation": "Digital agreement to card terms, fees and billing cycle required before dispatch",
+      "resolve_action_id": "SIGN_CARD_AGREEMENT",
       "mandatory": true
     }
   ],
   "available_actions": [
-    "UPLOAD_ITR"
+    "UPLOAD_ITR",
+    "VERIFY_EMPLOYMENT",
+    "UPLOAD_UTILITY_BILL",
+    "SIGN_CARD_AGREEMENT"
   ],
   "history_summary": "Credit card journey initialized.",
   "created_at": "2026-09-12T10:00:00Z",
@@ -49,6 +85,6 @@
   "resume_screen": "STATUS",
   "display": {
     "title": "Credit Card",
-    "summary": "₹9,00,000 income · ₹40,000/mo spend"
+    "summary": "₹9,00,000 income · Cashback rewards"
   }
 }

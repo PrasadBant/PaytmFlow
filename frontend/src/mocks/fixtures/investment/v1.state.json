@@ -7,10 +7,10 @@
   "readiness": "NOT_READY",
   "status": "IN_PROGRESS",
   "progress": {
-    "completed": 1,
+    "completed": 2,
     "pending": 0,
-    "blockers": 1,
-    "total": 2
+    "blockers": 5,
+    "total": 7
   },
   "fields": [
     {
@@ -23,16 +23,61 @@
       "mandatory": true
     },
     {
-      "key": "fatca_declaration",
-      "label": "FATCA & Tax Residency Declaration",
+      "key": "monthly_sip_budget",
+      "label": "Target Monthly SIP",
+      "status": "SATISFIED",
+      "value": 10000,
+      "display_value": "₹10,000/month",
+      "explanation": "Target monthly investment amount",
+      "mandatory": true
+    },
+    {
+      "key": "kra_kyc_validated",
+      "label": "KRA KYC Validation",
       "status": "BLOCKED",
-      "explanation": "Mandatory tax declaration for SEBI compliance",
-      "resolve_action_id": "SUBMIT_FATCA",
+      "explanation": "Your KYC record must be validated with the KYC Registration Agency (KRA) before you can transact in mutual funds",
+      "resolve_action_id": "VALIDATE_KRA_KYC",
+      "mandatory": true
+    },
+    {
+      "key": "risk_assessment_completed",
+      "label": "Risk Profile Questionnaire",
+      "status": "BLOCKED",
+      "explanation": "Complete a short questionnaire to determine your investment risk appetite",
+      "resolve_action_id": "COMPLETE_RISK_PROFILE",
+      "mandatory": true
+    },
+    {
+      "key": "bank_account_verified",
+      "label": "Bank Account Verification",
+      "status": "BLOCKED",
+      "explanation": "Upload a cancelled cheque to verify the bank account funds will be debited from",
+      "resolve_action_id": "UPLOAD_CANCELLED_CHEQUE",
+      "mandatory": true
+    },
+    {
+      "key": "sip_mandate_approved",
+      "label": "SIP Auto-Debit Mandate",
+      "status": "BLOCKED",
+      "explanation": "Set up a recurring auto-debit mandate for your monthly SIP contribution",
+      "resolve_action_id": "SETUP_SIP_MANDATE",
+      "mandatory": true
+    },
+    {
+      "key": "nomination_and_fatca_signed",
+      "label": "Nomination & FATCA Declaration",
+      "status": "BLOCKED",
+      "explanation": "Mandatory nomination and FATCA/tax-residency declaration required for SEBI compliance",
+      "resolve_action_id": "SIGN_FATCA_DECLARATION",
       "mandatory": true
     }
   ],
   "available_actions": [
-    "SUBMIT_FATCA"
+    "VALIDATE_KRA_KYC",
+    "COMPLETE_RISK_PROFILE",
+    "UPLOAD_CANCELLED_CHEQUE",
+    "SETUP_SIP_MANDATE",
+    "SIGN_FATCA_DECLARATION"
   ],
   "history_summary": "Investment journey initialized.",
   "created_at": "2026-09-12T10:00:00Z",

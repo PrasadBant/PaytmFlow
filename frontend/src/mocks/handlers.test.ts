@@ -270,7 +270,7 @@ describe('MSW Handlers & Scenarios Suite', () => {
       );
       expect(rec.readiness).toBe('NEEDS_REVIEW');
       expect(rec.recommendation?.kind).toBe('CLARIFICATION');
-      expect(rec.recommendation?.unlocks).toContain('medical_declaration');
+      expect(rec.recommendation?.unlocks).toContain('medical_history_declared');
     });
 
     it('an unknown journey_id 404s instead of silently returning Lending data', async () => {
@@ -290,6 +290,25 @@ describe('MSW Handlers & Scenarios Suite', () => {
       expect(journey.display?.title).not.toBe('Personal Loan');
       expect(journey.display?.title).toBeTruthy();
     });
+
+    it('a journey with a pending clarification still exposes every other BLOCKED field\'s own action in `alternatives` (regression)', async () => {
+      // Bug: buildGenericRecommendation returned early on the AMBIGUOUS branch
+      // with `alternatives: []`, so Screen 6 could never resolve `action` for
+      // any of this journey's OTHER blocked fields (it matches the actionId
+      // in the URL against `recommendation` + `alternatives`) - their action
+      // screens silently fell back to a generic title and, for FORM actions,
+      // Lending's own hardcoded income/employer fields, on a pack that has
+      // nothing to do with income or employment.
+      const rec = await apiClient.get<components['schemas']['RecommendationResponse']>(
+        `/journeys/${INSURANCE_ID}/recommendation`
+      );
+      expect(rec.recommendation?.kind).toBe('CLARIFICATION');
+      const alternativeActionIds = (rec.alternatives ?? []).map((a) => a.action_id);
+      expect(alternativeActionIds).toContain('UPLOAD_MEDICAL_RECORDS');
+      expect(alternativeActionIds).toContain('SCHEDULE_UNDERWRITING_CALL');
+      const pedAlternative = rec.alternatives?.find((a) => a.action_id === 'UPLOAD_MEDICAL_RECORDS');
+      expect(pedAlternative?.title).toBe('Pre-existing Disease Clearance');
+    });
   });
 
   describe('Full EVIDENCE/FORM action cycle for every non-Lending pack (Phase 4/6 regression)', () => {
@@ -302,18 +321,18 @@ describe('MSW Handlers & Scenarios Suite', () => {
     const ACCOUNT_OPENING_ID = '55555555-5555-5555-5555-555555555555';
     const INVESTMENT_ID = '66666666-6666-6666-6666-666666666666';
 
-    it('CREDIT_CARD: uploading the ITR resolves itr_verification and readiness becomes READY', async () => {
+    it('CREDIT_CARD: uploading the ITR resolves income_verified and advances progress (not yet READY - 3 other blockers remain)', async () => {
       const before = await apiClient.get<components['schemas']['JourneyStateResponse']>(
         `/journeys/${CREDIT_CARD_ID}`
       );
-      expect(before.progress).toEqual({ completed: 2, pending: 0, blockers: 1, total: 3 });
+      expect(before.progress).toEqual({ completed: 3, pending: 0, blockers: 4, total: 7 });
 
       const evidence = await postMultipart<components['schemas']['EvidenceResponse']>(
         `/journeys/${CREDIT_CARD_ID}/evidence`,
         { doc_type: 'ITR', expected_snapshot_id: before.snapshot_id }
       );
       expect(evidence.proposed_action_id).toBe('UPLOAD_ITR');
-      expect(evidence.interpretation.detected.map((d) => d.key)).toContain('itr_verification');
+      expect(evidence.interpretation.detected.map((d) => d.key)).toContain('income_verified');
 
       const result = await apiClient.post<components['schemas']['ActionResponse']>(
         `/journeys/${CREDIT_CARD_ID}/actions`,
@@ -324,60 +343,73 @@ describe('MSW Handlers & Scenarios Suite', () => {
         }
       );
       expect(result.journey.journey_type).toBe('CREDIT_CARD');
-      const itrField = result.journey.fields.find((f) => f.key === 'itr_verification');
+      const itrField = result.journey.fields.find((f) => f.key === 'income_verified');
       expect(itrField?.status).toBe('SATISFIED');
-      expect(result.journey.progress).toEqual({ completed: 3, pending: 0, blockers: 0, total: 3 });
-      expect(result.journey.readiness).toBe('READY');
-      expect(result.next_recommendation?.recommendation).toBeNull();
+      // One of four blockers resolved: completed +1, blockers -1. The other
+      // three (employment, address, agreement) remain - readiness must not
+      // jump to READY on a single action when real requirements are still
+      // outstanding (Phase 7/8 regression: no "READY + pending blockers").
+      expect(result.journey.progress).toEqual({ completed: 4, pending: 0, blockers: 3, total: 7 });
+      expect(result.journey.readiness).toBe('NOT_READY');
+      expect(result.next_recommendation?.recommendation).not.toBeNull();
       // No Lending or Insurance field ever appears on a Credit Card journey.
       expect(result.journey.fields.map((f) => f.key)).not.toContain('loan_amount');
+      expect(result.journey.fields.map((f) => f.key)).not.toContain('coverage_amount');
     });
 
-    it('ACCOUNT_OPENING: submitting VERIFY_PAN (a FORM action) resolves pan_record generically', async () => {
+    it('ACCOUNT_OPENING: submitting VERIFY_PAN (a FORM action) resolves pan_authenticated generically', async () => {
       const before = await apiClient.get<components['schemas']['JourneyStateResponse']>(
         `/journeys/${ACCOUNT_OPENING_ID}`
       );
+      expect(before.progress).toEqual({ completed: 2, pending: 0, blockers: 5, total: 7 });
+
       const result = await apiClient.post<components['schemas']['ActionResponse']>(
         `/journeys/${ACCOUNT_OPENING_ID}/actions`,
         {
           action_id: 'VERIFY_PAN',
           expected_snapshot_id: before.snapshot_id,
           idempotency_key: '10000000-0000-0000-0000-000000000002',
-          input: { pan_record: 'ABCDE1234F' },
+          input: { pan_authenticated: 'ABCDE1234F' },
         }
       );
       expect(result.journey.journey_type).toBe('ACCOUNT_OPENING');
-      const panField = result.journey.fields.find((f) => f.key === 'pan_record');
+      const panField = result.journey.fields.find((f) => f.key === 'pan_authenticated');
       expect(panField?.status).toBe('SATISFIED');
       expect(panField?.display_value).toBe('ABCDE1234F');
-      expect(result.journey.progress).toEqual({ completed: 2, pending: 0, blockers: 0, total: 2 });
-      expect(result.journey.readiness).toBe('READY');
+      // One of five blockers resolved (nominee, signature, video KYC, and
+      // terms acceptance remain) - must not jump straight to READY.
+      expect(result.journey.progress).toEqual({ completed: 3, pending: 0, blockers: 4, total: 7 });
+      expect(result.journey.readiness).toBe('NOT_READY');
     });
 
-    it('INVESTMENT: submitting SUBMIT_FATCA (a FORM action) resolves fatca_declaration generically', async () => {
+    it('INVESTMENT: submitting SIGN_FATCA_DECLARATION (a FORM action) resolves nomination_and_fatca_signed generically', async () => {
       const before = await apiClient.get<components['schemas']['JourneyStateResponse']>(
         `/journeys/${INVESTMENT_ID}`
       );
+      expect(before.progress).toEqual({ completed: 2, pending: 0, blockers: 5, total: 7 });
+
       const result = await apiClient.post<components['schemas']['ActionResponse']>(
         `/journeys/${INVESTMENT_ID}/actions`,
         {
-          action_id: 'SUBMIT_FATCA',
+          action_id: 'SIGN_FATCA_DECLARATION',
           expected_snapshot_id: before.snapshot_id,
           idempotency_key: '10000000-0000-0000-0000-000000000003',
-          input: { fatca_declaration: 'Resident' },
+          input: { nomination_and_fatca_signed: 'Resident' },
         }
       );
       expect(result.journey.journey_type).toBe('INVESTMENT');
-      const fatcaField = result.journey.fields.find((f) => f.key === 'fatca_declaration');
+      const fatcaField = result.journey.fields.find((f) => f.key === 'nomination_and_fatca_signed');
       expect(fatcaField?.status).toBe('SATISFIED');
-      expect(result.journey.progress).toEqual({ completed: 2, pending: 0, blockers: 0, total: 2 });
-      expect(result.journey.readiness).toBe('READY');
+      // One of five blockers resolved (KRA KYC, risk profile, bank account,
+      // SIP mandate remain) - must not jump straight to READY.
+      expect(result.journey.progress).toEqual({ completed: 3, pending: 0, blockers: 4, total: 7 });
+      expect(result.journey.readiness).toBe('NOT_READY');
       // GET /diff for this journey now reflects THIS journey's own change, not
       // another pack's cached diff.
       const diff = await apiClient.get<components['schemas']['JourneyDiff']>(
         `/journeys/${INVESTMENT_ID}/diff`
       );
-      expect(diff.fields_changed.map((f) => f.key)).toContain('fatca_declaration');
+      expect(diff.fields_changed.map((f) => f.key)).toContain('nomination_and_fatca_signed');
     });
 
     it('a stale expected_snapshot_id on a non-Lending journey is rejected with ACTION_STALE (409), not silently applied', async () => {
@@ -386,7 +418,7 @@ describe('MSW Handlers & Scenarios Suite', () => {
           action_id: 'VERIFY_PAN',
           expected_snapshot_id: 'this-snapshot-id-does-not-exist',
           idempotency_key: '10000000-0000-0000-0000-000000000004',
-          input: { pan_record: 'ZZZZZ0000Z' },
+          input: { pan_authenticated: 'ZZZZZ0000Z' },
         });
         expect.unreachable('expected a 409');
       } catch (err) {

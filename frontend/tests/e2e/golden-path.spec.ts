@@ -352,6 +352,15 @@ test.describe("Resume from Screen 10 — My Journeys", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe("Mobile viewport (375px) golden path smoke", () => {
+  // Pin the real 375px viewport regardless of which project runs this file.
+  // Without this, chromium-desktop's own 1440x900 default silently ran every
+  // "on 375px" test in this suite at desktop width - the assertions still
+  // passed (a 1440px page also has no horizontal overflow, its CTA is also
+  // in-viewport, etc.), so the gap was invisible until a fallback assertion
+  // here happened to depend on genuinely-mobile behaviour (the hamburger
+  // toggle only rendering below the `md` breakpoint) to pick the right branch.
+  test.use({ viewport: { width: 375, height: 812 } });
+
   test("home screen CTA visible and in viewport on 375px", async ({ page }) => {
     await visitHome(page);
     const cta = page.getByRole("button", { name: /Start Your Journey/i });
@@ -480,7 +489,7 @@ test.describe("Every journey shows its own pack data (regression)", () => {
   test("cold-loading the INSURANCE journey shows Insurance fields, never Lending's", async ({ page }) => {
     await page.goto(`/j/${INSURANCE_ID}`);
     await expect(page.getByTestId("screen-04-current-status")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("Government ID Proof")).toBeVisible();
+    await expect(page.getByText("Pre-existing Disease Clearance")).toBeVisible();
     await expect(page.getByText("Loan Amount")).not.toBeVisible();
     await expect(page.getByText("Verified Monthly Income")).not.toBeVisible();
   });
@@ -490,7 +499,7 @@ test.describe("Every journey shows its own pack data (regression)", () => {
     await expect(page.getByTestId("screen-04-current-status")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/Aadhaar/i).first()).toBeVisible();
     await expect(page.getByText("Loan Amount")).not.toBeVisible();
-    await expect(page.getByText("Government ID Proof")).not.toBeVisible();
+    await expect(page.getByText("Pre-existing Disease Clearance")).not.toBeVisible();
   });
 
   test("resuming Insurance from My Journeys shows its own Needs Review clarification, not Lending's", async ({ page }) => {
@@ -500,7 +509,7 @@ test.describe("Every journey shows its own pack data (regression)", () => {
     await expect(page).toHaveURL(new RegExp(`/j/${INSURANCE_ID}$`), { timeout: 10_000 });
     await expect(page.getByTestId("needs-review-card")).toBeVisible({ timeout: 8_000 });
     await expect(
-      page.getByText(/pre-existing medical conditions/i)
+      page.getByText(/nicotine or tobacco products/i)
     ).toBeVisible();
   });
 });

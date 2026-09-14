@@ -100,7 +100,7 @@ export const Screen09CompleteJourney: React.FC = () => {
 
   const heading = 'Application Ready!';
   const subtext =
-    'All required information is completed. You can now proceed to submit your application.';
+    'All required information is complete. Your application package is ready for handoff.';
   const journeyTitle = journey.display?.title || journey.journey_type.replace(/_/g, ' ');
 
   return (
@@ -161,7 +161,7 @@ export const Screen09CompleteJourney: React.FC = () => {
           'All mandatory fields completed',
           'No blockers remaining',
           'Documents verified',
-          'Ready for provider submission',
+          'Ready for provider handoff',
         ].map((line) => (
           <div key={line} className="flex items-center gap-3 text-sm text-content-primary">
             <div className="w-5 h-5 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0">
@@ -179,9 +179,9 @@ export const Screen09CompleteJourney: React.FC = () => {
           size="lg"
           className="w-full py-3 text-base font-semibold shadow-xs"
           onClick={() => setIsHandoffModalOpen(true)}
-          data-testid="proceed-submit-btn"
+          data-testid="proceed-handoff-btn"
         >
-          Proceed to Submit
+          Proceed to Handoff
         </Button>
 
         <Button
@@ -200,7 +200,7 @@ export const Screen09CompleteJourney: React.FC = () => {
         isOpen={isHandoffModalOpen}
         onClose={() => setIsHandoffModalOpen(false)}
         title="Application Package Ready for Handoff"
-        description="Next steps for external partner submission."
+        description="Next steps for external partner handoff."
         footer={
           <div className="flex items-center justify-end gap-3 w-full">
             <Button variant="secondary" onClick={() => setIsHandoffModalOpen(false)}>
@@ -241,8 +241,8 @@ export const Screen09CompleteJourney: React.FC = () => {
             </div>
             <ul className="text-xs list-disc list-inside space-y-1 pl-1">
               <li>All required verification documents and parameters confirmed</li>
-              <li>Pre-submission integrity checks passed (Snapshot v{journey.version_number})</li>
-              <li>Ready for submission to designated financial service partners</li>
+              <li>Pre-handoff integrity checks passed (Snapshot v{journey.version_number})</li>
+              <li>Ready for handoff to designated financial service partners</li>
             </ul>
           </div>
         </div>

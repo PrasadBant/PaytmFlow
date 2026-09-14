@@ -173,6 +173,46 @@ describe('Application Shell Components Suite (F06)', () => {
       expect(useUiStore.getState().isSidebarOpen).toBe(false);
     });
 
+    it('hideOnDesktop: sidebar has no unscoped `md:flex` overriding `hidden` (regression)', () => {
+      // Bug: the closed-drawer branch always added `md:flex` regardless of
+      // hideOnDesktop, so at desktop widths Tailwind's later `md:flex` rule
+      // beat the earlier `hidden` rule in the cascade - the sidebar was
+      // `display:flex` (merely translated off-screen) instead of truly
+      // `display:none`, leaving its nav links in the tab order and
+      // accessibility tree on the "/" landing route. See Sidebar.tsx.
+      render(
+        <MemoryRouter initialEntries={['/']}>
+          <Sidebar hideOnDesktop />
+        </MemoryRouter>
+      );
+
+      const sidebarContainer = screen.getByTestId('sidebar-container');
+      expect(sidebarContainer.className).toContain('hidden');
+      expect(sidebarContainer.className).not.toMatch(/(^|\s)md:flex(\s|$)/);
+
+      // Nav links must not be reachable via Tab while hidden on desktop.
+      const homeLink = screen.getByRole('link', { name: 'Home' });
+      expect(homeLink).not.toHaveFocus();
+    });
+
+    it('hideOnDesktop: mobile drawer still opens via isSidebarOpen (no regression)', () => {
+      render(
+        <MemoryRouter initialEntries={['/']}>
+          <Sidebar hideOnDesktop />
+        </MemoryRouter>
+      );
+
+      const sidebarContainer = screen.getByTestId('sidebar-container');
+      expect(sidebarContainer.className).toContain('-translate-x-full');
+
+      act(() => {
+        useUiStore.setState({ isSidebarOpen: true });
+      });
+
+      expect(sidebarContainer.className).toContain('translate-x-0');
+      expect(sidebarContainer.className).toContain('flex');
+    });
+
     it('contains responsive visibility classes for desktop and mobile', () => {
       render(
         <MemoryRouter initialEntries={['/']}>
