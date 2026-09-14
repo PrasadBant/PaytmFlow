@@ -117,15 +117,88 @@ function seedJourneyStore(): void {
     journeyStore.set(initial.journey_id, initial);
   }
 }
-seedJourneyStore();
+
+// All mutable mock state above (`currentLendingStep`, `journeyStore`,
+// `journeyDiffStore`) previously lived only in this module's own in-memory
+// variables. That module is re-evaluated from scratch on every full page
+// load - not just an explicit refresh, but any same-origin navigation this
+// mock layer doesn't special-case - so a user who refreshed mid-journey (or
+// even right after reaching "Application Ready!") saw every pack's progress
+// silently revert to its pristine initial state, for real: confirmed by
+// driving a real browser through several real actions, then observing
+// `version_number` and `progress` both roll back after nothing more than a
+// same-origin `page.goto()`. The real backend has no such problem (Postgres
+// snapshots are genuinely durable); this was mock-layer-only. Session-scoped
+// persistence is explicitly sanctioned for exactly this file (see this
+// project's CLAUDE.md: "NEVER use localStorage/sessionStorage for app state
+// (sessionStorage in MSW handlers only)"), and `scenarios.ts` already
+// establishes the same pattern for scenario overrides.
+const MOCK_STATE_STORAGE_KEY = 'pf_mock_journey_state_v1';
+
+function persistMockState(): void {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  try {
+    window.sessionStorage.setItem(
+      MOCK_STATE_STORAGE_KEY,
+      JSON.stringify({
+        currentLendingStep,
+        journeys: Array.from(journeyStore.entries()),
+        diffs: Array.from(journeyDiffStore.entries()),
+      })
+    );
+  } catch {
+    // Storage full/unavailable (private browsing, quota) - fail open. The
+    // demo still works for this page load, it just won't survive a refresh.
+  }
+}
+
+function clearPersistedMockState(): void {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  try {
+    window.sessionStorage.removeItem(MOCK_STATE_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function loadMockState(): void {
+  seedJourneyStore();
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  try {
+    const raw = window.sessionStorage.getItem(MOCK_STATE_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as {
+      currentLendingStep?: number;
+      journeys?: [string, MockJourney][];
+      diffs?: [string, unknown][];
+    };
+    if (typeof parsed.currentLendingStep === 'number') {
+      currentLendingStep = parsed.currentLendingStep;
+    }
+    if (Array.isArray(parsed.journeys)) {
+      journeyStore.clear();
+      for (const [id, journey] of parsed.journeys) journeyStore.set(id, journey);
+    }
+    if (Array.isArray(parsed.diffs)) {
+      journeyDiffStore.clear();
+      for (const [id, diff] of parsed.diffs) journeyDiffStore.set(id, diff);
+    }
+  } catch {
+    // Corrupt/incompatible stored state - fall back to the fresh seed
+    // already applied above rather than crash the app.
+  }
+}
+loadMockState();
 
 export function resetMockState(): void {
   currentLendingStep = 1;
   seedJourneyStore();
+  clearPersistedMockState();
 }
 
 export function setLendingStep(step: number): void {
   currentLendingStep = step;
+  persistMockState();
 }
 
 // A resolve_action_id naming an EVIDENCE action is, by the same convention
@@ -285,6 +358,7 @@ function applyGenericAction(
 
   journeyStore.set(journey.journey_id, journey);
   journeyDiffStore.set(journey.journey_id, diff);
+  persistMockState();
 
   return { journey, diff };
 }
@@ -433,6 +507,7 @@ export const handlers = [
       journeyStore.set(initialState.journey_id, initialState);
       journeyDiffStore.delete(initialState.journey_id);
     }
+    persistMockState();
 
     return HttpResponse.json(initialState, { status: 201 });
   }),
@@ -695,15 +770,18 @@ export const handlers = [
     // Advance step in sequence
     if (currentLendingStep === 1) {
       currentLendingStep = 2;
+      persistMockState();
       return HttpResponse.json(lendingV2Action);
     }
 
     if (currentLendingStep === 2 || currentLendingStep === 3) {
       currentLendingStep = 4;
+      persistMockState();
       return HttpResponse.json(lendingV4Clarification);
     }
 
     currentLendingStep = 5;
+    persistMockState();
     return HttpResponse.json({
       journey: lendingV5Ready,
       diff: lendingV4Clarification.diff,
@@ -785,6 +863,7 @@ export const handlers = [
       };
       journeyStore.set(journeyId, stored);
       journeyDiffStore.set(journeyId, diff);
+      persistMockState();
       return HttpResponse.json({
         journey: stored,
         diff,
@@ -793,6 +872,7 @@ export const handlers = [
     }
 
     currentLendingStep = 4;
+    persistMockState();
     return HttpResponse.json(lendingV4Clarification);
   }),
 
@@ -818,7 +898,11 @@ export const handlers = [
 
   // 13. POST /api/v1/demo/reset
   http.post('*/api/v1/demo/reset', async () => {
-    currentLendingStep = 1;
+    // Previously only reset currentLendingStep, silently leaving every
+    // other pack's mutated journeyStore entries (and any persisted
+    // sessionStorage state) untouched - "reset the demo" is meant to give a
+    // genuinely clean slate for every pack, not just Lending.
+    resetMockState();
     return HttpResponse.json({ reset: true, elapsed_ms: 12 });
   }),
 ];

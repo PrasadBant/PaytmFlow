@@ -86,7 +86,7 @@
       "label": "Policy Confirmation & Consent",
       "status": "BLOCKED",
       "explanation": "Final agreement to policy terms and premium schedule required before issuance",
-      "resolve_action_id": "CONFIRM_POLICY_TERMS",
+      "resolve_action_id": "ACCEPT_POLICY_TERMS",
       "mandatory": true
     }
   ],
@@ -94,7 +94,7 @@
     "UPLOAD_MEDICAL_RECORDS",
     "SCHEDULE_UNDERWRITING_CALL",
     "SETUP_PREMIUM_MANDATE",
-    "CONFIRM_POLICY_TERMS"
+    "ACCEPT_POLICY_TERMS"
   ],
   "display": { "title": "Health Insurance", "summary": "₹10,00,000 · Health Comprehensive" },
   "history_summary": "Insurance journey initialized with coverage goal.",

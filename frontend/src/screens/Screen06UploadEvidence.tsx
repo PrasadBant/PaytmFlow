@@ -7,6 +7,10 @@ import { useUploadEvidence } from '@/api/hooks/useUploadEvidence';
 import { useApplyAction } from '@/api/hooks/useApplyAction';
 import { EvidenceDropzone } from '@/components/EvidenceDropzone';
 import { SchemaForm } from '@/components/SchemaForm/SchemaForm';
+import { SchedulingPicker } from '@/components/interactions/SchedulingPicker';
+import { ConsentPanel } from '@/components/interactions/ConsentPanel';
+import { VideoVerificationFlow } from '@/components/interactions/VideoVerificationFlow';
+import { classifyInteraction } from '@/lib/actionInteraction';
 import { Tabs, type TabItem } from '@/components/primitives/Tabs';
 import { Button } from '@/components/primitives/Button';
 import { Card } from '@/components/primitives/Card';
@@ -86,11 +90,27 @@ export const Screen06UploadEvidence: React.FC = () => {
   const isFormAction = action?.kind === 'FORM';
   const screenTitle = action?.title || (isFormAction ? 'Complete This Step' : 'Upload Evidence');
 
+  // A refinement on top of `kind: FORM` - never a new wire-level kind (the
+  // contract freezes ActionOption.kind to EVIDENCE/FORM/CLARIFICATION; see
+  // actionInteraction.ts). Booking a call, giving mandate/agreement consent,
+  // and a liveness/video check are real, distinct interactions - not a
+  // blank text field - and this is true for whichever pack's action happens
+  // to be one of those, never a specific journey by name.
+  const interactionType = classifyInteraction(action);
+  const tabLabel =
+    interactionType === 'SCHEDULING'
+      ? 'Schedule'
+      : interactionType === 'CONSENT'
+        ? 'Confirm & Consent'
+        : interactionType === 'VIDEO_VERIFICATION'
+          ? 'Verify'
+          : 'Enter Details';
+
   const tabs: TabItem[] = isFormAction
     ? [
         {
           id: 'manual',
-          label: 'Enter Details',
+          label: tabLabel,
           icon: <FileEdit className="w-4 h-4" aria-hidden="true" />,
         },
       ]
@@ -393,7 +413,34 @@ export const Screen06UploadEvidence: React.FC = () => {
           className="space-y-6"
         >
           <Card className="p-6 space-y-6">
-            {manualSchema ? (
+            {interactionType === 'SCHEDULING' ? (
+              <SchedulingPicker
+                actionTitle={screenTitle}
+                why={action?.why}
+                fieldKey={action?.unlocks?.[0]}
+                submitLabel={applyAction.isPending ? 'Submitting...' : 'Confirm Slot →'}
+                isSubmitting={applyAction.isPending}
+                onSubmit={handleManualSubmit}
+              />
+            ) : interactionType === 'CONSENT' ? (
+              <ConsentPanel
+                actionTitle={screenTitle}
+                why={action?.why}
+                fieldKey={action?.unlocks?.[0]}
+                submitLabel={applyAction.isPending ? 'Submitting...' : 'Confirm →'}
+                isSubmitting={applyAction.isPending}
+                onSubmit={handleManualSubmit}
+              />
+            ) : interactionType === 'VIDEO_VERIFICATION' ? (
+              <VideoVerificationFlow
+                actionTitle={screenTitle}
+                why={action?.why}
+                fieldKey={action?.unlocks?.[0]}
+                submitLabel={applyAction.isPending ? 'Submitting...' : 'Continue →'}
+                isSubmitting={applyAction.isPending}
+                onSubmit={handleManualSubmit}
+              />
+            ) : manualSchema ? (
               <>
                 <div className="space-y-1">
                   <h2 className="text-base font-semibold text-content-primary">

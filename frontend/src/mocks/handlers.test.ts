@@ -456,4 +456,78 @@ describe('MSW Handlers & Scenarios Suite', () => {
       expect(lendingSecond.fields.map((f) => f.key)).not.toContain('coverage_amount');
     });
   });
+
+  describe('Mock journey state survives a page refresh (regression)', () => {
+    // Bug found via a real browser walkthrough: this mock layer's mutable
+    // state (currentLendingStep, journeyStore) lived only in this module's
+    // own in-memory variables, which are re-initialized from scratch on
+    // every full page load - not merely an explicit refresh, but ANY
+    // same-origin navigation this layer doesn't special-case. A user who
+    // completed several real steps of any journey, then refreshed (or
+    // simply navigated back to it later), saw their progress silently
+    // revert to the pristine initial state. Confirmed live: driving Lending
+    // through a real action then calling `page.goto()` again rolled
+    // `version_number` back from 2 to 1. Every mutating handler now calls
+    // `persistMockState()`, writing to sessionStorage (sanctioned for
+    // exactly this file per this project's CLAUDE.md). This proves the
+    // write half directly; the read/rehydrate half on a fresh module load
+    // was verified live in a real browser (version and snapshot_id both
+    // survived an actual `page.reload()` on a completed Lending journey).
+    const LENDING_ID = '11111111-1111-1111-1111-111111111111';
+    const INSURANCE_ID = '22222222-2222-2222-2222-222222222222';
+    const MOCK_STATE_KEY = 'pf_mock_journey_state_v1';
+
+    it('resolving a Lending action persists version/progress to sessionStorage', async () => {
+      const before = await apiClient.get<components['schemas']['JourneyStateResponse']>(
+        `/journeys/${LENDING_ID}`
+      );
+      await apiClient.post('/journeys/' + LENDING_ID + '/actions', {
+        action_id: 'UPLOAD_INCOME_PROOF',
+        expected_snapshot_id: before.snapshot_id,
+        idempotency_key: '20000000-0000-0000-0000-000000000001',
+      });
+
+      const raw = window.sessionStorage.getItem(MOCK_STATE_KEY);
+      expect(raw).toBeTruthy();
+      const persisted = JSON.parse(raw as string);
+      expect(persisted.currentLendingStep).toBe(2);
+    });
+
+    it('resolving a non-Lending action persists that journey\'s new field state to sessionStorage', async () => {
+      const before = await apiClient.get<components['schemas']['JourneyStateResponse']>(
+        `/journeys/${INSURANCE_ID}`
+      );
+      await apiClient.post('/journeys/' + INSURANCE_ID + '/actions', {
+        action_id: 'SCHEDULE_UNDERWRITING_CALL',
+        expected_snapshot_id: before.snapshot_id,
+        idempotency_key: '20000000-0000-0000-0000-000000000002',
+      });
+
+      const raw = window.sessionStorage.getItem(MOCK_STATE_KEY);
+      expect(raw).toBeTruthy();
+      const persisted = JSON.parse(raw as string);
+      const entry = (persisted.journeys as [string, { fields: { key: string; status: string }[] }][]).find(
+        ([id]) => id === INSURANCE_ID
+      );
+      expect(entry).toBeTruthy();
+      const field = entry?.[1].fields.find((f) => f.key === 'tele_underwriting_scheduled');
+      expect(field?.status).toBe('SATISFIED');
+    });
+
+    it('POST /demo/reset clears the persisted state entirely', async () => {
+      // Establish some persisted state first.
+      const before = await apiClient.get<components['schemas']['JourneyStateResponse']>(
+        `/journeys/${LENDING_ID}`
+      );
+      await apiClient.post('/journeys/' + LENDING_ID + '/actions', {
+        action_id: 'UPLOAD_INCOME_PROOF',
+        expected_snapshot_id: before.snapshot_id,
+        idempotency_key: '20000000-0000-0000-0000-000000000003',
+      });
+      expect(window.sessionStorage.getItem(MOCK_STATE_KEY)).toBeTruthy();
+
+      await apiClient.post('/demo/reset', {});
+      expect(window.sessionStorage.getItem(MOCK_STATE_KEY)).toBeNull();
+    });
+  });
 });
