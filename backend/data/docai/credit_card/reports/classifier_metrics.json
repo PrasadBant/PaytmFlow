@@ -1,0 +1,315 @@
+{
+  "meta": {
+    "version": "credit_card-classifier-v1",
+    "journey_type": "CREDIT_CARD",
+    "label_names": [
+      "ITR_V_ACKNOWLEDGEMENT",
+      "OTHER",
+      "SALARY_SLIP",
+      "UTILITY_BILL_ELECTRICITY"
+    ],
+    "trained_at": "2026-09-14T20:36:55.268099+00:00",
+    "dataset_seed": 20260917,
+    "train_n": 75,
+    "sklearn_version": "1.9.1",
+    "python_version": "3.13.12 (tags/v3.13.12:1cbe481, Feb  3 2026, 18:22:25) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "model_type": "TfidfVectorizer(1,2-gram) + LogisticRegression(class_weight=balanced)"
+  },
+  "results": {
+    "val": {
+      "split": "val",
+      "n": 21,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "per_class_report": {
+        "ITR_V_ACKNOWLEDGEMENT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "OTHER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3.0
+        },
+        "SALARY_SLIP": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "UTILITY_BILL_ELECTRICITY": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 21.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 21.0
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "ITR_V_ACKNOWLEDGEMENT",
+          "OTHER",
+          "SALARY_SLIP",
+          "UTILITY_BILL_ELECTRICITY"
+        ],
+        "matrix": [
+          [
+            6,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            6,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            6
+          ]
+        ]
+      }
+    },
+    "test": {
+      "split": "test",
+      "n": 21,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "per_class_report": {
+        "ITR_V_ACKNOWLEDGEMENT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "OTHER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3.0
+        },
+        "SALARY_SLIP": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "UTILITY_BILL_ELECTRICITY": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 21.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 21.0
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "ITR_V_ACKNOWLEDGEMENT",
+          "OTHER",
+          "SALARY_SLIP",
+          "UTILITY_BILL_ELECTRICITY"
+        ],
+        "matrix": [
+          [
+            6,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            6,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            6
+          ]
+        ]
+      }
+    },
+    "unseen_template": {
+      "split": "unseen_template",
+      "n": 39,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "per_class_report": {
+        "ITR_V_ACKNOWLEDGEMENT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 12.0
+        },
+        "OTHER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3.0
+        },
+        "SALARY_SLIP": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 12.0
+        },
+        "UTILITY_BILL_ELECTRICITY": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 12.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 39.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 39.0
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "ITR_V_ACKNOWLEDGEMENT",
+          "OTHER",
+          "SALARY_SLIP",
+          "UTILITY_BILL_ELECTRICITY"
+        ],
+        "matrix": [
+          [
+            12,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            12,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            12
+          ]
+        ]
+      }
+    }
+  },
+  "errors": [],
+  "runtime_safety": {
+    "val": {
+      "split": "val",
+      "n": 21,
+      "outcomes": {
+        "CORRECT_DOCUMENT": 18,
+        "WRONG_DOCUMENT": 3,
+        "AMBIGUOUS_DOCUMENT": 0,
+        "UNREADABLE_DOCUMENT": 0
+      },
+      "correct_rate": 0.8571,
+      "false_rejection_rate": 0.0,
+      "false_acceptance_rate": 0.0,
+      "safe_non_answer_rate": 0.0,
+      "false_rejections": [],
+      "false_acceptances": []
+    },
+    "test": {
+      "split": "test",
+      "n": 21,
+      "outcomes": {
+        "CORRECT_DOCUMENT": 18,
+        "WRONG_DOCUMENT": 3,
+        "AMBIGUOUS_DOCUMENT": 0,
+        "UNREADABLE_DOCUMENT": 0
+      },
+      "correct_rate": 0.8571,
+      "false_rejection_rate": 0.0,
+      "false_acceptance_rate": 0.0,
+      "safe_non_answer_rate": 0.0,
+      "false_rejections": [],
+      "false_acceptances": []
+    },
+    "unseen_template": {
+      "split": "unseen_template",
+      "n": 39,
+      "outcomes": {
+        "CORRECT_DOCUMENT": 36,
+        "WRONG_DOCUMENT": 3,
+        "AMBIGUOUS_DOCUMENT": 0,
+        "UNREADABLE_DOCUMENT": 0
+      },
+      "correct_rate": 0.9231,
+      "false_rejection_rate": 0.0,
+      "false_acceptance_rate": 0.0,
+      "safe_non_answer_rate": 0.0,
+      "false_rejections": [],
+      "false_acceptances": []
+    }
+  }
+}

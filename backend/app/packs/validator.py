@@ -2,7 +2,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 
 from app.packs.contract import JourneyPackManifest
-from app.schemas.enums import FieldStatus
+from app.schemas.enums import ActionKind, FieldStatus
 
 CANONICAL_BANNED_WORDS = [
     "approved",
@@ -37,6 +37,7 @@ class PackValidator:
         if not has_cycle:
             self.validate_depth_quality()
         self.validate_claims()
+        self.validate_evidence_integrity()
         return self.violations
 
     def validate_referential_integrity(self):
@@ -313,6 +314,110 @@ class PackValidator:
                         field_or_id=amb.ambiguity_id,
                     )
                 )
+
+    def validate_evidence_integrity(self):
+        """Generic (non journey-specific) checks for the class of manifest
+        defects repeatedly found by hand across all six Document AI
+        phases - a reusable validator, not six one-off hacks, per the
+        integrity-hardening phase's explicit requirement. Covers:
+
+        - `accepts` holding MIME types instead of doc_type values (the
+          bug found and fixed identically in Insurance/KYC/Credit
+          Card/Account Opening/Investment's manifests before this
+          validator existed - it would have caught all 5 instances).
+        - an evidence_mapping's `action_id` pointing to an action whose
+          `satisfies` does NOT include the mapping's own `target_field`
+          (the class of defect disclosed, not fixed, for Account
+          Opening's PAN_CARD_IMAGE and Investment's KRA_KYC_LETTER).
+        - an evidence_mapping's `doc_type` never appearing in that same
+          action's `accepts` list - the actual runtime consequence of
+          both bugs above: `app/evidence/reconcile.py`'s real
+          `proposed_action` lookup matches purely on `accepts`, so this
+          is the check that most directly predicts "consequence_preview
+          will be null for this doc_type", regardless of which of the
+          two underlying causes produced it.
+        - two evidence_mappings entries for the same `doc_type` pointing
+          at different `target_field`s (a genuine conflict - contrast
+          with Credit Card's/Investment's legitimate pattern of two
+          different doc_types alternately satisfying the SAME field,
+          which is not flagged).
+
+        This function reports; it never repairs a manifest automatically
+        - the phase's explicit "do not silently change business
+        semantics" instruction.
+        """
+        actions_by_id = {a.action_id: a for a in self.manifest.actions}
+
+        seen_doc_type_targets: dict[str, str] = {}
+        for em in self.manifest.evidence_mappings:
+            prior_target = seen_doc_type_targets.get(em.doc_type)
+            if prior_target is not None and prior_target != em.target_field:
+                self.violations.append(
+                    PackViolation(
+                        code="CONFLICTING_EVIDENCE_MAPPING",
+                        message=(
+                            f"doc_type '{em.doc_type}' maps to both "
+                            f"'{prior_target}' and '{em.target_field}'"
+                        ),
+                        field_or_id=em.doc_type,
+                    )
+                )
+            seen_doc_type_targets[em.doc_type] = em.target_field
+
+            action = actions_by_id.get(em.action_id)
+            if action is None:
+                continue  # already reported by validate_referential_integrity
+
+            if em.target_field not in action.satisfies:
+                self.violations.append(
+                    PackViolation(
+                        code="ACTION_TARGET_FIELD_MISMATCH",
+                        message=(
+                            f"Evidence mapping '{em.doc_type}' -> '{em.target_field}' "
+                            f"references action '{em.action_id}', whose satisfies="
+                            f"{action.satisfies} does not include '{em.target_field}'"
+                        ),
+                        field_or_id=em.doc_type,
+                    )
+                )
+
+            accepts = action.accepts or []
+            if not any(acc.upper() == em.doc_type.upper() for acc in accepts):
+                self.violations.append(
+                    PackViolation(
+                        code="EVIDENCE_DOC_TYPE_NOT_ROUTABLE",
+                        message=(
+                            f"doc_type '{em.doc_type}' is not in action "
+                            f"'{em.action_id}'.accepts={accepts} - a real upload of "
+                            f"this doc_type will get a null proposed_action_id/"
+                            f"consequence_preview at the HTTP layer"
+                        ),
+                        field_or_id=em.doc_type,
+                    )
+                )
+
+        for action in self.manifest.actions:
+            if action.kind != ActionKind.EVIDENCE or not action.accepts:
+                continue
+            for acc in action.accepts:
+                # A doc_type is an UPPER_SNAKE_CASE token; a MIME type
+                # always contains "/" (and conventionally lowercase) -
+                # this is the exact, unambiguous defect class found
+                # identically 5 times by hand this project: `accepts`
+                # authored with MIME types instead of the doc_type
+                # values the frozen contract documents it should hold.
+                if "/" in acc:
+                    self.violations.append(
+                        PackViolation(
+                            code="ACCEPTS_LOOKS_LIKE_MIME_TYPE",
+                            message=(
+                                f"Action '{action.action_id}'.accepts contains "
+                                f"'{acc}', which looks like a MIME type, not a "
+                                f"doc_type value"
+                            ),
+                            field_or_id=action.action_id,
+                        )
+                    )
 
     def validate_claims(self):
         text_corpus = [

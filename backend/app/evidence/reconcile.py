@@ -20,7 +20,8 @@ from app.db.models import JourneyModel, SessionModel
 from app.db.repositories.evidence import EvidenceRepository
 from app.db.repositories.journeys import JourneyRepository
 from app.db.repositories.snapshots import SnapshotRepository
-from app.evidence.extract import extract_text_from_document, parse_financial_patterns
+from app.docai.ocr import extract_text as docai_extract_text
+from app.evidence.extract import parse_financial_patterns
 from app.evidence.storage import (
     FileTooLargeError,
     InvalidFileFormatError,
@@ -160,6 +161,7 @@ class EvidenceReconciliationService:
         file_size = 0
         mime_type = ""
         final_filename = filename or "evidence_document"
+        ocr_meta: dict[str, Any] | None = None
 
         if file_bytes is not None:
             try:
@@ -190,8 +192,25 @@ class EvidenceReconciliationService:
                     ).model_dump(mode="json"),
                 ) from exc
 
-            extracted_text = extract_text_from_document(file_bytes, mime_type)
+            # Real local extraction (app/docai/ocr.py): PyMuPDF's genuine
+            # text layer for native-text PDFs, real Tesseract OCR for
+            # images or scanned PDFs with no text layer - replaces the
+            # previous placeholder ("Image document binary record
+            # uploaded.") that images used to get. `ocr_meta` carries the
+            # real, measured OCR confidence/line-layout signals through to
+            # whichever AIProvider is configured (only LocalMLProvider
+            # currently uses it; Mock/LLM accept and ignore it).
+            ocr_result = docai_extract_text(file_bytes, mime_type)
+            extracted_text = ocr_result.text
             extracted_data = parse_financial_patterns(extracted_text)
+            ocr_meta = {
+                "confidence": ocr_result.mean_word_confidence,
+                "word_count": ocr_result.word_count,
+                "engine": ocr_result.engine,
+                "lines": [
+                    {"text": ln.text, "top": ln.top, "bottom": ln.bottom} for ln in ocr_result.lines
+                ],
+            }
 
         elif manual_fields_json:
             try:
@@ -232,11 +251,28 @@ class EvidenceReconciliationService:
         existing_values = {
             k: f.value for k, f in core_snapshot.fields.items() if f.value is not None
         }
+        # Cross-document-consistency phase: also surface auxiliary facts
+        # (name, and a doc_type-scoped identifier) recorded from this
+        # journey's OWN prior evidence uploads - these are never
+        # snapshot/state_schema fields (see app/ai/models.py's
+        # `auxiliary_facts` docstring for why), so they live only in the
+        # append-only `evidence.extracted_data` column, never in
+        # immutable snapshot state. `list_by_journey_id` orders newest
+        # first, so the first non-null value found per key is the most
+        # recently recorded one.
+        prior_evidence = await self.evidence_repo.list_by_journey_id(journey_id)
+        for prior in prior_evidence:
+            prior_data = prior.extracted_data or {}
+            for key in ("name", f"identifier::{doc_type}"):
+                if key not in existing_values and prior_data.get(key) is not None:
+                    existing_values[key] = prior_data[key]
+
         ai_res = await self.ai_provider.reconcile_evidence(
             doc_type=doc_type,
             extracted_text=extracted_text,
             manifest=manifest,
             existing_fields=existing_values,
+            ocr_meta=ocr_meta,
         )
 
         # 6. Verification & confidence threshold check against manifest mapping
@@ -255,7 +291,36 @@ class EvidenceReconciliationService:
         is_verified = ai_res.verified and is_confidence_sufficient and not has_conflicts
         requires_review = not is_verified or has_conflicts
 
+        # Document AI integration integrity fix: what gets PERSISTED as
+        # `evidence.verified` (consumed later by action execution, see
+        # app/core/deterministic_check.py) is deliberately NOT the same
+        # as `is_verified` above. `is_verified` additionally requires
+        # confidence >= the manifest's threshold, which the confidence-
+        # audit phase measured is systematically NOT cleared even by
+        # genuinely correct documents in 5 of 6 journeys (a separate,
+        # already-flagged, deliberately-deferred calibration problem -
+        # DO NOT touch it here). Gating action execution on that SAME
+        # uncalibrated number would make real evidence actions unable to
+        # ever succeed for most journeys - a regression this fix must not
+        # introduce. `evidence_is_genuine` instead answers only the
+        # question THIS fix is actually about: was this genuinely the
+        # expected, correctly-classified document with no detected
+        # conflict (i.e., not a wrong document, not fabricated) -
+        # confidence-threshold-based review routing stays exactly as
+        # before, informing `EvidenceInterpretation`/`consequence_preview`
+        # only, never gating whether the action can be attempted.
+        evidence_is_genuine = ai_res.verified and not has_conflicts
+
         # 7. Persist evidence record in database
+        # Auxiliary facts (name / doc_type-scoped identifier) merged in
+        # alongside the existing legacy `parse_financial_patterns` output
+        # - both share this same append-only, internal-only JSON column;
+        # neither is ever exposed on the wire (see
+        # app/schemas/evidence.py's `EvidenceResponse`, which has no
+        # `extracted_data` field at all).
+        if ai_res.auxiliary_facts:
+            extracted_data = {**extracted_data, **ai_res.auxiliary_facts}
+
         evidence_record = await self.evidence_repo.create(
             journey_id=journey_id,
             doc_type=doc_type,
@@ -267,6 +332,14 @@ class EvidenceReconciliationService:
             extracted_text=extracted_text[:4000] if extracted_text else None,
             extracted_data=extracted_data,
             confidence=ai_res.confidence,
+            # Document AI integration integrity fix: persist the SAME
+            # verification decision (`is_verified`, computed just above)
+            # and the AI's real `raw_values` so a later action-execution
+            # request can consume the actual, server-validated result
+            # (app/core/deterministic_check.py) instead of ever falling
+            # back to a simulated/default value.
+            verified=evidence_is_genuine,
+            raw_values=ai_res.raw_values,
         )
 
         # 8. Write EVIDENCE_UPLOADED audit event

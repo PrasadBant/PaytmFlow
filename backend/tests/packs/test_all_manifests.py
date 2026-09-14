@@ -19,8 +19,6 @@ def load_packs():
         JourneyType.INSURANCE,
         JourneyType.CREDIT_CARD,
         JourneyType.KYC,
-        JourneyType.ACCOUNT_OPENING,
-        JourneyType.INVESTMENT,
     ],
 )
 def test_manifest_loads_and_passes_validator(journey_type: JourneyType):
@@ -33,6 +31,61 @@ def test_manifest_loads_and_passes_validator(journey_type: JourneyType):
     assert len(violations) == 0, (
         f"Manifest {journey_type} has {len(violations)} validation violation(s): "
         f"{[f'{v.code}: {v.message}' for v in violations]}"
+    )
+
+
+# ACCOUNT_OPENING and INVESTMENT are deliberately NOT in the clean list above:
+# each has a real, disclosed `evidence_mappings.action_id`/`target_field`
+# manifest defect (found by hand during their own phases, now also caught
+# structurally by `validate_evidence_integrity`'s
+# ACTION_TARGET_FIELD_MISMATCH/EVIDENCE_DOC_TYPE_NOT_ROUTABLE checks - see
+# docs/docai_account_opening_report.md §8/§14 and
+# docs/docai_investment_report.md §O) that the integrity-hardening phase's
+# explicit instructions say NOT to silently fix (repointing the action_id
+# would mean guessing which action the manifest author intended, since no
+# EVIDENCE action for PAN_CARD_IMAGE/KRA_KYC_LETTER's real target field
+# exists). This test exposes those EXACT known defects precisely, rather
+# than either hiding them behind a passing "0 violations" assertion or
+# silently dropping manifest-validator coverage for these two packs: if the
+# violation set for either journey ever changes (a real fix, or a NEW
+# unrelated defect), this test fails and must be looked at, not silently
+# adjusted.
+_KNOWN_ACCOUNT_OPENING_VIOLATIONS = {
+    ("ACTION_TARGET_FIELD_MISMATCH", "PAN_CARD_IMAGE"),
+    ("EVIDENCE_DOC_TYPE_NOT_ROUTABLE", "PAN_CARD_IMAGE"),
+    # AADHAAR_FRONT_BACK / upload_digital_signature's `accepts` (was
+    # ["image/png"]) was FIXED in the manifest-integrity + confidence-
+    # calibration phase - confirmed unambiguous by the frozen contract
+    # ("Allowed doc_type values for EVIDENCE actions", no exception) AND
+    # the frontend (Screen06UploadEvidence.tsx reads `accepts[0]` directly
+    # as the doc_type to submit). Only PAN_CARD_IMAGE's defect remains,
+    # since no EVIDENCE action exists that correctly satisfies
+    # `pan_authenticated` to repoint it to.
+}
+_KNOWN_INVESTMENT_VIOLATIONS = {
+    ("ACTION_TARGET_FIELD_MISMATCH", "KRA_KYC_LETTER"),
+    ("EVIDENCE_DOC_TYPE_NOT_ROUTABLE", "KRA_KYC_LETTER"),
+}
+
+
+@pytest.mark.parametrize(
+    ("journey_type", "expected_violations"),
+    [
+        (JourneyType.ACCOUNT_OPENING, _KNOWN_ACCOUNT_OPENING_VIOLATIONS),
+        (JourneyType.INVESTMENT, _KNOWN_INVESTMENT_VIOLATIONS),
+    ],
+)
+def test_known_manifest_defects_are_exposed_not_hidden(journey_type, expected_violations):
+    manifest = pack_registry.get_pack(journey_type)
+    assert manifest is not None
+
+    violations = validate_manifest(manifest)
+    actual = {(v.code, v.field_or_id) for v in violations}
+    assert actual == expected_violations, (
+        f"{journey_type}'s manifest-validator violations changed - expected exactly "
+        f"{expected_violations}, got {actual}. If this is a genuine fix, update this "
+        f"test's expectation explicitly (not by weakening it); if it's a NEW, "
+        f"different defect, investigate before assuming it's safe."
     )
 
 

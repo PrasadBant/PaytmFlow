@@ -104,9 +104,9 @@ actions:
     preconditions:
       - medical_history_declared
     accepts:
-      - application/pdf
-      - image/jpeg
-      - image/png
+      - MEDICAL_DISCHARGE_SUMMARY
+      - HEALTH_CHECKUP_REPORT
+      - PREVIOUS_POLICY_COPY
     action_group: ped_satisfaction
 
   - action_id: submit_ped_exemption

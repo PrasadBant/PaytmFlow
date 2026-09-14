@@ -26,6 +26,12 @@ dependencies = [
     "mypy>=1.9.0",
     "import-linter>=2.0",
     "aiosqlite>=0.20.0",
+    "pytesseract>=0.3.13",
+    "pillow>=12.3.0",
+    "scikit-learn>=1.9.1",
+    "reportlab>=5.0.1",
+    "faker>=40.38.0",
+    "joblib>=1.6.0",
 ]
 
 [tool.setuptools.packages.find]

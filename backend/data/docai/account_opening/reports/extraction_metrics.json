@@ -1,0 +1,347 @@
+{
+  "val": {
+    "split": "val",
+    "n_documents": 18,
+    "field_metrics": {
+      "name": {
+        "n": 18,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      },
+      "identifier": {
+        "n": 12,
+        "exact_match_accuracy": 0.8333,
+        "extraction_coverage": 0.9167
+      },
+      "document_date": {
+        "n": 12,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      }
+    },
+    "errors": [
+      {
+        "split": "val",
+        "sample_id": "PAN_CARD_IMAGE_pan_standard_0067",
+        "doc_type": "PAN_CARD_IMAGE",
+        "template_id": "pan_standard",
+        "field": "identifier",
+        "expected": "IWCKS6883I",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "val",
+        "sample_id": "AADHAAR_FRONT_BACK_aadhaar_compact_0114",
+        "doc_type": "AADHAAR_FRONT_BACK",
+        "template_id": "aadhaar_compact",
+        "field": "identifier",
+        "expected": "956692542677",
+        "predicted": "956692842677",
+        "raw_value": " 9566 9284 2677",
+        "validated": true,
+        "note": null
+      }
+    ]
+  },
+  "test": {
+    "split": "test",
+    "n_documents": 18,
+    "field_metrics": {
+      "name": {
+        "n": 18,
+        "exact_match_accuracy": 0.8889,
+        "extraction_coverage": 0.9444
+      },
+      "identifier": {
+        "n": 12,
+        "exact_match_accuracy": 0.9167,
+        "extraction_coverage": 0.9167
+      },
+      "document_date": {
+        "n": 12,
+        "exact_match_accuracy": 0.9167,
+        "extraction_coverage": 0.9167
+      }
+    },
+    "errors": [
+      {
+        "split": "test",
+        "sample_id": "PAN_CARD_IMAGE_pan_standard_0073",
+        "doc_type": "PAN_CARD_IMAGE",
+        "template_id": "pan_standard",
+        "field": "identifier",
+        "expected": "YMVZO4898T",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "test",
+        "sample_id": "PAN_CARD_IMAGE_pan_compact_0074",
+        "doc_type": "PAN_CARD_IMAGE",
+        "template_id": "pan_compact",
+        "field": "document_date",
+        "expected": "1972-10-21",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled document date found."
+      },
+      {
+        "split": "test",
+        "sample_id": "PAN_CARD_IMAGE_pan_compact_0076",
+        "doc_type": "PAN_CARD_IMAGE",
+        "template_id": "pan_compact",
+        "field": "name",
+        "expected": "Michael Mendoza",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "test",
+        "sample_id": "AADHAAR_FRONT_BACK_aadhaar_compact_0119",
+        "doc_type": "AADHAAR_FRONT_BACK",
+        "template_id": "aadhaar_compact",
+        "field": "name",
+        "expected": "Jacob Randolph",
+        "predicted": "Jacob Randoiph Aadhaar",
+        "raw_value": "Jacob Randoiph Aadhaar",
+        "validated": true,
+        "note": null
+      }
+    ]
+  },
+  "unseen_template": {
+    "split": "unseen_template",
+    "n_documents": 36,
+    "field_metrics": {
+      "name": {
+        "n": 36,
+        "exact_match_accuracy": 0.5833,
+        "extraction_coverage": 0.6111
+      },
+      "identifier": {
+        "n": 24,
+        "exact_match_accuracy": 0.9167,
+        "extraction_coverage": 0.9167
+      },
+      "document_date": {
+        "n": 24,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      }
+    },
+    "errors": [
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0033",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Valerie Thomas",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0034",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Trevor Perez",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0035",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Julia Ward",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0036",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Richard Gray",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0037",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Samuel Collins",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0038",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Theresa Romero",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0039",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Dr. Megan Lewis",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0040",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Bradley Coleman",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0041",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Ryan Ross",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0042",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Jacqueline Knox",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0043",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Mary Smith",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "SIGNATURE_SPECIMEN_signature_plain_unseen_0044",
+        "doc_type": "SIGNATURE_SPECIMEN",
+        "template_id": "signature_plain_unseen",
+        "field": "name",
+        "expected": "Cynthia Dawson",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "PAN_CARD_IMAGE_pan_letterhead_unseen_0085",
+        "doc_type": "PAN_CARD_IMAGE",
+        "template_id": "pan_letterhead_unseen",
+        "field": "identifier",
+        "expected": "HUWVL8965O",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "PAN_CARD_IMAGE_pan_letterhead_unseen_0088",
+        "doc_type": "PAN_CARD_IMAGE",
+        "template_id": "pan_letterhead_unseen",
+        "field": "name",
+        "expected": "Natalie Stevens",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "AADHAAR_FRONT_BACK_aadhaar_letterhead_unseen_0122",
+        "doc_type": "AADHAAR_FRONT_BACK",
+        "template_id": "aadhaar_letterhead_unseen",
+        "field": "name",
+        "expected": "Charles Morton",
+        "predicted": "Charles Marton",
+        "raw_value": "Charles Marton",
+        "validated": true,
+        "note": null
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "AADHAAR_FRONT_BACK_aadhaar_letterhead_unseen_0125",
+        "doc_type": "AADHAAR_FRONT_BACK",
+        "template_id": "aadhaar_letterhead_unseen",
+        "field": "name",
+        "expected": "Anthony Hale",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "AADHAAR_FRONT_BACK_aadhaar_letterhead_unseen_0128",
+        "doc_type": "AADHAAR_FRONT_BACK",
+        "template_id": "aadhaar_letterhead_unseen",
+        "field": "identifier",
+        "expected": "222901314247",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No recognized identifier label found."
+      }
+    ]
+  }
+}

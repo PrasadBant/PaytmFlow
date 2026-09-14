@@ -1,0 +1,339 @@
+{
+  "meta": {
+    "version": "account_opening-classifier-v1",
+    "journey_type": "ACCOUNT_OPENING",
+    "label_names": [
+      "AADHAAR_FRONT_BACK",
+      "OTHER",
+      "PAN_CARD_IMAGE",
+      "SIGNATURE_SPECIMEN"
+    ],
+    "trained_at": "2026-09-14T20:36:55.364667+00:00",
+    "dataset_seed": 20260918,
+    "train_n": 75,
+    "sklearn_version": "1.9.1",
+    "python_version": "3.13.12 (tags/v3.13.12:1cbe481, Feb  3 2026, 18:22:25) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "model_type": "TfidfVectorizer(1,2-gram) + LogisticRegression(class_weight=balanced)"
+  },
+  "results": {
+    "val": {
+      "split": "val",
+      "n": 21,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "per_class_report": {
+        "AADHAAR_FRONT_BACK": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "OTHER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3.0
+        },
+        "PAN_CARD_IMAGE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "SIGNATURE_SPECIMEN": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 21.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 21.0
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "AADHAAR_FRONT_BACK",
+          "OTHER",
+          "PAN_CARD_IMAGE",
+          "SIGNATURE_SPECIMEN"
+        ],
+        "matrix": [
+          [
+            6,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            6,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            6
+          ]
+        ]
+      }
+    },
+    "test": {
+      "split": "test",
+      "n": 21,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "per_class_report": {
+        "AADHAAR_FRONT_BACK": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "OTHER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3.0
+        },
+        "PAN_CARD_IMAGE": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "SIGNATURE_SPECIMEN": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 21.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 21.0
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "AADHAAR_FRONT_BACK",
+          "OTHER",
+          "PAN_CARD_IMAGE",
+          "SIGNATURE_SPECIMEN"
+        ],
+        "matrix": [
+          [
+            6,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            6,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            6
+          ]
+        ]
+      }
+    },
+    "unseen_template": {
+      "split": "unseen_template",
+      "n": 39,
+      "accuracy": 0.9744,
+      "macro_f1": 0.9791,
+      "macro_precision": 0.9808,
+      "macro_recall": 0.9792,
+      "per_class_report": {
+        "AADHAAR_FRONT_BACK": {
+          "precision": 1.0,
+          "recall": 0.9166666666666666,
+          "f1-score": 0.9565217391304348,
+          "support": 12.0
+        },
+        "OTHER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3.0
+        },
+        "PAN_CARD_IMAGE": {
+          "precision": 0.9230769230769231,
+          "recall": 1.0,
+          "f1-score": 0.96,
+          "support": 12.0
+        },
+        "SIGNATURE_SPECIMEN": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 12.0
+        },
+        "accuracy": 0.9743589743589743,
+        "macro avg": {
+          "precision": 0.9807692307692308,
+          "recall": 0.9791666666666666,
+          "f1-score": 0.9791304347826086,
+          "support": 39.0
+        },
+        "weighted avg": {
+          "precision": 0.9763313609467457,
+          "recall": 0.9743589743589743,
+          "f1-score": 0.974314381270903,
+          "support": 39.0
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "AADHAAR_FRONT_BACK",
+          "OTHER",
+          "PAN_CARD_IMAGE",
+          "SIGNATURE_SPECIMEN"
+        ],
+        "matrix": [
+          [
+            11,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            12,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            12
+          ]
+        ]
+      }
+    }
+  },
+  "errors": [
+    {
+      "split": "unseen_template",
+      "sample_id": "AADHAAR_FRONT_BACK_aadhaar_letterhead_unseen_0128",
+      "template_id": "aadhaar_letterhead_unseen",
+      "expected": "AADHAAR_FRONT_BACK",
+      "predicted": "PAN_CARD_IMAGE",
+      "ocr_confidence": 0.9386,
+      "word_count": 29,
+      "degradation": {
+        "rotation_deg": 1.29,
+        "blur_radius": 0,
+        "noise_sigma": 6,
+        "jpeg_quality": 85
+      }
+    }
+  ],
+  "runtime_safety": {
+    "val": {
+      "split": "val",
+      "n": 21,
+      "outcomes": {
+        "CORRECT_DOCUMENT": 18,
+        "WRONG_DOCUMENT": 3,
+        "AMBIGUOUS_DOCUMENT": 0,
+        "UNREADABLE_DOCUMENT": 0
+      },
+      "correct_rate": 0.8571,
+      "false_rejection_rate": 0.0,
+      "false_acceptance_rate": 0.0,
+      "safe_non_answer_rate": 0.0,
+      "false_rejections": [],
+      "false_acceptances": []
+    },
+    "test": {
+      "split": "test",
+      "n": 21,
+      "outcomes": {
+        "CORRECT_DOCUMENT": 18,
+        "WRONG_DOCUMENT": 3,
+        "AMBIGUOUS_DOCUMENT": 0,
+        "UNREADABLE_DOCUMENT": 0
+      },
+      "correct_rate": 0.8571,
+      "false_rejection_rate": 0.0,
+      "false_acceptance_rate": 0.0,
+      "safe_non_answer_rate": 0.0,
+      "false_rejections": [],
+      "false_acceptances": []
+    },
+    "unseen_template": {
+      "split": "unseen_template",
+      "n": 39,
+      "outcomes": {
+        "CORRECT_DOCUMENT": 33,
+        "WRONG_DOCUMENT": 4,
+        "AMBIGUOUS_DOCUMENT": 2,
+        "UNREADABLE_DOCUMENT": 0
+      },
+      "correct_rate": 0.8462,
+      "false_rejection_rate": 0.0256,
+      "false_acceptance_rate": 0.0,
+      "safe_non_answer_rate": 0.0513,
+      "false_rejections": [
+        {
+          "sample_id": "AADHAAR_FRONT_BACK_aadhaar_letterhead_unseen_0128",
+          "expected": "AADHAAR_FRONT_BACK",
+          "actual_doc_type": "AADHAAR_FRONT_BACK",
+          "predicted": "PAN_CARD_IMAGE",
+          "top_probability": 0.4661
+        }
+      ],
+      "false_acceptances": []
+    }
+  }
+}

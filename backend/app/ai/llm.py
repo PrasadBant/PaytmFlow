@@ -137,8 +137,14 @@ class LLMProvider:
         extracted_text: str,
         manifest: JourneyPackManifest,
         existing_fields: dict[str, Any] | None = None,
+        ocr_meta: dict[str, Any] | None = None,
     ) -> AIInterpretationResult:
-        """Interprets evidence text against pack mappings and detects conflicts."""
+        """Interprets evidence text against pack mappings and detects conflicts.
+
+        `ocr_meta` is accepted for AIProvider Protocol compatibility and
+        unused here - the hosted LLM reasons over the text itself, not
+        local OCR bounding-box layout.
+        """
         try:
             mappings_desc = [
                 {
@@ -201,6 +207,7 @@ class LLMProvider:
             extracted_text=extracted_text,
             manifest=manifest,
             existing_fields=existing_fields,
+            ocr_meta=ocr_meta,
         )
 
     async def select_action(

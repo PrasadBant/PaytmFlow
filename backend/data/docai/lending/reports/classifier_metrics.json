@@ -1,0 +1,416 @@
+{
+  "meta": {
+    "version": "lending-classifier-v1",
+    "journey_type": "LENDING",
+    "label_names": [
+      "BANK_STATEMENT",
+      "OFFER_LETTER",
+      "OFFICE_ID_CARD",
+      "OTHER",
+      "SALARY_SLIP"
+    ],
+    "trained_at": "2026-09-14T20:36:54.940032+00:00",
+    "dataset_seed": 20260914,
+    "train_n": 115,
+    "sklearn_version": "1.9.1",
+    "python_version": "3.13.12 (tags/v3.13.12:1cbe481, Feb  3 2026, 18:22:25) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "model_type": "TfidfVectorizer(1,2-gram) + LogisticRegression(class_weight=balanced)"
+  },
+  "results": {
+    "val": {
+      "split": "val",
+      "n": 33,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "per_class_report": {
+        "BANK_STATEMENT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 9.0
+        },
+        "OFFER_LETTER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "OFFICE_ID_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "OTHER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3.0
+        },
+        "SALARY_SLIP": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 9.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 33.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 33.0
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "BANK_STATEMENT",
+          "OFFER_LETTER",
+          "OFFICE_ID_CARD",
+          "OTHER",
+          "SALARY_SLIP"
+        ],
+        "matrix": [
+          [
+            9,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            6,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            6,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            3,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            9
+          ]
+        ]
+      }
+    },
+    "test": {
+      "split": "test",
+      "n": 33,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "per_class_report": {
+        "BANK_STATEMENT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 9.0
+        },
+        "OFFER_LETTER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "OFFICE_ID_CARD": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 6.0
+        },
+        "OTHER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3.0
+        },
+        "SALARY_SLIP": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 9.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 33.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 33.0
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "BANK_STATEMENT",
+          "OFFER_LETTER",
+          "OFFICE_ID_CARD",
+          "OTHER",
+          "SALARY_SLIP"
+        ],
+        "matrix": [
+          [
+            9,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            6,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            6,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            3,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            9
+          ]
+        ]
+      }
+    },
+    "unseen_template": {
+      "split": "unseen_template",
+      "n": 51,
+      "accuracy": 0.9412,
+      "macro_f1": 0.9492,
+      "macro_precision": 0.96,
+      "macro_recall": 0.95,
+      "per_class_report": {
+        "BANK_STATEMENT": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 12.0
+        },
+        "OFFER_LETTER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 12.0
+        },
+        "OFFICE_ID_CARD": {
+          "precision": 1.0,
+          "recall": 0.75,
+          "f1-score": 0.8571428571428571,
+          "support": 12.0
+        },
+        "OTHER": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 3.0
+        },
+        "SALARY_SLIP": {
+          "precision": 0.8,
+          "recall": 1.0,
+          "f1-score": 0.8888888888888888,
+          "support": 12.0
+        },
+        "accuracy": 0.9411764705882353,
+        "macro avg": {
+          "precision": 0.96,
+          "recall": 0.95,
+          "f1-score": 0.9492063492063492,
+          "support": 51.0
+        },
+        "weighted avg": {
+          "precision": 0.9529411764705883,
+          "recall": 0.9411764705882353,
+          "f1-score": 0.9402427637721754,
+          "support": 51.0
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "BANK_STATEMENT",
+          "OFFER_LETTER",
+          "OFFICE_ID_CARD",
+          "OTHER",
+          "SALARY_SLIP"
+        ],
+        "matrix": [
+          [
+            12,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            12,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            9,
+            0,
+            3
+          ],
+          [
+            0,
+            0,
+            0,
+            3,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            12
+          ]
+        ]
+      }
+    }
+  },
+  "errors": [
+    {
+      "split": "unseen_template",
+      "sample_id": "OFFICE_ID_CARD_id_qr_unseen_0155",
+      "template_id": "id_qr_unseen",
+      "expected": "OFFICE_ID_CARD",
+      "predicted": "SALARY_SLIP",
+      "ocr_confidence": 0.8327,
+      "word_count": 11,
+      "degradation": {
+        "rotation_deg": -3.38,
+        "blur_radius": 0.8,
+        "noise_sigma": 0,
+        "jpeg_quality": 70
+      }
+    },
+    {
+      "split": "unseen_template",
+      "sample_id": "OFFICE_ID_CARD_id_qr_unseen_0157",
+      "template_id": "id_qr_unseen",
+      "expected": "OFFICE_ID_CARD",
+      "predicted": "SALARY_SLIP",
+      "ocr_confidence": 0.9033,
+      "word_count": 12,
+      "degradation": {
+        "rotation_deg": -3.13,
+        "blur_radius": 0,
+        "noise_sigma": 0,
+        "jpeg_quality": 70
+      }
+    },
+    {
+      "split": "unseen_template",
+      "sample_id": "OFFICE_ID_CARD_id_qr_unseen_0160",
+      "template_id": "id_qr_unseen",
+      "expected": "OFFICE_ID_CARD",
+      "predicted": "SALARY_SLIP",
+      "ocr_confidence": 0.88,
+      "word_count": 11,
+      "degradation": {
+        "rotation_deg": -2.94,
+        "blur_radius": 0,
+        "noise_sigma": 3,
+        "jpeg_quality": 70
+      }
+    }
+  ],
+  "runtime_safety": {
+    "val": {
+      "split": "val",
+      "n": 33,
+      "outcomes": {
+        "CORRECT_DOCUMENT": 30,
+        "WRONG_DOCUMENT": 3,
+        "AMBIGUOUS_DOCUMENT": 0,
+        "UNREADABLE_DOCUMENT": 0
+      },
+      "correct_rate": 0.9091,
+      "false_rejection_rate": 0.0,
+      "false_acceptance_rate": 0.0,
+      "safe_non_answer_rate": 0.0,
+      "false_rejections": [],
+      "false_acceptances": []
+    },
+    "test": {
+      "split": "test",
+      "n": 33,
+      "outcomes": {
+        "CORRECT_DOCUMENT": 30,
+        "WRONG_DOCUMENT": 3,
+        "AMBIGUOUS_DOCUMENT": 0,
+        "UNREADABLE_DOCUMENT": 0
+      },
+      "correct_rate": 0.9091,
+      "false_rejection_rate": 0.0,
+      "false_acceptance_rate": 0.0,
+      "safe_non_answer_rate": 0.0,
+      "false_rejections": [],
+      "false_acceptances": []
+    },
+    "unseen_template": {
+      "split": "unseen_template",
+      "n": 51,
+      "outcomes": {
+        "CORRECT_DOCUMENT": 36,
+        "WRONG_DOCUMENT": 3,
+        "AMBIGUOUS_DOCUMENT": 12,
+        "UNREADABLE_DOCUMENT": 0
+      },
+      "correct_rate": 0.7059,
+      "false_rejection_rate": 0.0,
+      "false_acceptance_rate": 0.0,
+      "safe_non_answer_rate": 0.2353,
+      "false_rejections": [],
+      "false_acceptances": []
+    }
+  }
+}

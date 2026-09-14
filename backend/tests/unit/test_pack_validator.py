@@ -66,6 +66,16 @@ VALID_BASELINE_MANIFEST_DICT = {
             "kind": "EVIDENCE",
             "satisfies": ["f_income"],
             "preconditions": ["f_init"],
+            # Integrity-hardening phase: `accepts` must list the doc_type
+            # values evidence_mappings below actually routes here (the
+            # real-manifest convention every one of the six journey
+            # manifests follows) - an empty/missing `accepts` on an
+            # EVIDENCE action with real evidence_mappings pointing at it
+            # is exactly the class of defect
+            # `validate_evidence_integrity`'s EVIDENCE_DOC_TYPE_NOT_ROUTABLE
+            # check now catches, so a "valid baseline" fixture must not
+            # have this gap either.
+            "accepts": ["SALARY_SLIP", "BANK_STATEMENT", "ITR_V"],
         },
         {
             "action_id": "ACT_EMP",

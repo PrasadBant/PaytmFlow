@@ -127,6 +127,23 @@ class EvidenceModel(Base):
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     extracted_data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Document AI integration integrity fix: whether the AI genuinely
+    # recognized this as the expected document (correct classification)
+    # with no detected conflict - `EvidenceReconciliationService.
+    # submit_evidence`'s `evidence_is_genuine`, deliberately NOT the same
+    # as that method's fuller `is_verified` (which also requires
+    # confidence >= the manifest threshold - a separate, deliberately
+    # unaddressed calibration concern; see reconcile.py's own comment).
+    # Persisted so a LATER action-execution request can consume the real,
+    # server-validated result instead of ever falling back to a
+    # simulated/default value or trusting a client-supplied one. `False`
+    # by default so a row somehow missing it never reads as verified.
+    verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # The AI's real `raw_values` (manifest target-field key -> validated
+    # value) at upload time - e.g. {"monthly_income": 92000} or
+    # {"income_verified": True}. Never client-supplied; only ever written
+    # from `AIInterpretationResult.raw_values`.
+    raw_values: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

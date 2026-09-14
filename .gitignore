@@ -10,6 +10,7 @@ frontend/.env.local
 
 # --- Backend (Python / FastAPI) ---
 backend/.venv/
+backend/.venv-ocr-bench/
 backend/__pycache__/
 **/__pycache__/
 backend/.pytest_cache/
@@ -32,3 +33,14 @@ Thumbs.db
 nul
 .vscode/
 .idea/
+
+# --- Document AI dataset (regenerable, large binary files) ---
+# Regenerate with: uv run python -m app.docai.dataset.generate
+#                   uv run python -m app.docai.dataset.build_ocr_cache
+# labels.jsonl / ocr_cache.jsonl / reports / dataset_manifest.json are
+# small and ARE committed (evidence + reproducibility); only the bulk
+# generated PDF/JPG documents themselves are excluded.
+backend/data/docai/**/*.pdf
+backend/data/docai/**/*.jpg
+backend/data/docai/**/*.jpeg
+backend/data/docai/**/*.png

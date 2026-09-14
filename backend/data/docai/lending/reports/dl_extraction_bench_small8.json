@@ -1,0 +1,157 @@
+{
+  "model": "distilbert-base-cased-distilled-squad",
+  "approach": "zero-shot extractive QA (no training)",
+  "device": "cpu",
+  "load_seconds": 26.81,
+  "n_documents": 8,
+  "overall_exact_match_accuracy": 0.25,
+  "by_field": {
+    "monthly_income": {
+      "n": 4,
+      "exact_match_accuracy": 0.0
+    },
+    "employer_name": {
+      "n": 4,
+      "exact_match_accuracy": 0.5
+    }
+  },
+  "mean_latency_seconds": 0.0338,
+  "per_document": [
+    {
+      "sample_id": "SALARY_SLIP_salary_table_0031",
+      "split": "val",
+      "doc_type": "SALARY_SLIP",
+      "field_key": "monthly_income",
+      "question": "What is the net pay?",
+      "elapsed_seconds": 0.032,
+      "qa_answer": "79",
+      "qa_score": 0.4981,
+      "error": null,
+      "result": {
+        "expected": 133000,
+        "predicted_raw": "79",
+        "predicted": 79,
+        "match": false
+      }
+    },
+    {
+      "sample_id": "SALARY_SLIP_salary_table_0032",
+      "split": "val",
+      "doc_type": "SALARY_SLIP",
+      "field_key": "monthly_income",
+      "question": "What is the net pay?",
+      "elapsed_seconds": 0.03,
+      "qa_answer": "66, 600 933, 300 1, 16, 550 5, 550",
+      "qa_score": 0.6809,
+      "error": null,
+      "result": {
+        "expected": 111000,
+        "predicted_raw": "66, 600 933, 300 1, 16, 550 5, 550",
+        "predicted": null,
+        "match": false
+      }
+    },
+    {
+      "sample_id": "BANK_STATEMENT_bank_hdfc_0091",
+      "split": "val",
+      "doc_type": "BANK_STATEMENT",
+      "field_key": "monthly_income",
+      "question": "What is the salary credit amount?",
+      "elapsed_seconds": 0.043,
+      "qa_answer": "1, 59, 000 700",
+      "qa_score": 0.7576,
+      "error": null,
+      "result": {
+        "expected": 159000,
+        "predicted_raw": "1, 59, 000 700",
+        "predicted": null,
+        "match": false
+      }
+    },
+    {
+      "sample_id": "BANK_STATEMENT_bank_hdfc_0093",
+      "split": "val",
+      "doc_type": "BANK_STATEMENT",
+      "field_key": "monthly_income",
+      "question": "What is the salary credit amount?",
+      "elapsed_seconds": 0.035,
+      "qa_answer": "1, 78, 000 2, 900",
+      "qa_score": 0.7536,
+      "error": null,
+      "result": {
+        "expected": 178000,
+        "predicted_raw": "1, 78, 000 2, 900",
+        "predicted": null,
+        "match": false
+      }
+    },
+    {
+      "sample_id": "OFFICE_ID_CARD_id_horizontal_0141",
+      "split": "val",
+      "doc_type": "OFFICE_ID_CARD",
+      "field_key": "employer_name",
+      "question": "What is the name of the employer company?",
+      "elapsed_seconds": 0.023,
+      "qa_answer": "Thompson Ltd Solutions",
+      "qa_score": 0.8807,
+      "error": null,
+      "result": {
+        "expected": "Thompson Ltd Solutions India Pvt Ltd",
+        "predicted_raw": "Thompson Ltd Solutions",
+        "predicted": "Thompson Ltd Solutions",
+        "match": true
+      }
+    },
+    {
+      "sample_id": "OFFICE_ID_CARD_id_horizontal_0142",
+      "split": "val",
+      "doc_type": "OFFICE_ID_CARD",
+      "field_key": "employer_name",
+      "question": "What is the name of the employer company?",
+      "elapsed_seconds": 0.024,
+      "qa_answer": "Ortega - Woodard Technologies Pvt Ltd",
+      "qa_score": 0.9021,
+      "error": null,
+      "result": {
+        "expected": "Ortega-Woodard Technologies Pvt Ltd",
+        "predicted_raw": "Ortega - Woodard Technologies Pvt Ltd",
+        "predicted": "Ortega - Woodard Technologies Pvt Ltd",
+        "match": false
+      }
+    },
+    {
+      "sample_id": "OFFER_LETTER_offer_formal_0185",
+      "split": "val",
+      "doc_type": "OFFER_LETTER",
+      "field_key": "employer_name",
+      "question": "What is the name of the employer company?",
+      "elapsed_seconds": 0.042,
+      "qa_answer": "Smith - Gomez Solutions India Pvt Ltd 0378 Bentley Falls Apt. 692, South Kimberlystad, NM 26271 OFFER OF EMPLOYMENT Date : Aug 2011 Dear Alicia Wagner, We are pleased to offer you the position of Associate at Smith - Gomez Solutions India Pvi Ltd",
+      "qa_score": 0.583,
+      "error": null,
+      "result": {
+        "expected": "Smith-Gomez Solutions India Pvt Ltd",
+        "predicted_raw": "Smith - Gomez Solutions India Pvt Ltd 0378 Bentley Falls Apt. 692, South Kimberlystad, NM 26271 OFFER OF EMPLOYMENT Date : Aug 2011 Dear Alicia Wagner, We are pleased to offer you the position of Associate at Smith - Gomez Solutions India Pvi Ltd",
+        "predicted": "Smith - Gomez Solutions India Pvt Ltd 0378 Bentley Falls Apt. 692, South Kimberlystad, NM 26271 OFFER OF EMPLOYMENT Date : Aug 2011 Dear Alicia Wagner, We are pleased to offer you the position of Associate at Smith - Gomez Solutions India Pvi Ltd",
+        "match": false
+      }
+    },
+    {
+      "sample_id": "OFFER_LETTER_offer_formal_0186",
+      "split": "val",
+      "doc_type": "OFFER_LETTER",
+      "field_key": "employer_name",
+      "question": "What is the name of the employer company?",
+      "elapsed_seconds": 0.041,
+      "qa_answer": "Pine",
+      "qa_score": 0.2732,
+      "error": null,
+      "result": {
+        "expected": "Rogers Cunningham and Pineda Technologies Pvt Ltd",
+        "predicted_raw": "Pine",
+        "predicted": "Pine",
+        "match": true
+      }
+    }
+  ]
+}

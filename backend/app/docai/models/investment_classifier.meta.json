@@ -1,0 +1,17 @@
+{
+  "version": "investment-classifier-v1",
+  "journey_type": "INVESTMENT",
+  "label_names": [
+    "BANK_STATEMENT_SUMMARY",
+    "CANCELLED_CHEQUE",
+    "KRA_KYC_LETTER",
+    "OTHER"
+  ],
+  "trained_at": "2026-09-14T20:36:55.465915+00:00",
+  "dataset_seed": 20260919,
+  "train_n": 75,
+  "sklearn_version": "1.9.1",
+  "python_version": "3.13.12 (tags/v3.13.12:1cbe481, Feb  3 2026, 18:22:25) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "model_type": "TfidfVectorizer(1,2-gram) + LogisticRegression(class_weight=balanced)"
+}

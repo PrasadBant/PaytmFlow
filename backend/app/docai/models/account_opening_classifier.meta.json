@@ -1,0 +1,17 @@
+{
+  "version": "account_opening-classifier-v1",
+  "journey_type": "ACCOUNT_OPENING",
+  "label_names": [
+    "AADHAAR_FRONT_BACK",
+    "OTHER",
+    "PAN_CARD_IMAGE",
+    "SIGNATURE_SPECIMEN"
+  ],
+  "trained_at": "2026-09-14T20:36:55.364667+00:00",
+  "dataset_seed": 20260918,
+  "train_n": 75,
+  "sklearn_version": "1.9.1",
+  "python_version": "3.13.12 (tags/v3.13.12:1cbe481, Feb  3 2026, 18:22:25) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "model_type": "TfidfVectorizer(1,2-gram) + LogisticRegression(class_weight=balanced)"
+}

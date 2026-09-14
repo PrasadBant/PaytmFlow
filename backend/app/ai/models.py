@@ -29,6 +29,17 @@ class AIInterpretationResult(BaseModel):
     summary: str
     conflicts: list[AIConflict] = Field(default_factory=list)
     raw_values: dict[str, Any] = Field(default_factory=dict)
+    # Cross-document-consistency phase: auxiliary facts (name, and a
+    # doc_type-scoped identifier) that are NOT manifest target fields and
+    # so are deliberately never surfaced in `detected`/`raw_values` (no
+    # public-API/wire-contract expansion - `EvidenceInterpretation` in
+    # app/schemas/evidence.py is built field-by-field from this object in
+    # app/evidence/reconcile.py, never auto-serialized, so this stays
+    # internal). The caller persists these into the append-only
+    # `evidence.extracted_data` JSON column (never into snapshot state)
+    # so a LATER evidence upload in the SAME journey can compare against
+    # them - the actual cross-document consistency mechanism.
+    auxiliary_facts: dict[str, Any] = Field(default_factory=dict)
 
 
 class ActionRankingResult(BaseModel):
