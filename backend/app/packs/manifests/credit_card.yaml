@@ -97,7 +97,7 @@ actions:
     preconditions:
       - kyc_verified
     accepts:
-      - application/pdf
+      - SALARY_SLIP
     action_group: income_proof_satisfaction
 
   - action_id: upload_it_return
@@ -109,7 +109,7 @@ actions:
     preconditions:
       - kyc_verified
     accepts:
-      - application/pdf
+      - ITR_V_ACKNOWLEDGEMENT
     action_group: income_proof_satisfaction
 
   - action_id: verify_employment_details
@@ -130,9 +130,7 @@ actions:
     preconditions:
       - kyc_verified
     accepts:
-      - application/pdf
-      - image/jpeg
-      - image/png
+      - UTILITY_BILL_ELECTRICITY
 
   - action_id: confirm_dispatch_address
     title: Confirm Delivery Location

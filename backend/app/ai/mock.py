@@ -82,8 +82,14 @@ class MockAI:
         extracted_text: str,
         manifest: JourneyPackManifest,
         existing_fields: dict[str, Any] | None = None,
+        ocr_meta: dict[str, Any] | None = None,
     ) -> AIInterpretationResult:
-        """Deterministically extracts evidence data and detects potential conflicts."""
+        """Deterministically extracts evidence data and detects potential conflicts.
+
+        `ocr_meta` is accepted for AIProvider Protocol compatibility and
+        intentionally unused - MockAI's whole purpose is fixed, reproducible
+        output regardless of real OCR signals.
+        """
         existing_fields = existing_fields or {}
         text = (extracted_text or "").lower()
 

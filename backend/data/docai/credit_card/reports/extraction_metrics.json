@@ -1,0 +1,181 @@
+{
+  "val": {
+    "split": "val",
+    "n_documents": 18,
+    "field_metrics": {
+      "name": {
+        "n": 18,
+        "exact_match_accuracy": 0.9444,
+        "extraction_coverage": 0.9444
+      },
+      "document_date": {
+        "n": 12,
+        "exact_match_accuracy": 0.9167,
+        "extraction_coverage": 0.9167
+      },
+      "monthly_income": {
+        "n": 6,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      },
+      "identifier": {
+        "n": 6,
+        "exact_match_accuracy": 0.8333,
+        "extraction_coverage": 0.8333
+      }
+    },
+    "errors": [
+      {
+        "split": "val",
+        "sample_id": "SALARY_SLIP_salary_table_0021",
+        "doc_type": "SALARY_SLIP",
+        "template_id": "salary_table",
+        "field": "name",
+        "expected": "Cheryl Greer",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "val",
+        "sample_id": "SALARY_SLIP_salary_table_0022",
+        "doc_type": "SALARY_SLIP",
+        "template_id": "salary_table",
+        "field": "document_date",
+        "expected": "2002-02",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled document date found."
+      },
+      {
+        "split": "val",
+        "sample_id": "ITR_V_ACKNOWLEDGEMENT_itr_formal_0065",
+        "doc_type": "ITR_V_ACKNOWLEDGEMENT",
+        "template_id": "itr_formal",
+        "field": "identifier",
+        "expected": "BMJNG0120J",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      }
+    ]
+  },
+  "test": {
+    "split": "test",
+    "n_documents": 18,
+    "field_metrics": {
+      "name": {
+        "n": 18,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      },
+      "document_date": {
+        "n": 12,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      },
+      "monthly_income": {
+        "n": 6,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      },
+      "identifier": {
+        "n": 6,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      }
+    },
+    "errors": []
+  },
+  "unseen_template": {
+    "split": "unseen_template",
+    "n_documents": 36,
+    "field_metrics": {
+      "name": {
+        "n": 36,
+        "exact_match_accuracy": 0.9444,
+        "extraction_coverage": 0.9722
+      },
+      "document_date": {
+        "n": 24,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      },
+      "monthly_income": {
+        "n": 12,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      },
+      "identifier": {
+        "n": 12,
+        "exact_match_accuracy": 0.75,
+        "extraction_coverage": 0.8333
+      }
+    },
+    "errors": [
+      {
+        "split": "unseen_template",
+        "sample_id": "SALARY_SLIP_salary_letterhead_unseen_0037",
+        "doc_type": "SALARY_SLIP",
+        "template_id": "salary_letterhead_unseen",
+        "field": "name",
+        "expected": "Ronald Brown",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "ITR_V_ACKNOWLEDGEMENT_itr_letterhead_unseen_0080",
+        "doc_type": "ITR_V_ACKNOWLEDGEMENT",
+        "template_id": "itr_letterhead_unseen",
+        "field": "identifier",
+        "expected": "VAVJZ6976O",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "ITR_V_ACKNOWLEDGEMENT_itr_letterhead_unseen_0081",
+        "doc_type": "ITR_V_ACKNOWLEDGEMENT",
+        "template_id": "itr_letterhead_unseen",
+        "field": "name",
+        "expected": "Ann Turner",
+        "predicted": "Ann Tumer",
+        "raw_value": "Ann Tumer",
+        "validated": true,
+        "note": null
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "ITR_V_ACKNOWLEDGEMENT_itr_letterhead_unseen_0086",
+        "doc_type": "ITR_V_ACKNOWLEDGEMENT",
+        "template_id": "itr_letterhead_unseen",
+        "field": "identifier",
+        "expected": "AXIYJ4333J",
+        "predicted": "AXIYS4333J",
+        "raw_value": "AXIYS4333J",
+        "validated": true,
+        "note": null
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "ITR_V_ACKNOWLEDGEMENT_itr_letterhead_unseen_0088",
+        "doc_type": "ITR_V_ACKNOWLEDGEMENT",
+        "template_id": "itr_letterhead_unseen",
+        "field": "identifier",
+        "expected": "YTSPD3703S",
+        "predicted": null,
+        "raw_value": "YTSPD37038S",
+        "validated": false,
+        "note": "Matched label but digit portion '37038' is 5 chars, expected 4."
+      }
+    ]
+  }
+}

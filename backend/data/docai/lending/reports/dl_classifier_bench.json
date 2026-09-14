@@ -1,0 +1,30 @@
+{
+  "model": "distilbert-base-uncased",
+  "params": 66957317,
+  "epochs": 8,
+  "train_n": 115,
+  "train_seconds": 667.0,
+  "total_seconds": 709.3,
+  "process_rss_mb": 1517.1,
+  "device": "cpu",
+  "results": {
+    "val": {
+      "split": "val",
+      "n": 33,
+      "accuracy": 1.0,
+      "mean_latency_seconds": 0.1197
+    },
+    "test": {
+      "split": "test",
+      "n": 33,
+      "accuracy": 1.0,
+      "mean_latency_seconds": 0.1143
+    },
+    "unseen_template": {
+      "split": "unseen_template",
+      "n": 51,
+      "accuracy": 0.9804,
+      "mean_latency_seconds": 0.127
+    }
+  }
+}

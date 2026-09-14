@@ -140,6 +140,7 @@ class GuardrailedAIProvider:
         extracted_text: str,
         manifest: JourneyPackManifest,
         existing_fields: dict[str, Any] | None = None,
+        ocr_meta: dict[str, Any] | None = None,
     ) -> AIInterpretationResult:
         """Reconciles evidence with untrusted wrapping, timeout, schema validation,
 
@@ -157,6 +158,7 @@ class GuardrailedAIProvider:
                         extracted_text=bounded_text,
                         manifest=manifest,
                         existing_fields=existing_fields,
+                        ocr_meta=ocr_meta,
                     ),
                     timeout=self.timeout_seconds,
                 )

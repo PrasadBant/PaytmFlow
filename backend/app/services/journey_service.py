@@ -11,7 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.provider import get_ai_provider
 from app.audit.writer import AuditWriter
 from app.core.dependencies import DependencyGraph
-from app.core.deterministic_check import DeterministicCheckError, deterministic_check
+from app.core.deterministic_check import (
+    DeterministicCheckError,
+    ResolvedEvidence,
+    deterministic_check,
+)
 from app.core.diff import compute_diff
 from app.core.models import (
     CheckToken,
@@ -25,6 +29,7 @@ from app.core.readiness import evaluate_readiness
 from app.core.rules import derive_field_states
 from app.db.models import JourneyModel, SessionModel
 from app.db.repositories.clarifications import ClarificationRepository
+from app.db.repositories.evidence import EvidenceRepository
 from app.db.repositories.idempotency import IdempotencyRepository
 from app.db.repositories.journeys import JourneyRepository
 from app.db.repositories.snapshots import SnapshotRepository
@@ -991,6 +996,56 @@ class JourneyService:
             goal=curr_snap.goal or journey.goal,
         )
 
+        # 5b. Resolve a real evidence_id (Document AI integration integrity
+        # fix) - the ONLY place a client-supplied evidence reference is
+        # ever turned into trusted field values. Looks up the actual,
+        # server-persisted evidence row and its ALREADY-COMPUTED
+        # verification result (`app/evidence/reconcile.py`'s
+        # `is_verified` + the AI's real `raw_values`) - never the
+        # client's own claims about what the evidence contains.
+        # `app/core` cannot do this DB lookup itself (CLAUDE.md rule 1),
+        # so it happens here, in the impure service layer, and is handed
+        # to `deterministic_check` as plain, already-validated data.
+        resolved_evidence: ResolvedEvidence | None = None
+        raw_evidence_id = (action_input or {}).get("evidence_id")
+        if raw_evidence_id:
+            try:
+                evidence_uuid = UUID(str(raw_evidence_id))
+            except (ValueError, TypeError, AttributeError) as exc:
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "error": {
+                            "code": "NOT_FOUND",
+                            "message": f"Evidence '{raw_evidence_id}' not found",
+                        }
+                    },
+                ) from exc
+            evidence_repo = EvidenceRepository(db)
+            evidence_row = await evidence_repo.get_by_id(evidence_uuid)
+            # Cross-journey AND cross-session safety: evidence rows belong
+            # to exactly one journey, and journeys were already confirmed
+            # to belong to the CURRENT session before `apply_action` is
+            # ever called (`verify_journey_ownership` at the API layer) -
+            # so requiring `evidence_row.journey_id == journey.id` also
+            # transitively rules out another session's evidence, without
+            # needing a second, separate session check here.
+            if not evidence_row or evidence_row.journey_id != journey.id:
+                raise HTTPException(
+                    status_code=404,
+                    detail={
+                        "error": {
+                            "code": "NOT_FOUND",
+                            "message": f"Evidence '{raw_evidence_id}' not found",
+                        }
+                    },
+                )
+            resolved_evidence = ResolvedEvidence(
+                doc_type=evidence_row.doc_type,
+                verified=bool(evidence_row.verified),
+                values=dict(evidence_row.raw_values or {}),
+            )
+
         # 6. Deterministic Check (choke point)
         audit_writer = AuditWriter(db)
         try:
@@ -1000,6 +1055,7 @@ class JourneyService:
                 action_id=action_id,
                 action_input=action_input,
                 manifest=manifest,
+                resolved_evidence=resolved_evidence,
             )
         except DeterministicCheckError as err:
             await audit_writer.record_action_rejected(
@@ -1015,7 +1071,7 @@ class JourneyService:
             status_code = 400
             if err.code == ErrorCode.ACTION_STALE:
                 status_code = 409
-            elif err.code == ErrorCode.ACTION_INVALID:
+            elif err.code in (ErrorCode.ACTION_INVALID, ErrorCode.EVIDENCE_CONFLICT):
                 status_code = 422
 
             cur_snap_id = None

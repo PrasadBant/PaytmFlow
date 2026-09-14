@@ -1,0 +1,227 @@
+{
+  "val": {
+    "split": "val",
+    "n_documents": 18,
+    "field_metrics": {
+      "name": {
+        "n": 18,
+        "exact_match_accuracy": 0.9444,
+        "extraction_coverage": 1.0
+      },
+      "identifier": {
+        "n": 18,
+        "exact_match_accuracy": 0.9444,
+        "extraction_coverage": 0.9444
+      },
+      "document_date": {
+        "n": 12,
+        "exact_match_accuracy": 0.9167,
+        "extraction_coverage": 1.0
+      }
+    },
+    "errors": [
+      {
+        "split": "val",
+        "sample_id": "BANK_STATEMENT_SUMMARY_statement_compact_0069",
+        "doc_type": "BANK_STATEMENT_SUMMARY",
+        "template_id": "statement_compact",
+        "field": "name",
+        "expected": "Erica Cook",
+        "predicted": "Erica Gook Account No",
+        "raw_value": "Erica Gook Account No",
+        "validated": true,
+        "note": null
+      },
+      {
+        "split": "val",
+        "sample_id": "KRA_KYC_LETTER_kra_standard_0109",
+        "doc_type": "KRA_KYC_LETTER",
+        "template_id": "kra_standard",
+        "field": "document_date",
+        "expected": "1983-01-16",
+        "predicted": "1983-04-16",
+        "raw_value": "16/04/1983",
+        "validated": true,
+        "note": null
+      },
+      {
+        "split": "val",
+        "sample_id": "KRA_KYC_LETTER_kra_standard_0111",
+        "doc_type": "KRA_KYC_LETTER",
+        "template_id": "kra_standard",
+        "field": "identifier",
+        "expected": "ENLNB4824J",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      }
+    ]
+  },
+  "test": {
+    "split": "test",
+    "n_documents": 18,
+    "field_metrics": {
+      "name": {
+        "n": 18,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      },
+      "identifier": {
+        "n": 18,
+        "exact_match_accuracy": 0.8889,
+        "extraction_coverage": 0.8889
+      },
+      "document_date": {
+        "n": 12,
+        "exact_match_accuracy": 0.8333,
+        "extraction_coverage": 1.0
+      }
+    },
+    "errors": [
+      {
+        "split": "test",
+        "sample_id": "CANCELLED_CHEQUE_cheque_compact_0032",
+        "doc_type": "CANCELLED_CHEQUE",
+        "template_id": "cheque_compact",
+        "field": "identifier",
+        "expected": "MTBL0504862",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "test",
+        "sample_id": "KRA_KYC_LETTER_kra_standard_0116",
+        "doc_type": "KRA_KYC_LETTER",
+        "template_id": "kra_standard",
+        "field": "identifier",
+        "expected": "YWMZL9153O",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "test",
+        "sample_id": "KRA_KYC_LETTER_kra_standard_0116",
+        "doc_type": "KRA_KYC_LETTER",
+        "template_id": "kra_standard",
+        "field": "document_date",
+        "expected": "2004-08-10",
+        "predicted": "40/08/2004",
+        "raw_value": "40/08/2004",
+        "validated": false,
+        "note": "Could not normalize date '40/08/2004'."
+      },
+      {
+        "split": "test",
+        "sample_id": "KRA_KYC_LETTER_kra_compact_0120",
+        "doc_type": "KRA_KYC_LETTER",
+        "template_id": "kra_compact",
+        "field": "document_date",
+        "expected": "1993-09-21",
+        "predicted": "24 99/1993",
+        "raw_value": "24 99/1993",
+        "validated": false,
+        "note": "Could not normalize date '24 99/1993'."
+      }
+    ]
+  },
+  "unseen_template": {
+    "split": "unseen_template",
+    "n_documents": 36,
+    "field_metrics": {
+      "name": {
+        "n": 36,
+        "exact_match_accuracy": 0.9722,
+        "extraction_coverage": 1.0
+      },
+      "identifier": {
+        "n": 36,
+        "exact_match_accuracy": 0.8889,
+        "extraction_coverage": 0.9167
+      },
+      "document_date": {
+        "n": 24,
+        "exact_match_accuracy": 0.9583,
+        "extraction_coverage": 1.0
+      }
+    },
+    "errors": [
+      {
+        "split": "unseen_template",
+        "sample_id": "BANK_STATEMENT_SUMMARY_statement_letterhead_unseen_0086",
+        "doc_type": "BANK_STATEMENT_SUMMARY",
+        "template_id": "statement_letterhead_unseen",
+        "field": "name",
+        "expected": "Jared Wilkinson",
+        "predicted": "Jared Witkingon",
+        "raw_value": "Jared Witkingon",
+        "validated": true,
+        "note": null
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "BANK_STATEMENT_SUMMARY_statement_letterhead_unseen_0086",
+        "doc_type": "BANK_STATEMENT_SUMMARY",
+        "template_id": "statement_letterhead_unseen",
+        "field": "document_date",
+        "expected": "1971-05",
+        "predicted": "1974-05",
+        "raw_value": "May 1974",
+        "validated": true,
+        "note": null
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "KRA_KYC_LETTER_kra_letterhead_unseen_0121",
+        "doc_type": "KRA_KYC_LETTER",
+        "template_id": "kra_letterhead_unseen",
+        "field": "identifier",
+        "expected": "GHOYI3437J",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "KRA_KYC_LETTER_kra_letterhead_unseen_0125",
+        "doc_type": "KRA_KYC_LETTER",
+        "template_id": "kra_letterhead_unseen",
+        "field": "identifier",
+        "expected": "UCAJS5939I",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "KRA_KYC_LETTER_kra_letterhead_unseen_0128",
+        "doc_type": "KRA_KYC_LETTER",
+        "template_id": "kra_letterhead_unseen",
+        "field": "identifier",
+        "expected": "VMMAO6788Z",
+        "predicted": null,
+        "raw_value": "VMMAO67882Z",
+        "validated": false,
+        "note": "Matched label but digit portion '67882' is 5 chars, expected 4."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "KRA_KYC_LETTER_kra_letterhead_unseen_0132",
+        "doc_type": "KRA_KYC_LETTER",
+        "template_id": "kra_letterhead_unseen",
+        "field": "identifier",
+        "expected": "QUHWA9062E",
+        "predicted": "QUHWA9082E",
+        "raw_value": "QUHWA9082E",
+        "validated": true,
+        "note": null
+      }
+    ]
+  }
+}

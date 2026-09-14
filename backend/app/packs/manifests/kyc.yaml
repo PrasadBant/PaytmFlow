@@ -100,9 +100,8 @@ actions:
     preconditions:
       - aadhaar_authenticated
     accepts:
-      - application/pdf
-      - image/jpeg
-      - image/png
+      - PASSPORT_SCAN
+      - DRIVING_LICENCE
     action_group: ovd_satisfaction
 
   - action_id: upload_voter_id_ovd
@@ -114,9 +113,7 @@ actions:
     preconditions:
       - aadhaar_authenticated
     accepts:
-      - application/pdf
-      - image/jpeg
-      - image/png
+      - VOTER_ID_CARD
     action_group: ovd_satisfaction
 
   - action_id: capture_liveness_selfie

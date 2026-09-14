@@ -111,9 +111,8 @@ actions:
     preconditions:
       - pan_verified
     accepts:
-      - application/pdf
-      - image/jpeg
-      - image/png
+      - CANCELLED_CHEQUE
+      - BANK_STATEMENT_SUMMARY
     action_group: bank_verification_satisfaction
 
   - action_id: link_upi_penny_drop

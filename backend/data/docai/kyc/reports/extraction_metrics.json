@@ -1,0 +1,347 @@
+{
+  "val": {
+    "split": "val",
+    "n_documents": 18,
+    "field_metrics": {
+      "name": {
+        "n": 18,
+        "exact_match_accuracy": 0.9444,
+        "extraction_coverage": 1.0
+      },
+      "document_date": {
+        "n": 18,
+        "exact_match_accuracy": 0.8889,
+        "extraction_coverage": 0.9444
+      },
+      "identifier": {
+        "n": 18,
+        "exact_match_accuracy": 0.7778,
+        "extraction_coverage": 0.8333
+      }
+    },
+    "errors": [
+      {
+        "split": "val",
+        "sample_id": "PASSPORT_SCAN_passport_compact_0026",
+        "doc_type": "PASSPORT_SCAN",
+        "template_id": "passport_compact",
+        "field": "identifier",
+        "expected": "Z2469902",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "val",
+        "sample_id": "VOTER_ID_CARD_voter_standard_0067",
+        "doc_type": "VOTER_ID_CARD",
+        "template_id": "voter_standard",
+        "field": "name",
+        "expected": "Tiffany Kennedy",
+        "predicted": "Tittany Kennedy",
+        "raw_value": "Tittany Kennedy",
+        "validated": true,
+        "note": null
+      },
+      {
+        "split": "val",
+        "sample_id": "VOTER_ID_CARD_voter_compact_0070",
+        "doc_type": "VOTER_ID_CARD",
+        "template_id": "voter_compact",
+        "field": "identifier",
+        "expected": "DTE6381941",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No recognized identifier label found."
+      },
+      {
+        "split": "val",
+        "sample_id": "DRIVING_LICENCE_dl_standard_0110",
+        "doc_type": "DRIVING_LICENCE",
+        "template_id": "dl_standard",
+        "field": "identifier",
+        "expected": "RJ0119974599993",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No recognized identifier label found."
+      },
+      {
+        "split": "val",
+        "sample_id": "DRIVING_LICENCE_dl_standard_0111",
+        "doc_type": "DRIVING_LICENCE",
+        "template_id": "dl_standard",
+        "field": "document_date",
+        "expected": "2019-04-18",
+        "predicted": "48/04/2019",
+        "raw_value": "48/04/2019",
+        "validated": false,
+        "note": "Could not normalize date '48/04/2019'."
+      },
+      {
+        "split": "val",
+        "sample_id": "DRIVING_LICENCE_dl_compact_0113",
+        "doc_type": "DRIVING_LICENCE",
+        "template_id": "dl_compact",
+        "field": "document_date",
+        "expected": "2023-07-07",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled document date found."
+      },
+      {
+        "split": "val",
+        "sample_id": "DRIVING_LICENCE_dl_compact_0113",
+        "doc_type": "DRIVING_LICENCE",
+        "template_id": "dl_compact",
+        "field": "identifier",
+        "expected": "WB2320106253199",
+        "predicted": "WB2320106253499",
+        "raw_value": "WB23201062534 99",
+        "validated": true,
+        "note": null
+      }
+    ]
+  },
+  "test": {
+    "split": "test",
+    "n_documents": 18,
+    "field_metrics": {
+      "name": {
+        "n": 18,
+        "exact_match_accuracy": 0.9444,
+        "extraction_coverage": 1.0
+      },
+      "document_date": {
+        "n": 18,
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
+      },
+      "identifier": {
+        "n": 18,
+        "exact_match_accuracy": 0.7778,
+        "extraction_coverage": 0.7778
+      }
+    },
+    "errors": [
+      {
+        "split": "test",
+        "sample_id": "PASSPORT_SCAN_passport_compact_0032",
+        "doc_type": "PASSPORT_SCAN",
+        "template_id": "passport_compact",
+        "field": "identifier",
+        "expected": "Z7371234",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "test",
+        "sample_id": "VOTER_ID_CARD_voter_standard_0072",
+        "doc_type": "VOTER_ID_CARD",
+        "template_id": "voter_standard",
+        "field": "name",
+        "expected": "Stephen Taylor",
+        "predicted": "Stephen Taytor",
+        "raw_value": "Stephen Taytor",
+        "validated": true,
+        "note": null
+      },
+      {
+        "split": "test",
+        "sample_id": "VOTER_ID_CARD_voter_compact_0076",
+        "doc_type": "VOTER_ID_CARD",
+        "template_id": "voter_compact",
+        "field": "identifier",
+        "expected": "OED6410667",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No recognized identifier label found."
+      },
+      {
+        "split": "test",
+        "sample_id": "DRIVING_LICENCE_dl_standard_0117",
+        "doc_type": "DRIVING_LICENCE",
+        "template_id": "dl_standard",
+        "field": "identifier",
+        "expected": "GJ7420168399815",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No recognized identifier label found."
+      },
+      {
+        "split": "test",
+        "sample_id": "DRIVING_LICENCE_dl_compact_0119",
+        "doc_type": "DRIVING_LICENCE",
+        "template_id": "dl_compact",
+        "field": "identifier",
+        "expected": "GJ5520038058928",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      }
+    ]
+  },
+  "unseen_template": {
+    "split": "unseen_template",
+    "n_documents": 36,
+    "field_metrics": {
+      "name": {
+        "n": 36,
+        "exact_match_accuracy": 0.9444,
+        "extraction_coverage": 0.9444
+      },
+      "document_date": {
+        "n": 36,
+        "exact_match_accuracy": 0.9444,
+        "extraction_coverage": 1.0
+      },
+      "identifier": {
+        "n": 36,
+        "exact_match_accuracy": 0.8056,
+        "extraction_coverage": 0.8611
+      }
+    },
+    "errors": [
+      {
+        "split": "unseen_template",
+        "sample_id": "PASSPORT_SCAN_passport_letterhead_unseen_0034",
+        "doc_type": "PASSPORT_SCAN",
+        "template_id": "passport_letterhead_unseen",
+        "field": "identifier",
+        "expected": "P0319971",
+        "predicted": "P0319974",
+        "raw_value": "P0319974",
+        "validated": true,
+        "note": null
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "PASSPORT_SCAN_passport_letterhead_unseen_0038",
+        "doc_type": "PASSPORT_SCAN",
+        "template_id": "passport_letterhead_unseen",
+        "field": "document_date",
+        "expected": "2001-11-21",
+        "predicted": "24/7 1/2001",
+        "raw_value": "24/7 1/2001",
+        "validated": false,
+        "note": "Could not normalize date '24/7 1/2001'."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "PASSPORT_SCAN_passport_letterhead_unseen_0039",
+        "doc_type": "PASSPORT_SCAN",
+        "template_id": "passport_letterhead_unseen",
+        "field": "identifier",
+        "expected": "T1795141",
+        "predicted": null,
+        "raw_value": "t 795144",
+        "validated": false,
+        "note": "Matched label but digit portion '795144' is 6 chars, expected 7."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "PASSPORT_SCAN_passport_letterhead_unseen_0042",
+        "doc_type": "PASSPORT_SCAN",
+        "template_id": "passport_letterhead_unseen",
+        "field": "name",
+        "expected": "Joseph Andrade",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "PASSPORT_SCAN_passport_letterhead_unseen_0044",
+        "doc_type": "PASSPORT_SCAN",
+        "template_id": "passport_letterhead_unseen",
+        "field": "identifier",
+        "expected": "D6791678",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "VOTER_ID_CARD_voter_letterhead_unseen_0078",
+        "doc_type": "VOTER_ID_CARD",
+        "template_id": "voter_letterhead_unseen",
+        "field": "document_date",
+        "expected": "1971-01-01",
+        "predicted": "1974-01-01",
+        "raw_value": "01/01/1974",
+        "validated": true,
+        "note": null
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "VOTER_ID_CARD_voter_letterhead_unseen_0080",
+        "doc_type": "VOTER_ID_CARD",
+        "template_id": "voter_letterhead_unseen",
+        "field": "identifier",
+        "expected": "HZM0498702",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "VOTER_ID_CARD_voter_letterhead_unseen_0081",
+        "doc_type": "VOTER_ID_CARD",
+        "template_id": "voter_letterhead_unseen",
+        "field": "identifier",
+        "expected": "IIO7414626",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "Identifier label found but no value matched the expected format."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "VOTER_ID_CARD_voter_letterhead_unseen_0084",
+        "doc_type": "VOTER_ID_CARD",
+        "template_id": "voter_letterhead_unseen",
+        "field": "name",
+        "expected": "Karen Rivera",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No labeled name found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "VOTER_ID_CARD_voter_letterhead_unseen_0084",
+        "doc_type": "VOTER_ID_CARD",
+        "template_id": "voter_letterhead_unseen",
+        "field": "identifier",
+        "expected": "EFG4353354",
+        "predicted": null,
+        "raw_value": null,
+        "validated": false,
+        "note": "No recognized identifier label found."
+      },
+      {
+        "split": "unseen_template",
+        "sample_id": "DRIVING_LICENCE_dl_letterhead_unseen_0131",
+        "doc_type": "DRIVING_LICENCE",
+        "template_id": "dl_letterhead_unseen",
+        "field": "identifier",
+        "expected": "GJ8120061126898",
+        "predicted": "GJ8120061426898",
+        "raw_value": "GJ8120061 426898",
+        "validated": true,
+        "note": null
+      }
+    ]
+  }
+}

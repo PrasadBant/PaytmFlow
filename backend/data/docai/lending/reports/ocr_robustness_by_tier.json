@@ -1,0 +1,37 @@
+{
+  "blurred": {
+    "n_documents": 45,
+    "mean_ocr_confidence": 0.9156,
+    "mean_ocr_word_count": 35.53,
+    "field_exact_match_accuracy": 0.9333,
+    "field_n": 45
+  },
+  "clean": {
+    "n_documents": 14,
+    "mean_ocr_confidence": 0.9288,
+    "mean_ocr_word_count": 35.79,
+    "field_exact_match_accuracy": 1.0,
+    "field_n": 14
+  },
+  "heavy_jpeg_compression": {
+    "n_documents": 9,
+    "mean_ocr_confidence": 0.9168,
+    "mean_ocr_word_count": 30.78,
+    "field_exact_match_accuracy": 1.0,
+    "field_n": 9
+  },
+  "noisy": {
+    "n_documents": 35,
+    "mean_ocr_confidence": 0.9181,
+    "mean_ocr_word_count": 31.37,
+    "field_exact_match_accuracy": 0.9143,
+    "field_n": 35
+  },
+  "rotated": {
+    "n_documents": 5,
+    "mean_ocr_confidence": 0.895,
+    "mean_ocr_word_count": 30.2,
+    "field_exact_match_accuracy": 0.8,
+    "field_n": 5
+  }
+}

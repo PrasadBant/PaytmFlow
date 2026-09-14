@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -8,7 +9,29 @@ from app.core.models import (
     CoreSnapshot,
 )
 from app.packs.contract import JourneyPackManifest
-from app.schemas.enums import ErrorCode, FieldType
+from app.schemas.enums import ActionKind, ErrorCode, FieldType
+
+
+@dataclass(frozen=True)
+class ResolvedEvidence:
+    """The SERVER-SIDE-VALIDATED result of a real evidence upload,
+    resolved by the impure caller (app/services/journey_service.py, which
+    does the actual DB lookup) and handed to this pure function as plain
+    data - `app/core` itself never touches the database (CLAUDE.md rule
+    1), so the lookup cannot happen here, but the CONSUMPTION of its
+    result must.
+
+    Document AI integration integrity fix: this is what makes an EVIDENCE
+    action consume the REAL, already-computed verification decision
+    (`app/evidence/reconcile.py`'s `is_verified` and the AI's own
+    `raw_values`) instead of ever falling back to `simulation_defaults`
+    or a bare `True`, and instead of ever trusting whatever the client
+    put directly in `action_input`.
+    """
+
+    doc_type: str
+    verified: bool
+    values: dict[str, Any]
 
 
 class DeterministicCheckError(Exception):
@@ -33,6 +56,7 @@ def deterministic_check(
     action_input: dict[str, Any] | None,
     manifest: JourneyPackManifest,
     now: datetime | None = None,
+    resolved_evidence: ResolvedEvidence | None = None,
 ) -> CheckToken:
     """The single mutation choke point for PaytmFlow.
 
@@ -41,6 +65,20 @@ def deterministic_check(
     2. Known action: action_id exists in manifest.actions (422 ACTION_INVALID)
     3. Preconditions: All action preconditions are satisfied (422 ACTION_INVALID)
     4. Input schema: All required inputs are present, type-checked, bounded (400 VALIDATION_ERROR)
+    5. Evidence/action compatibility (only when `resolved_evidence` is given - i.e. the caller
+       resolved a real `evidence_id` from `action_input`): the evidence's own doc_type must be
+       accepted by THIS action, and the evidence must have been genuinely verified
+       (422 EVIDENCE_CONFLICT otherwise).
+
+    `resolved_evidence`, when provided, is the caller's already-looked-up, server-side-validated
+    evidence result (`app/services/journey_service.py` resolves `action_input["evidence_id"]`
+    against the `evidence` table before calling this function - this function itself never
+    touches the database). When an EVIDENCE-kind action is executed with `resolved_evidence`
+    present, its `values` become the ONLY source for that action's `satisfies` fields - never
+    `action_input` (so a client cannot forge `{"evidence_id": ..., "monthly_income": 999999}`),
+    never `manifest.simulation_defaults`, never a bare `True`. `simulation_defaults`/`action_input`
+    remain the source for FORM/CLARIFICATION actions and for any EVIDENCE action executed with NO
+    `evidence_id` at all (a deliberate test/demo fixture path, not a real evidence submission).
 
     Returns unforgeable CheckToken on success.
     """
@@ -65,6 +103,37 @@ def deterministic_check(
             ),
             details={"action_id": action_id},
         )
+
+    # 2b. Evidence/action compatibility (Document AI integration integrity
+    # fix) - only runs when the caller resolved a real evidence_id. An
+    # EVIDENCE action executed with evidence for a doc_type it doesn't
+    # even accept, or with evidence that was never verified, must fail
+    # here rather than silently proceed to the simulation-default
+    # fallback further below.
+    if resolved_evidence is not None and action_spec.kind == ActionKind.EVIDENCE:
+        accepts_upper = {a.upper() for a in (action_spec.accepts or [])}
+        if resolved_evidence.doc_type.upper() not in accepts_upper:
+            raise DeterministicCheckError(
+                code=ErrorCode.EVIDENCE_CONFLICT,
+                message=(
+                    f"Evidence of doc_type '{resolved_evidence.doc_type}' is not accepted "
+                    f"by action '{action_id}'."
+                ),
+                details={
+                    "action_id": action_id,
+                    "evidence_doc_type": resolved_evidence.doc_type,
+                    "accepted_doc_types": sorted(accepts_upper),
+                },
+            )
+        if not resolved_evidence.verified:
+            raise DeterministicCheckError(
+                code=ErrorCode.EVIDENCE_CONFLICT,
+                message=(
+                    "The submitted evidence was not verified (wrong document, low "
+                    "confidence, or a detected conflict) and cannot satisfy this action."
+                ),
+                details={"action_id": action_id, "evidence_doc_type": resolved_evidence.doc_type},
+            )
 
     # 3. Preconditions check
     for p in action_spec.preconditions:
@@ -149,9 +218,35 @@ def deterministic_check(
                         )
 
     # 5. Compute new values for satisfied fields
+    #
+    # Document AI integration integrity fix: for a real EVIDENCE action
+    # (`resolved_evidence` present - by this point already confirmed
+    # accepted and verified in step 2b above), the field values come
+    # EXCLUSIVELY from the server-validated `resolved_evidence.values` -
+    # never from `action_input` (a client could otherwise forge
+    # `{"evidence_id": ..., "monthly_income": 999999}`), never from
+    # `manifest.simulation_defaults`, never a bare `True`. FORM/
+    # CLARIFICATION actions, and any EVIDENCE action executed with no
+    # `evidence_id` at all (existing test/demo fixture paths untouched),
+    # keep the original `action_input` / simulation_defaults / bare-True
+    # fallback chain exactly as before.
     new_values: dict[str, Any] = {}
+    use_resolved_evidence = (
+        resolved_evidence is not None and action_spec.kind == ActionKind.EVIDENCE
+    )
     for s in action_spec.satisfies:
-        if s in action_input:
+        if use_resolved_evidence:
+            assert resolved_evidence is not None  # narrowed by use_resolved_evidence above
+            if s not in resolved_evidence.values:
+                raise DeterministicCheckError(
+                    code=ErrorCode.EVIDENCE_CONFLICT,
+                    message=(
+                        f"Verified evidence did not produce a value for required field '{s}'."
+                    ),
+                    details={"action_id": action_id, "field": s},
+                )
+            new_values[s] = resolved_evidence.values[s]
+        elif s in action_input:
             new_values[s] = action_input[s]
         else:
             matching_val = next(

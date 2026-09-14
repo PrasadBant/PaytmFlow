@@ -122,9 +122,7 @@ actions:
     preconditions:
       - pan_authenticated
     accepts:
-      - application/pdf
-      - image/jpeg
-      - image/png
+      - SIGNATURE_SPECIMEN
     action_group: signature_satisfaction
 
   - action_id: upload_digital_signature
@@ -136,7 +134,7 @@ actions:
     preconditions:
       - pan_authenticated
     accepts:
-      - image/png
+      - AADHAAR_FRONT_BACK
     action_group: signature_satisfaction
 
   - action_id: complete_video_kyc

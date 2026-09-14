@@ -29,8 +29,18 @@ class AIProvider(Protocol):
         extracted_text: str,
         manifest: JourneyPackManifest,
         existing_fields: dict[str, Any] | None = None,
+        ocr_meta: dict[str, Any] | None = None,
     ) -> AIInterpretationResult:
-        """Interprets extracted evidence text against manifest mappings and detects conflicts."""
+        """Interprets extracted evidence text against manifest mappings and detects conflicts.
+
+        `ocr_meta`, when supplied by the caller, carries real signals from
+        the OCR pass (`{"confidence": float, "word_count": int, "engine": str,
+        "lines": [{"text", "top", "bottom"}, ...]}` - see app/docai/ocr.py)
+        that a real local-inference provider (app/ai/local_ml.py) uses for
+        layout-aware extraction and honest confidence composition. It is
+        optional and additive: MockAI and LLMProvider both accept and
+        ignore it, so this is not a breaking change to either.
+        """
         ...
 
     async def select_action(
@@ -60,6 +70,10 @@ def get_ai_provider(guardrailed: bool = True) -> AIProvider:
         from app.ai.llm import LLMProvider
 
         base_provider = LLMProvider()
+    elif settings.AI_PROVIDER == "local_ml":
+        from app.ai.local_ml import LocalMLProvider
+
+        base_provider = LocalMLProvider()
     else:
         from app.ai.mock import MockAI
 
