@@ -95,6 +95,14 @@ describe('Router & Route Map Suite (F07)', () => {
     expect(screen.getByTestId('active-tab')).toHaveTextContent('IN_PROGRESS');
   });
 
+  it('renders the actual Help page (not Home) on "/help"', () => {
+    renderWithRouter('/help');
+    expect(screen.getByTestId('screen-help')).toBeInTheDocument();
+    expect(screen.getByText('How can we help?')).toBeInTheDocument();
+    expect(screen.queryByTestId('screen-01-home')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Your Financial Journey/i)).not.toBeInTheDocument();
+  });
+
   it('renders KitchenSink showcase on "/dev/kitchen-sink"', () => {
     renderWithRouter('/dev/kitchen-sink');
     expect(screen.getByText(/Primitives Kitchen Sink/i)).toBeInTheDocument();
