@@ -205,8 +205,10 @@ class MockAI:
             )
 
         doc_name_clean = doc_type.replace("_", " ").title()
+        # No numeric confidence percentage in this user-facing string - see
+        # the identical fix/rationale in app/ai/local_ml.py.
         summary = (
-            f"Verified {doc_name_clean} with high confidence ({int(confidence * 100)}%). "
+            f"Verified {doc_name_clean} with high confidence. "
             f"Extracted {len(detected_fields)} attribute(s) successfully."
         )
 

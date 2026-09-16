@@ -79,7 +79,16 @@ class DocumentClassifier:
         expected_doc_type: str,
         ocr_confidence: float,
         word_count: int,
+        accepted_doc_types: set[str] | None = None,
     ) -> ClassificationResult:
+        """`accepted_doc_types`, when given, is the FULL set of doc_types
+        that satisfy the same action as `expected_doc_type` (real manifest
+        example: Lending's UPLOAD_INCOME_PROOF accepts either SALARY_SLIP
+        or BANK_STATEMENT, independently mapped - see
+        app/ai/models.py::AIInterpretationResult.resolved_doc_type for the
+        full explanation). Defaults to `{expected_doc_type}` alone, which
+        is byte-for-byte the previous single-type behavior - existing
+        callers that never pass this parameter are unaffected."""
         if word_count < MIN_WORDS_FOR_CLASSIFICATION or ocr_confidence < OCR_CONFIDENCE_FLOOR:
             return ClassificationResult(
                 predicted_doc_type="UNREADABLE",
@@ -107,7 +116,8 @@ class DocumentClassifier:
                 ),
             )
 
-        if predicted == "OTHER" or predicted != expected_doc_type.upper():
+        acceptable = accepted_doc_types or {expected_doc_type.upper()}
+        if predicted == "OTHER" or predicted not in acceptable:
             return ClassificationResult(
                 predicted_doc_type=predicted,
                 probabilities=probabilities,

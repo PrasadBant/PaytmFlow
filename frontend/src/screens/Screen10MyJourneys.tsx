@@ -216,6 +216,20 @@ export const Screen10MyJourneys: React.FC = () => {
                 key={journey.journey_id}
                 data-testid={`journey-row-${journey.journey_id}`}
                 onClick={() => handleResume(journey)}
+                // Real-user QA finding: Resume is the primary action on
+                // this screen, but this row was a plain <div> with only
+                // onClick - unreachable and unusable via keyboard. Same
+                // fix pattern already established elsewhere in this
+                // codebase (see components/ActionList.tsx).
+                role="button"
+                tabIndex={0}
+                aria-label={`Resume ${referenceTitle}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleResume(journey);
+                  }
+                }}
                 className="p-4 sm:p-5 bg-white border border-surface-border shadow-xs hover:shadow-card hover:border-slate-300 transition-all rounded-card cursor-pointer"
               >
                 <div className="flex items-center justify-between gap-4">

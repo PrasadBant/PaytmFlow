@@ -34,33 +34,44 @@ def test_manifest_loads_and_passes_validator(journey_type: JourneyType):
     )
 
 
-# ACCOUNT_OPENING and INVESTMENT are deliberately NOT in the clean list above:
-# each has a real, disclosed `evidence_mappings.action_id`/`target_field`
-# manifest defect (found by hand during their own phases, now also caught
-# structurally by `validate_evidence_integrity`'s
-# ACTION_TARGET_FIELD_MISMATCH/EVIDENCE_DOC_TYPE_NOT_ROUTABLE checks - see
-# docs/docai_account_opening_report.md §8/§14 and
-# docs/docai_investment_report.md §O) that the integrity-hardening phase's
-# explicit instructions say NOT to silently fix (repointing the action_id
-# would mean guessing which action the manifest author intended, since no
-# EVIDENCE action for PAN_CARD_IMAGE/KRA_KYC_LETTER's real target field
-# exists). This test exposes those EXACT known defects precisely, rather
-# than either hiding them behind a passing "0 violations" assertion or
-# silently dropping manifest-validator coverage for these two packs: if the
-# violation set for either journey ever changes (a real fix, or a NEW
-# unrelated defect), this test fails and must be looked at, not silently
-# adjusted.
+# INVESTMENT is deliberately NOT in the clean list above: it has a real,
+# disclosed `evidence_mappings.action_id`/`target_field` manifest defect
+# (found by hand during its own phase, now also caught structurally by
+# `validate_evidence_integrity`'s ACTION_TARGET_FIELD_MISMATCH/
+# EVIDENCE_DOC_TYPE_NOT_ROUTABLE checks - see docs/docai_investment_report.md
+# §O) that the integrity-hardening phase's explicit instructions say NOT to
+# silently fix (repointing the action_id would mean guessing which action the
+# manifest author intended, since no EVIDENCE action for KRA_KYC_LETTER's
+# real target field exists). This test exposes that EXACT known defect
+# precisely, rather than either hiding it behind a passing "0 violations"
+# assertion or silently dropping manifest-validator coverage for this pack:
+# if the violation set ever changes (a real fix, or a NEW unrelated defect),
+# this test fails and must be looked at, not silently adjusted.
+#
+# ACCOUNT_OPENING previously had the exact same class of defect
+# (PAN_CARD_IMAGE routed to upload_wet_signature, an action whose own
+# `accepts` never listed PAN_CARD_IMAGE and whose `satisfies` is
+# signature_uploaded, not the mapping's target_field pan_authenticated).
+# Unlike KRA_KYC_LETTER, this one was NOT ambiguous to resolve: it was
+# unambiguously DEAD, unreachable config (no UI path could ever select
+# PAN_CARD_IMAGE for that action) that was live-reproduced (QA closure pass)
+# to actually mismatch a real classifier-verified PAN card upload against
+# the wrong field, returning a false `verified: true` / "Verified" claim for
+# `pan_authenticated` via the signature-upload action - a real, if narrowly
+# reachable, truthfulness defect (the deterministic engine's own
+# `action.satisfies` scoping is what actually prevented state corruption,
+# not this mapping being safe). The real PAN path
+# (`verify_pan_for_banking`, a FORM action, unaffected) was never doc-upload
+# based, so removing the dead mapping changes no reachable product behavior.
+# Its removal drops `evidence_mappings` from 3 to 2, tripping the validator's
+# unrelated `BELOW_CONTRACT_FLOOR` manifest-richness-depth check (`evidence
+# >= 3`) - a structural coverage metric, not a functional or security defect.
+# Inventing a third evidence mapping purely to satisfy that count would be
+# exactly the kind of guessed, unrequested business behavior this fix must
+# not introduce, so that one new, benign violation is left as documented,
+# known, non-blocking manifest debt rather than hidden or invented around.
 _KNOWN_ACCOUNT_OPENING_VIOLATIONS = {
-    ("ACTION_TARGET_FIELD_MISMATCH", "PAN_CARD_IMAGE"),
-    ("EVIDENCE_DOC_TYPE_NOT_ROUTABLE", "PAN_CARD_IMAGE"),
-    # AADHAAR_FRONT_BACK / upload_digital_signature's `accepts` (was
-    # ["image/png"]) was FIXED in the manifest-integrity + confidence-
-    # calibration phase - confirmed unambiguous by the frozen contract
-    # ("Allowed doc_type values for EVIDENCE actions", no exception) AND
-    # the frontend (Screen06UploadEvidence.tsx reads `accepts[0]` directly
-    # as the doc_type to submit). Only PAN_CARD_IMAGE's defect remains,
-    # since no EVIDENCE action exists that correctly satisfies
-    # `pan_authenticated` to repoint it to.
+    ("BELOW_CONTRACT_FLOOR", None),
 }
 _KNOWN_INVESTMENT_VIOLATIONS = {
     ("ACTION_TARGET_FIELD_MISMATCH", "KRA_KYC_LETTER"),

@@ -140,4 +140,66 @@ describe('Screen02JourneySelection', () => {
     fireEvent.click(draftCard);
     expect(navigateMock).not.toHaveBeenCalled();
   });
+
+  it('is keyboard-reachable and activatable with Enter (regression)', () => {
+    // Real-user QA finding: this card - the primary way to choose a
+    // journey on this screen - was a plain <div onClick>, unreachable and
+    // unusable via keyboard alone (no Tab stop, no Enter/Space
+    // activation).
+    const navigateMock = vi.fn();
+    vi.mocked(useNavigate).mockReturnValue(navigateMock);
+
+    vi.spyOn(usePacksHook, 'usePacks').mockReturnValue({
+      data: { packs: mockPacks },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePacksHook.usePacks>);
+
+    render(<Screen02JourneySelection />, { wrapper: BrowserRouter });
+
+    const card = screen.getByTestId('pack-card-LENDING');
+    expect(card).toHaveAttribute('tabIndex', '0');
+    expect(card).toHaveAttribute('role', 'button');
+
+    fireEvent.keyDown(card, { key: 'Enter' });
+    expect(navigateMock).toHaveBeenCalledWith('/start/LENDING');
+  });
+
+  it('is activatable with the Space key (regression)', () => {
+    const navigateMock = vi.fn();
+    vi.mocked(useNavigate).mockReturnValue(navigateMock);
+
+    vi.spyOn(usePacksHook, 'usePacks').mockReturnValue({
+      data: { packs: mockPacks },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePacksHook.usePacks>);
+
+    render(<Screen02JourneySelection />, { wrapper: BrowserRouter });
+
+    const card = screen.getByTestId('pack-card-LENDING');
+    fireEvent.keyDown(card, { key: ' ' });
+    expect(navigateMock).toHaveBeenCalledWith('/start/LENDING');
+  });
+
+  it('a draft journey card is removed from the tab order and does not activate via keyboard', () => {
+    const navigateMock = vi.fn();
+    vi.mocked(useNavigate).mockReturnValue(navigateMock);
+
+    vi.spyOn(usePacksHook, 'usePacks').mockReturnValue({
+      data: { packs: mockPacks },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof usePacksHook.usePacks>);
+
+    render(<Screen02JourneySelection />, { wrapper: BrowserRouter });
+
+    const draftCard = screen.getByTestId('pack-card-DRAFT_JOURNEY');
+    expect(draftCard).toHaveAttribute('tabIndex', '-1');
+    fireEvent.keyDown(draftCard, { key: 'Enter' });
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
 });

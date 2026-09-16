@@ -13,7 +13,7 @@ async def test_health_endpoint(client: AsyncClient):
     assert "db" in data
     assert data["packs_loaded"] == 6
     assert data["packs_supported"] == 6
-    assert data["ai_provider"] in ["mock", "llm"]
+    assert data["ai_provider"] in ["mock", "llm", "local_ml"]
     assert "git_sha" in data
 
 

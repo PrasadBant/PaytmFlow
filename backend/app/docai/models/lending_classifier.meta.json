@@ -8,7 +8,7 @@
     "OTHER",
     "SALARY_SLIP"
   ],
-  "trained_at": "2026-09-14T20:36:54.940032+00:00",
+  "trained_at": "2026-09-15T18:10:42.906528+00:00",
   "dataset_seed": 20260914,
   "train_n": 115,
   "sklearn_version": "1.9.1",

@@ -6,9 +6,14 @@ import { cn } from '@/lib/utils';
 export interface SchedulingPickerProps {
   actionTitle: string;
   why?: string | null;
-  /** The state field this action resolves (ActionOption.unlocks[0]) - the
-   * submitted value is keyed by this so it applies to the real field
-   * instead of an arbitrary constant name. */
+  /** The payload key the backend actually expects for this action's
+   * submitted value - the caller must derive this from the action's own
+   * `input_schema[0].key` when declared, falling back to
+   * `ActionOption.unlocks[0]` (the state field this action resolves) only
+   * when no input_schema exists. Passing `unlocks[0]` unconditionally was
+   * a real, user-reported bug (BUG-003) whenever an action declared an
+   * input_schema key different from what it satisfies - see
+   * Screen06UploadEvidence.tsx's `interactionFieldKey`. */
   fieldKey?: string | null;
   submitLabel: string;
   isSubmitting?: boolean;

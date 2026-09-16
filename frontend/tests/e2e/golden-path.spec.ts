@@ -434,6 +434,11 @@ test.describe("Evidence analysis does not reuse the previous document (regressio
       mimeType: "application/pdf",
       buffer: Buffer.from("dummy salary slip content"),
     });
+    // UPLOAD_INCOME_PROOF accepts both SALARY_SLIP and BANK_STATEMENT, so the
+    // frontend requires an explicit choice before Upload enables (real-user QA
+    // finding: it used to silently declare accepts[0] regardless of the actual
+    // file - see backend/docs/paytmflow_ultimate_qa_report.md §16 Item 1).
+    await page.getByTestId("doc-type-select").selectOption("SALARY_SLIP");
     await page.getByTestId("upload-submit-btn").click();
     await expect(page.getByTestId("screen-07-ai-analysis")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("payslip_august_2026.pdf")).toBeVisible();

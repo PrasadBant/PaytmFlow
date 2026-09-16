@@ -59,6 +59,50 @@ def test_empty_text_reports_unreadable():
     assert result.outcome == "UNREADABLE_DOCUMENT"
 
 
+def test_alternate_accepted_doc_type_is_correctly_accepted_not_rejected():
+    """Human-first real-browser QA regression (BUG-005): an action can
+    accept MULTIPLE doc_types (real manifest fact: Lending's
+    UPLOAD_INCOME_PROOF accepts either SALARY_SLIP or BANK_STATEMENT). The
+    client only ever declares ONE (`expected_doc_type`) when uploading,
+    since it has no way to know in advance which of the accepted types
+    the user's real file is. Before this fix, a genuine BANK_STATEMENT
+    declared as `expected_doc_type="SALARY_SLIP"` was always WRONG_
+    DOCUMENT purely because of the single-string comparison - even though
+    both are equally valid, manifest-declared evidence for the same
+    action. Real bank-statement OCR text, not a synthetic string."""
+    text = (
+        "HDFC Bank - Account Statement\nAccount Holder: Jeanette Phillips\n"
+        "Account No: 89831315230 IFSC: SBINO236806\nDate Description Credit\n"
+        "Jun 2002 OPENING BALANCE\nJun 2002 SALARY CREDIT GONZALEZ TRAVIS AND\n"
+        "Jun 2002 UTILITY BILL PAYMENT\nRs. 2,05,000\nRs. 1,900"
+    )
+    result = classifier.classify(
+        text,
+        expected_doc_type="SALARY_SLIP",
+        ocr_confidence=0.95,
+        word_count=25,
+        accepted_doc_types={"SALARY_SLIP", "BANK_STATEMENT"},
+    )
+    assert result.outcome == "CORRECT_DOCUMENT"
+    assert result.predicted_doc_type == "BANK_STATEMENT"
+
+
+def test_accepted_doc_types_defaults_to_expected_alone_when_omitted():
+    """Backward-compatibility regression: every pre-existing caller that
+    never passes `accepted_doc_types` keeps the exact previous single-type
+    strict behavior."""
+    text = (
+        "HDFC Bank - Account Statement\nAccount Holder: Jeanette Phillips\n"
+        "Account No: 89831315230 IFSC: SBINO236806\nDate Description Credit\n"
+        "Jun 2002 OPENING BALANCE\nJun 2002 SALARY CREDIT GONZALEZ TRAVIS AND\n"
+        "Jun 2002 UTILITY BILL PAYMENT\nRs. 2,05,000\nRs. 1,900"
+    )
+    result = classifier.classify(
+        text, expected_doc_type="SALARY_SLIP", ocr_confidence=0.95, word_count=25
+    )
+    assert result.outcome == "WRONG_DOCUMENT"
+
+
 def test_unrelated_document_classified_as_other_and_wrong():
     text = "FreshMart Retail - Tax Invoice\nInvoice No: INV-1234\nGroceries 1,240\nTotal 2,100"
     result = classifier.classify(

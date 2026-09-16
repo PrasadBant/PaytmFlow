@@ -21,6 +21,19 @@ class TestExtractMonthlyIncomeSalarySlip:
         field = extract_monthly_income(text, "SALARY_SLIP")
         assert field.value == 125000
 
+    def test_monthly_net_income_synonym_label(self):
+        # Human-QA-found regression: a real salary slip using this exact
+        # common phrasing was correctly classified as SALARY_SLIP but its
+        # income could not be extracted, because "Monthly Net Income" was
+        # missing from the label vocabulary (the classifier and extractor
+        # are independent stages - correct classification does not imply
+        # correct extraction). Not a hardcoded value or filename check -
+        # a genuine, common label synonym, same class as the three above.
+        text = "Salary Slip for March 2026\nMonthly Net Income: INR 1,33,000"
+        field = extract_monthly_income(text, "SALARY_SLIP")
+        assert field.value == 133000
+        assert field.validated
+
     def test_no_label_returns_none_not_fabricated(self):
         text = "Some unrelated document text with a number 85000 in it."
         field = extract_monthly_income(text, "SALARY_SLIP")

@@ -5,8 +5,10 @@ from collections.abc import AsyncGenerator
 from uuid import uuid4
 
 import pytest
+from db_safety import assert_safe_for_destructive_db_setup, resolve_test_database_url
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -31,30 +33,85 @@ from app.main import app
 REQUIRE_POSTGRES = os.environ.get("REQUIRE_POSTGRES", "").lower() in ("1", "true", "yes")
 
 
+async def _ensure_database_exists(url: str) -> None:
+    """Auto-provisions the dedicated test database on first use, via a
+    maintenance connection to the server's own `postgres` database. Only
+    ever called with a URL `assert_safe_for_destructive_db_setup` has
+    already proven safe (see db_safety.py) - this makes "a dedicated test
+    database by default" require zero manual setup (no `createdb` step) on
+    a fresh checkout or a fresh CI runner. Never touches the real target
+    database's contents: it only ever creates a new, empty database if one
+    by that name does not already exist."""
+    parsed = make_url(url)
+    db_name = parsed.database
+    # `str(...)`/`URL.__str__` redacts the password as "***" - this is a
+    # real connection, not a log line, so it must use the un-redacted form.
+    maintenance_url = parsed.set(database="postgres").render_as_string(hide_password=False)
+    maintenance_engine = create_async_engine(maintenance_url, isolation_level="AUTOCOMMIT")
+    try:
+        async with maintenance_engine.connect() as conn:
+            exists = await conn.scalar(
+                text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": db_name}
+            )
+            if not exists:
+                await conn.execute(text(f'CREATE DATABASE "{db_name}"'))
+    finally:
+        await maintenance_engine.dispose()
+
+
 @pytest.fixture(scope="session")
 async def db_engine() -> AsyncGenerator[AsyncEngine, None]:
     """Provide async database engine.
 
-    Connects to PostgreSQL. Falls back to SQLite in-memory ONLY when
-    REQUIRE_POSTGRES is not set, and always prints a loud warning when it does.
-    Set REQUIRE_POSTGRES=1 to fail hard instead (see `make test-integration-pg`).
+    Connects to a DEDICATED test PostgreSQL database - see db_safety.py:
+    `TEST_DATABASE_URL` if explicitly set, otherwise `settings.DATABASE_URL`
+    with `_test` appended to the database name (auto-created here if it
+    does not exist yet). Falls back to SQLite in-memory ONLY when that
+    database is unreachable and REQUIRE_POSTGRES is not set, and always
+    prints a loud warning when it does. Set REQUIRE_POSTGRES=1 to fail hard
+    instead (see `make test-integration-pg`).
+
+    `assert_safe_for_destructive_db_setup` is a hard, fail-closed gate run
+    unconditionally, before even attempting a connection or auto-creating
+    the database - it is pure URL parsing (no I/O), so there is no reason
+    to defer it, and running it first means an unsafe URL is rejected
+    before this fixture does ANYTHING to the server, not just before the
+    final `drop_all`. This is the last line of defense against ever
+    running destructive setup against the real demo/dev database,
+    regardless of how `pg_url` was resolved.
     """
-    pg_url = settings.DATABASE_URL
-    if pg_url.startswith("postgresql://"):
-        pg_url = pg_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    pg_url = resolve_test_database_url(settings.DATABASE_URL)
+    assert_safe_for_destructive_db_setup(pg_url)
 
     use_postgres = False
+    connect_exc: Exception | None = None
     try:
         test_engine = create_async_engine(pg_url, echo=False)
         async with test_engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         use_postgres = True
     except Exception as exc:
+        connect_exc = exc
+        # The dedicated test database most likely just doesn't exist yet
+        # (first run on this server) - try to provision it and retry once
+        # before falling back, so a fresh checkout needs no manual step.
+        try:
+            await _ensure_database_exists(pg_url)
+            test_engine = create_async_engine(pg_url, echo=False)
+            async with test_engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            use_postgres = True
+            connect_exc = None
+        except Exception as create_exc:
+            connect_exc = create_exc
+
+    if not use_postgres:
         if REQUIRE_POSTGRES:
             pytest.fail(
-                f"REQUIRE_POSTGRES=1 but PostgreSQL is unavailable at "
-                f"{settings.DATABASE_URL!r}: {exc}. Start it with "
-                f"`docker compose up -d postgres` before running this target.",
+                f"REQUIRE_POSTGRES=1 but the dedicated test database at "
+                f"{pg_url!r} is unavailable and could not be auto-created: "
+                f"{connect_exc}. Start it with `docker compose up -d postgres` "
+                "before running this target.",
                 pytrace=False,
             )
         message = (

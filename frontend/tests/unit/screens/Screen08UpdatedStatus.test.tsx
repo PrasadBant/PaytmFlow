@@ -315,4 +315,48 @@ describe('Screen08UpdatedStatus (F22)', () => {
       screen.getByText('Your Aadhaar Verification has been successfully updated and verified.')
     ).toBeInTheDocument();
   });
+
+  it('does not claim "Verified" when the satisfying evidence itself needed manual review (regression)', async () => {
+    // Real-browser QA finding: clicking "Submit for Review ->" on Screen 7
+    // for evidence Screen 7 had ALREADY flagged `requires_review: true` /
+    // `interpretation.verified: false` (confidence below the manifest's
+    // auto-verification threshold, e.g. a real salary slip extracted
+    // correctly at 73% confidence against an 85% threshold) landed here on
+    // a screen unconditionally claiming "Verified Update" and "...has been
+    // successfully updated and verified." - directly contradicting the
+    // honest review-routing decision the user was just shown. The
+    // underlying field genuinely IS marked SATISFIED (the deterministic
+    // engine's own, correct, unrelated decision - unchanged here) but the
+    // COPY must not overclaim confidence the system never actually had.
+    renderScreen8('/j/11111111-1111-1111-1111-111111111111/updated', {
+      actionResponse: mockActionResponse,
+      journeyId: '11111111-1111-1111-1111-111111111111',
+      wasReviewNeeded: true,
+    });
+
+    await screen.findByTestId('celebration-header');
+    expect(screen.getByTestId('update-badge-review')).toHaveTextContent('Submitted for Review');
+    expect(screen.queryByText('Verified Update')).not.toBeInTheDocument();
+    expect(screen.getByTestId('progress-updated-subtitle')).toHaveTextContent(
+      /sent for manual review/i
+    );
+    expect(screen.getByTestId('progress-updated-subtitle')).not.toHaveTextContent(
+      /successfully updated and verified/i
+    );
+    // The real, satisfied outcome is still shown honestly - nothing hidden.
+    expect(screen.getByText('Monthly Income marked as completed')).toBeInTheDocument();
+    expect(screen.getByText('2 Completed')).toBeInTheDocument();
+  });
+
+  it('still shows the positive "Verified Update" badge when no review was needed (regression)', async () => {
+    renderScreen8('/j/11111111-1111-1111-1111-111111111111/updated', {
+      actionResponse: mockActionResponse,
+      journeyId: '11111111-1111-1111-1111-111111111111',
+      wasReviewNeeded: false,
+    });
+
+    await screen.findByTestId('celebration-header');
+    expect(screen.getByTestId('update-badge-verified')).toHaveTextContent('Verified Update');
+    expect(screen.queryByTestId('update-badge-review')).not.toBeInTheDocument();
+  });
 });

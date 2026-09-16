@@ -22,6 +22,7 @@ type JourneyDiffType = components['schemas']['JourneyDiff'];
 interface LocationState {
   actionResponse?: ActionResponse;
   journeyId?: string;
+  wasReviewNeeded?: boolean;
 }
 
 export const Screen08UpdatedStatus: React.FC = () => {
@@ -32,6 +33,11 @@ export const Screen08UpdatedStatus: React.FC = () => {
 
   // Read actionResponse from route state if arrived from action submission
   const actionResponse: ActionResponse | undefined = locationState.actionResponse;
+  // Real-browser QA finding: this update may have come from evidence Screen
+  // 7 already told the user needed manual review (confidence below the
+  // manifest's auto-verification threshold) - forwarded here as-is from
+  // that same server-computed `requires_review` flag, never recomputed.
+  const wasReviewNeeded = locationState.wasReviewNeeded ?? false;
 
   // Query hook to fetch or refresh latest journey state from server
   const {
@@ -143,9 +149,21 @@ export const Screen08UpdatedStatus: React.FC = () => {
       {/* Title & Subtitle with Celebration Header */}
       <div data-testid="celebration-header" className="space-y-2">
         <div className="flex items-center justify-center gap-2 text-xs font-semibold text-content-secondary mb-1">
-          <span className="px-2.5 py-0.5 rounded-full bg-[#e6f9f1] text-[#00b972] font-bold">
-            Verified Update
-          </span>
+          {wasReviewNeeded ? (
+            <span
+              className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold"
+              data-testid="update-badge-review"
+            >
+              Submitted for Review
+            </span>
+          ) : (
+            <span
+              className="px-2.5 py-0.5 rounded-full bg-[#e6f9f1] text-[#00b972] font-bold"
+              data-testid="update-badge-verified"
+            >
+              Verified Update
+            </span>
+          )}
           <span className="px-2.5 py-0.5 rounded-full bg-[#e6f9f1] text-[#00b972] font-bold">
             {completed} Completed
           </span>
@@ -159,10 +177,14 @@ export const Screen08UpdatedStatus: React.FC = () => {
         >
           Progress Updated!
         </h1>
-        <p className="text-sm text-content-secondary max-w-md mx-auto leading-relaxed">
-          {updateSubject
-            ? `Your ${updateSubject} has been successfully updated and verified.`
-            : 'Your information has been successfully updated and verified.'}
+        <p className="text-sm text-content-secondary max-w-md mx-auto leading-relaxed" data-testid="progress-updated-subtitle">
+          {wasReviewNeeded
+            ? updateSubject
+              ? `Your ${updateSubject} has been recorded from your submitted document and sent for manual review - automatic verification wasn't confident enough to confirm it on its own.`
+              : "Your information has been recorded and sent for manual review - automatic verification wasn't confident enough to confirm it on its own."
+            : updateSubject
+              ? `Your ${updateSubject} has been successfully updated and verified.`
+              : 'Your information has been successfully updated and verified.'}
         </p>
       </div>
 

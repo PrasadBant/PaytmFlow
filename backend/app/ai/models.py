@@ -40,6 +40,26 @@ class AIInterpretationResult(BaseModel):
     # so a LATER evidence upload in the SAME journey can compare against
     # them - the actual cross-document consistency mechanism.
     auxiliary_facts: dict[str, Any] = Field(default_factory=dict)
+    # Human-first real-browser QA finding: an action can legitimately
+    # accept MULTIPLE doc_types (e.g. Lending's UPLOAD_INCOME_PROOF takes
+    # either SALARY_SLIP or BANK_STATEMENT - two separate
+    # evidence_mappings entries, same action_id, same target_field,
+    # independently thresholded - a real, pre-existing, deliberate
+    # manifest design, not something invented for this fix). The client
+    # only ever declares ONE doc_type when uploading (the frontend has no
+    # way to know in advance which of several accepted types the user's
+    # real file is); a genuinely correct document of the OTHER accepted
+    # type was being flagged WRONG_DOCUMENT purely because it didn't match
+    # the single declared string. When the local classifier's real
+    # prediction lands on a DIFFERENT doc_type than the client declared
+    # but that type is still accepted for the same action, this carries
+    # the classifier's own actual prediction back to the caller
+    # (app/evidence/reconcile.py) so the confidence-threshold/target-field
+    # lookup uses the document's REAL type, not the client's guess. Never
+    # set by MockAI/LLM providers (both stay internal="ignore"; wire
+    # response is unaffected - see EvidenceInterpretation in
+    # app/schemas/evidence.py, which does not expose this).
+    resolved_doc_type: str | None = None
 
 
 class ActionRankingResult(BaseModel):

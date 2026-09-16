@@ -88,6 +88,16 @@ export const Screen07AiAnalysis: React.FC = () => {
         state: {
           actionResponse: response,
           journeyId,
+          // Real-browser QA finding: Screen 8 previously always claimed
+          // "Verified Update" / "successfully updated and verified", even
+          // when the field it just satisfied came from evidence this same
+          // flow had, one screen earlier, honestly flagged
+          // `requires_review: true` / `interpretation.verified: false`
+          // (confidence below the manifest's auto-verification threshold).
+          // Forwarding the same already-server-computed boolean Screen 7
+          // received - not computing anything new here - lets Screen 8
+          // avoid re-claiming confidence it never actually had.
+          wasReviewNeeded: evidenceResponse.requires_review ?? false,
         },
       });
     } catch (err) {
@@ -203,17 +213,50 @@ export const Screen07AiAnalysis: React.FC = () => {
         detected={interpretation.detected}
       />
 
-      {/* 2. Green Insight Card matching reference */}
+      {/* 2. Insight Card. Bug found during the final real-user QA pass: this
+          card's "looks good" header/green styling used to render
+          unconditionally, even when `interpretation.verified` was false -
+          e.g. a genuinely wrong document, correctly flagged as such in the
+          very next line's AI summary text, was shown directly under a green
+          checkmark and "This document looks good!" Now driven by the same
+          `verified` flag EvidenceCard above already receives. */}
       <Card
         data-testid="ai-summary-card"
-        className="p-4 bg-[#e6f9f1] border border-[#00b972]/30 rounded-card flex items-start gap-3 text-content-primary"
+        className={
+          interpretation.verified
+            ? 'p-4 bg-[#e6f9f1] border border-[#00b972]/30 rounded-card flex items-start gap-3 text-content-primary'
+            : 'p-4 bg-amber-50 border border-amber-200 rounded-card flex items-start gap-3 text-content-primary'
+        }
       >
-        <div className="w-6 h-6 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0 mt-0.5">
-          <CheckCircle2 className="w-4 h-4 text-white" aria-hidden="true" />
+        <div
+          className={
+            interpretation.verified
+              ? 'w-6 h-6 rounded-full bg-[#00b972] text-white flex items-center justify-center shrink-0 mt-0.5'
+              : 'w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5'
+          }
+        >
+          {interpretation.verified ? (
+            <CheckCircle2 className="w-4 h-4 text-white" aria-hidden="true" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-white" aria-hidden="true" />
+          )}
         </div>
         <div className="space-y-0.5 min-w-0">
-          <h3 className="text-sm font-bold text-content-primary">
-            This document looks good!
+          <h3 className="text-sm font-bold text-content-primary" data-testid="ai-summary-heading">
+            {interpretation.verified
+              ? 'This document looks good!'
+              // Real-browser QA finding: a document that WAS correctly
+              // recognized and extracted (interpretation.detected has
+              // entries) but still needs manual review - e.g. confidence
+              // below the auto-verification threshold - was given the
+              // exact same "needs a closer look" heading as a genuinely
+              // wrong/unreadable document (detected: []). That reads as
+              // if the extracted value itself might be wrong, which it
+              // isn't; interpretation.summary (server-authored, see
+              // reconcile.py) explains the real reason either way.
+              : interpretation.detected.length > 0
+                ? 'Recognized - manual review needed'
+                : 'This document needs a closer look'}
           </h3>
           <p className="text-xs text-content-secondary leading-relaxed" data-testid="ai-summary-text">
             {interpretation.summary || 'Based on this, your verification criteria are satisfied.'}

@@ -1,8 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
+import { server } from '@/mocks/server';
 import { Screen06UploadEvidence } from '@/screens/Screen06UploadEvidence';
 
 function renderScreen6(
@@ -60,6 +62,10 @@ describe('Screen06UploadEvidence (F19)', () => {
   });
 
   it('uploads a file from Tab 1 and navigates to AI analysis screen', async () => {
+    // The default route's action (UPLOAD_INCOME_PROOF, real Lending fixture)
+    // genuinely accepts two document types (SALARY_SLIP, BANK_STATEMENT), so
+    // an explicit doc-type selection is required first - see the
+    // multi-accept regression tests below for why (§14.5/Item 1 closure).
     const user = userEvent.setup();
     renderScreen6();
 
@@ -75,6 +81,9 @@ describe('Screen06UploadEvidence (F19)', () => {
     expect(await screen.findByText('salary_aug_2026.pdf')).toBeInTheDocument();
 
     const submitBtn = screen.getByTestId('upload-submit-btn');
+    expect(submitBtn).toBeDisabled();
+
+    await user.selectOptions(screen.getByTestId('doc-type-select'), 'SALARY_SLIP');
     expect(submitBtn).toBeEnabled();
 
     await user.click(submitBtn);
@@ -366,6 +375,74 @@ describe('Screen06UploadEvidence (F19)', () => {
       expect(await screen.findByTestId('screen-08-stub')).toBeInTheDocument();
     });
 
+    it('CONSENT action WITH a declared input_schema submits the input_schema key, not unlocks[0] (regression, real-user-reported BUG-003)', async () => {
+      // Real-user QA finding: ConsentPanel (and SchedulingPicker/
+      // VideoVerificationFlow) used to always submit `{ [unlocks[0]]: true }`
+      // as the action payload - the STATE FIELD the action satisfies (e.g.
+      // Lending's real `loan_offer_accepted`), not the payload key the
+      // backend's own `input_schema` requires (`accept_terms`). This exact
+      // shape reproduces Lending's real ACCEPT_LOAN_TERMS action
+      // (satisfies=['loan_offer_accepted'], input_schema=[{key:
+      // 'accept_terms', ...}]) - the two are genuinely different keys, and
+      // checking the box previously still produced a real backend 422
+      // ("Required input field 'accept_terms' is missing"), confirmed via a
+      // live browser session against the real backend.
+      let capturedBody: unknown = null;
+      server.use(
+        http.post('*/api/v1/journeys/:journey_id/actions', async ({ request }) => {
+          capturedBody = await request.json();
+          return HttpResponse.json({
+            journey: {
+              journey_id: '55555555-5555-5555-5555-555555555555',
+              journey_type: 'LENDING',
+              status: 'IN_PROGRESS',
+              readiness: 'READY',
+              version_number: 2,
+              fields: [],
+              display: { title: 'Personal Loan', summary: '' },
+              updated_at: new Date().toISOString(),
+            },
+            snapshot_id: '55555555-5555-5555-5555-555555555556',
+            what_changed: {
+              newly_satisfied: [],
+              newly_unlocked: [],
+              readiness_transition: null,
+            },
+          });
+        })
+      );
+
+      const user = userEvent.setup();
+      renderScreen6('/j/55555555-5555-5555-5555-555555555555/act/ACCEPT_LOAN_TERMS', {
+        action: {
+          action_id: 'ACCEPT_LOAN_TERMS',
+          title: 'Accept Loan Agreement Terms',
+          kind: 'FORM',
+          why: 'Accept customized loan terms to finalize application',
+          unlocks: ['loan_offer_accepted'],
+          input_schema: [
+            {
+              key: 'accept_terms',
+              type: 'boolean',
+              label: 'I agree to the loan agreement and repayment terms',
+              required: true,
+            },
+          ],
+        },
+        snapshotId: '55555555-5555-5555-5555-555555555555',
+      });
+
+      expect(await screen.findByTestId('consent-panel')).toBeInTheDocument();
+      await user.click(screen.getByTestId('consent-checkbox'));
+      await user.click(screen.getByTestId('consent-confirm-btn'));
+
+      await screen.findByTestId('screen-08-stub');
+      expect(capturedBody).toMatchObject({ input: { accept_terms: true } });
+      expect((capturedBody as { input: Record<string, unknown> }).input).not.toHaveProperty(
+        'loan_offer_accepted'
+      );
+    });
+
     it('VIDEO_VERIFICATION-classified FORM action (*VIDEO*/*LIVENESS*): renders the simulated video flow, never a document upload, and clearly labels it simulated', async () => {
       const user = userEvent.setup();
       renderScreen6('/j/33333333-3333-3333-3333-333333333333/act/START_VIDEO_KYC', {
@@ -395,6 +472,163 @@ describe('Screen06UploadEvidence (F19)', () => {
 
       await user.click(continueBtn);
       expect(await screen.findByTestId('screen-08-stub')).toBeInTheDocument();
+    });
+
+    it('single-accept EVIDENCE action: no doc-type selector shown, upload defaults to accepts[0] and is enabled once a file is chosen (regression, unchanged behavior)', async () => {
+      renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/UPLOAD_BANK_STATEMENT', {
+        action: {
+          action_id: 'UPLOAD_BANK_STATEMENT',
+          title: 'Upload Bank Statement',
+          kind: 'EVIDENCE',
+          why: 'Required to verify salary credits.',
+          unlocks: [],
+          accepts: ['BANK_STATEMENT'],
+        },
+        snapshotId: '33333333-3333-3333-3333-333333333333',
+      });
+
+      await screen.findByRole('heading', { level: 1 });
+      expect(screen.queryByTestId('doc-type-select')).not.toBeInTheDocument();
+
+      const fileInput = screen.getByTestId('evidence-file-input');
+      fireEvent.change(fileInput, {
+        target: { files: [new File(['x'], 'statement.pdf', { type: 'application/pdf' })] },
+      });
+
+      expect(await screen.findByTestId('upload-submit-btn')).toBeEnabled();
+    });
+
+    it('multi-accept EVIDENCE action (regression, §14.5/Item 1 closure): frontend no longer silently declares accepts[0] - the Upload button stays disabled until the user explicitly picks a document type, and the chosen value (not a guess) is sent as doc_type', async () => {
+      // This exact shape reproduces Lending's real UPLOAD_INCOME_PROOF action,
+      // which accepts both SALARY_SLIP and BANK_STATEMENT (see original QA
+      // report §5/§14.5). Before this fix, uploading a genuine bank statement
+      // here always silently declared doc_type: "SALARY_SLIP" to the backend.
+      // MSW's Request body can't reliably round-trip a FormData in this
+      // jsdom test environment (request.text()/formData() both fail to
+      // reconstruct it - a known environment limitation, not an app bug).
+      // Spying on FormData.prototype.append instead captures the actual
+      // value application code passes, independent of wire serialization.
+      const appendSpy = vi.spyOn(FormData.prototype, 'append');
+      server.use(
+        http.post('*/api/v1/journeys/:journey_id/evidence', async () => {
+          return HttpResponse.json({
+            evidence_id: 'evi-multi-accept-test',
+            filename: 'statement.pdf',
+            uploaded_at: new Date().toISOString(),
+            size_bytes: 100,
+            interpretation: {
+              verified: false,
+              confidence: 0.5,
+              detected: [],
+              summary: 'test',
+              conflicts: [],
+            },
+            proposed_action_id: 'UPLOAD_INCOME_PROOF',
+            consequence_preview: null,
+            diff_preview: null,
+            requires_review: true,
+          });
+        })
+      );
+
+      const user = userEvent.setup();
+      renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/UPLOAD_INCOME_PROOF', {
+        action: {
+          action_id: 'UPLOAD_INCOME_PROOF',
+          title: 'Upload Income Proof',
+          kind: 'EVIDENCE',
+          why: 'Verifying your monthly income unblocks loan offer calculation',
+          unlocks: ['monthly_income'],
+          accepts: ['SALARY_SLIP', 'BANK_STATEMENT'],
+        },
+        snapshotId: '33333333-3333-3333-3333-333333333333',
+      });
+
+      await screen.findByRole('heading', { level: 1 });
+
+      // Selector is shown, offering both accepted types.
+      const select = await screen.findByTestId('doc-type-select');
+      expect(select).toBeInTheDocument();
+      expect(screen.getByText(/Salary Slip/)).toBeInTheDocument();
+      expect(screen.getByText(/Bank Statement/)).toBeInTheDocument();
+
+      const fileInput = screen.getByTestId('evidence-file-input');
+      fireEvent.change(fileInput, {
+        target: { files: [new File(['x'], 'my_statement.pdf', { type: 'application/pdf' })] },
+      });
+
+      // File chosen but doc type NOT yet chosen - Upload must stay disabled
+      // (never silently default to accepts[0]).
+      expect(screen.getByTestId('upload-submit-btn')).toBeDisabled();
+
+      // User explicitly picks the type that actually matches their file.
+      await user.selectOptions(select, 'BANK_STATEMENT');
+      expect(screen.getByTestId('upload-submit-btn')).toBeEnabled();
+
+      await user.click(screen.getByTestId('upload-submit-btn'));
+
+      await screen.findByTestId('screen-07-stub');
+      // The explicit selection - not accepts[0] ("SALARY_SLIP") - is what was
+      // actually appended to the request body.
+      expect(appendSpy).toHaveBeenCalledWith('doc_type', 'BANK_STATEMENT');
+      appendSpy.mockRestore();
+    });
+
+    it('multi-accept EVIDENCE action, manual-entry path: also requires an explicit doc-type choice before submit (regression)', async () => {
+      // useUploadEvidence always sends multipart FormData (even for manual
+      // entry, via apiClient.postForm) - see the append-spy note on the
+      // upload-path test above for why this is asserted via FormData.append
+      // rather than by reading the intercepted request body.
+      const appendSpy = vi.spyOn(FormData.prototype, 'append');
+      server.use(
+        http.post('*/api/v1/journeys/:journey_id/evidence', async () => {
+          return HttpResponse.json({
+            evidence_id: 'evi-manual-multi-accept-test',
+            filename: null,
+            uploaded_at: new Date().toISOString(),
+            size_bytes: 0,
+            interpretation: {
+              verified: false,
+              confidence: 0.5,
+              detected: [],
+              summary: 'test',
+              conflicts: [],
+            },
+            proposed_action_id: 'UPLOAD_INCOME_PROOF',
+            consequence_preview: null,
+            diff_preview: null,
+            requires_review: true,
+          });
+        })
+      );
+
+      const user = userEvent.setup();
+      renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/UPLOAD_INCOME_PROOF', {
+        action: {
+          action_id: 'UPLOAD_INCOME_PROOF',
+          title: 'Upload Income Proof',
+          kind: 'EVIDENCE',
+          why: 'Verifying your monthly income unblocks loan offer calculation',
+          unlocks: ['monthly_income'],
+          accepts: ['SALARY_SLIP', 'BANK_STATEMENT'],
+          input_schema: [
+            { key: 'monthly_income', type: 'number', label: 'Monthly Income', required: true },
+          ],
+        },
+        snapshotId: '33333333-3333-3333-3333-333333333333',
+      });
+
+      await screen.findByRole('heading', { level: 1 });
+      await user.click(screen.getByRole('tab', { name: /Enter Details/i }));
+
+      const select = await screen.findByTestId('doc-type-select-manual');
+      await user.selectOptions(select, 'SALARY_SLIP');
+      await user.type(screen.getByLabelText(/Monthly Income/i), '50000');
+      await user.click(screen.getByRole('button', { name: /Submit Details/i }));
+
+      await screen.findByTestId('screen-07-stub');
+      expect(appendSpy).toHaveBeenCalledWith('doc_type', 'SALARY_SLIP');
+      appendSpy.mockRestore();
     });
 
     it('CLARIFICATION action: never renders the upload/form screen, redirects to Screen 4 instead', async () => {

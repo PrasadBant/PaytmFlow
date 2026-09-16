@@ -72,6 +72,28 @@ export const Screen02JourneySelection: React.FC = () => {
                     navigate(`/start/${pack.journey_type}`);
                   }
                 }}
+                // Real-user QA finding: this card is the primary way to
+                // choose a journey on this screen, but was a plain <div>
+                // with only onClick - completely unreachable and
+                // unusable via keyboard (no Tab stop, no Enter/Space
+                // activation). Same fix pattern already established
+                // elsewhere in this codebase for a clickable non-<button>
+                // element (see components/ActionList.tsx's alternative-
+                // action rows).
+                role="button"
+                tabIndex={isDraft ? -1 : 0}
+                aria-disabled={isDraft || undefined}
+                aria-label={
+                  isDraft
+                    ? `${pack.display_name} (coming soon)`
+                    : `Start ${pack.display_name} journey`
+                }
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && !isDraft) {
+                    e.preventDefault();
+                    navigate(`/start/${pack.journey_type}`);
+                  }
+                }}
                 title={isDraft ? 'This journey is coming soon' : undefined}
                 data-testid={`pack-card-${pack.journey_type}`}
               >

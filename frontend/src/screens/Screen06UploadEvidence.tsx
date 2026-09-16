@@ -15,6 +15,7 @@ import { Tabs, type TabItem } from '@/components/primitives/Tabs';
 import { Button } from '@/components/primitives/Button';
 import { Card } from '@/components/primitives/Card';
 import { Spinner } from '@/components/primitives/Spinner';
+import { Select } from '@/components/primitives/Select';
 import { mapErrorToUxAction } from '@/api/errors';
 import type { components } from '@/api/types.gen';
 
@@ -23,6 +24,14 @@ type ActionOption = components['schemas']['ActionOption'];
 interface LocationState {
   action?: ActionOption;
   snapshotId?: string;
+}
+
+function humanizeDocType(docType: string): string {
+  return docType
+    .toLowerCase()
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 function generateIdempotencyKey(): string {
@@ -55,6 +64,22 @@ export const Screen06UploadEvidence: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'upload' | 'manual' | 'help'>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Real-user QA finding (§14.5 / Item 1 closure): when an EVIDENCE action accepts
+  // more than one document type (e.g. Lending's UPLOAD_INCOME_PROOF: SALARY_SLIP or
+  // BANK_STATEMENT), the frontend cannot know which type the user is actually
+  // uploading just by looking at the file - silently declaring `accepts[0]` regardless
+  // of the real file meant a genuine bank-statement upload was always declared to the
+  // backend as a salary slip. This was previously masked only because AI_PROVIDER=
+  // local_ml's classifier overrides the client-declared type when confident
+  // (app/evidence/reconcile.py's `effective_doc_type`) - not guaranteed for MockAI/LLM
+  // providers, or for a low-confidence local_ml classification. Fix: when there is
+  // exactly one accepted type there is no ambiguity, so it is used directly as before;
+  // when there are two or more, the user must explicitly pick which type they are
+  // uploading before Upload is enabled, and that explicit choice - not a guess - is
+  // what gets sent as `doc_type`. The backend remains the authority on the real type
+  // regardless (this is advisory routing metadata, per reconcile.py), but the client
+  // must stop lying about it by default.
+  const [selectedDocType, setSelectedDocType] = useState<string>('');
 
   const {
     data: journey,
@@ -79,7 +104,16 @@ export const Screen06UploadEvidence: React.FC = () => {
       : recommendationData?.alternatives?.find((a) => a.action_id === actionId));
 
   const currentSnapshotId = locationState.snapshotId || journey?.snapshot_id || '';
-  const docType = action?.accepts?.[0] || (actionId ? actionId.replace(/^UPLOAD_/, '') : 'DOCUMENT');
+  const acceptedDocTypes = action?.accepts || [];
+  const requiresDocTypeChoice = acceptedDocTypes.length > 1;
+  const fallbackDocType = actionId ? actionId.replace(/^UPLOAD_/, '') : 'DOCUMENT';
+  // Single accepted type: no ambiguity, use it directly (matches prior behavior).
+  // Multiple accepted types: only use the user's explicit selection - never guess
+  // accepts[0] - so the Upload button stays disabled until they choose (see below).
+  const docType = requiresDocTypeChoice
+    ? selectedDocType
+    : acceptedDocTypes[0] || fallbackDocType;
+  const docTypeOptions = acceptedDocTypes.map((dt) => ({ value: dt, label: humanizeDocType(dt) }));
 
   // This route serves every resolve_action_id on Screen 4/5, for every action kind,
   // across all six packs - not just LENDING's income-proof upload. The screen must
@@ -97,6 +131,23 @@ export const Screen06UploadEvidence: React.FC = () => {
   // blank text field - and this is true for whichever pack's action happens
   // to be one of those, never a specific journey by name.
   const interactionType = classifyInteraction(action);
+
+  // Real-user QA finding (BUG-003): ConsentPanel/SchedulingPicker/
+  // VideoVerificationFlow all submit `{ [fieldKey]: <value> }` as the action
+  // payload. This used to always be `action.unlocks[0]` - the STATE FIELD
+  // the action satisfies (e.g. `loan_offer_accepted`), not the actual
+  // payload key the backend's `input_schema` requires (e.g. `accept_terms`
+  // for Lending's ACCEPT_LOAN_TERMS). The contract's own words: "FORM ->
+  // generic action modal rendered from input_schema" - input_schema is the
+  // correct, authoritative source whenever the action declares one; falling
+  // back to `unlocks[0]` is only correct for the (currently 10 of 11) real
+  // consent/scheduling/video actions across all six packs that declare NO
+  // input_schema at all, where it happens to coincide with the field the
+  // backend's own fallback matching accepts. Deriving this once, generically,
+  // here - not per-journey, per-action-id, or hardcoded - fixes every
+  // current and future CONSENT/SCHEDULING/VIDEO_VERIFICATION action that
+  // declares a real input_schema, not just Lending's.
+  const interactionFieldKey = action?.input_schema?.[0]?.key || action?.unlocks?.[0];
   const tabLabel =
     interactionType === 'SCHEDULING'
       ? 'Schedule'
@@ -149,7 +200,7 @@ export const Screen06UploadEvidence: React.FC = () => {
   }, [journeyId, action?.kind, navigate]);
 
   const handleFileUpload = async (): Promise<void> => {
-    if (!selectedFile || !journeyId || !currentSnapshotId) return;
+    if (!selectedFile || !journeyId || !currentSnapshotId || !docType) return;
     setSubmitError(null);
 
     try {
@@ -203,6 +254,11 @@ export const Screen06UploadEvidence: React.FC = () => {
       } catch (err) {
         setSubmitError(mapErrorToUxAction(err).message);
       }
+      return;
+    }
+
+    if (!docType) {
+      setSubmitError('Please select which document type this information is from before submitting.');
       return;
     }
 
@@ -333,6 +389,18 @@ export const Screen06UploadEvidence: React.FC = () => {
           className="space-y-6"
         >
           <Card className="p-6 md:p-8 space-y-6 bg-white border border-surface-border shadow-xs rounded-card">
+            {requiresDocTypeChoice && (
+              <Select
+                label="Which document are you uploading?"
+                required
+                helperText="This step accepts more than one document type - tell us which one you have so it's reviewed correctly."
+                options={docTypeOptions}
+                value={selectedDocType}
+                onChange={(e) => setSelectedDocType(e.target.value)}
+                data-testid="doc-type-select"
+              />
+            )}
+
             <EvidenceDropzone
               onFileSelect={(file) => {
                 setSelectedFile(file);
@@ -386,7 +454,7 @@ export const Screen06UploadEvidence: React.FC = () => {
                 type="button"
                 variant="primary"
                 onClick={handleFileUpload}
-                disabled={!selectedFile || uploadEvidence.isPending}
+                disabled={!selectedFile || !docType || uploadEvidence.isPending}
                 data-testid="upload-submit-btn"
                 className="px-8 py-2.5"
               >
@@ -417,7 +485,7 @@ export const Screen06UploadEvidence: React.FC = () => {
               <SchedulingPicker
                 actionTitle={screenTitle}
                 why={action?.why}
-                fieldKey={action?.unlocks?.[0]}
+                fieldKey={interactionFieldKey}
                 submitLabel={applyAction.isPending ? 'Submitting...' : 'Confirm Slot →'}
                 isSubmitting={applyAction.isPending}
                 onSubmit={handleManualSubmit}
@@ -426,7 +494,7 @@ export const Screen06UploadEvidence: React.FC = () => {
               <ConsentPanel
                 actionTitle={screenTitle}
                 why={action?.why}
-                fieldKey={action?.unlocks?.[0]}
+                fieldKey={interactionFieldKey}
                 submitLabel={applyAction.isPending ? 'Submitting...' : 'Confirm →'}
                 isSubmitting={applyAction.isPending}
                 onSubmit={handleManualSubmit}
@@ -435,7 +503,7 @@ export const Screen06UploadEvidence: React.FC = () => {
               <VideoVerificationFlow
                 actionTitle={screenTitle}
                 why={action?.why}
-                fieldKey={action?.unlocks?.[0]}
+                fieldKey={interactionFieldKey}
                 submitLabel={applyAction.isPending ? 'Submitting...' : 'Continue →'}
                 isSubmitting={applyAction.isPending}
                 onSubmit={handleManualSubmit}
@@ -452,6 +520,18 @@ export const Screen06UploadEvidence: React.FC = () => {
                       : 'Do not have the document handy? You can enter the required information directly below.'}
                   </p>
                 </div>
+
+                {!isFormAction && requiresDocTypeChoice && (
+                  <Select
+                    label="Which document is this information from?"
+                    required
+                    helperText="This step accepts more than one document type - tell us which one you're entering details for."
+                    options={docTypeOptions}
+                    value={selectedDocType}
+                    onChange={(e) => setSelectedDocType(e.target.value)}
+                    data-testid="doc-type-select-manual"
+                  />
+                )}
 
                 <SchemaForm
                   schema={manualSchema}

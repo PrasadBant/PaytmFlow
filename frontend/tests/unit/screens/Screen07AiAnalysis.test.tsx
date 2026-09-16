@@ -1,10 +1,23 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Screen07AiAnalysis } from '@/screens/Screen07AiAnalysis';
 import type { components } from '@/api/types.gen';
+
+// Exposes the navigation state Screen 7 actually forwarded to /updated, so
+// tests can assert on it directly rather than only on Screen 7's own render.
+function Screen08StateSpy() {
+  const location = useLocation();
+  const state = (location.state as Record<string, unknown>) || {};
+  return (
+    <div data-testid="screen-08-stub">
+      Updated Status Stub
+      <span data-testid="spy-was-review-needed">{String(state.wasReviewNeeded)}</span>
+    </div>
+  );
+}
 
 type EvidenceResponse = components['schemas']['EvidenceResponse'];
 
@@ -69,10 +82,7 @@ function renderScreen7(
       >
         <Routes>
           <Route path="/j/:id/analysis" element={<Screen07AiAnalysis />} />
-          <Route
-            path="/j/:id/updated"
-            element={<div data-testid="screen-08-stub">Updated Status Stub</div>}
-          />
+          <Route path="/j/:id/updated" element={<Screen08StateSpy />} />
           <Route
             path="/j/:id/next"
             element={<div data-testid="screen-05-stub">Recommendation Stub</div>}
@@ -170,6 +180,44 @@ describe('Screen07AiAnalysis (F20)', () => {
     expect(await screen.findByTestId('screen-08-stub')).toBeInTheDocument();
   });
 
+  it('forwards requires_review to Screen 8 as wasReviewNeeded so it cannot re-claim confidence it never had (regression)', async () => {
+    // Real-browser QA finding: clicking "Submit for Review ->" on a document
+    // Screen 7 had already flagged `requires_review: true` (confidence
+    // below the manifest's auto-verification threshold) still landed on a
+    // Screen 8 that unconditionally said "Verified Update". Screen 7 must
+    // forward the SAME already-server-computed `requires_review` boolean it
+    // received, never recompute or drop it.
+    const user = userEvent.setup();
+    const reviewNeededEvidence: EvidenceResponse = {
+      ...mockEvidenceResponse,
+      interpretation: { ...mockEvidenceResponse.interpretation, verified: false },
+      requires_review: true,
+    };
+    renderScreen7('/j/11111111-1111-1111-1111-111111111111/analysis', {
+      evidenceResponse: reviewNeededEvidence,
+      journeyId: '11111111-1111-1111-1111-111111111111',
+      actionId: 'UPLOAD_INCOME_PROOF',
+      snapshotId: '11111111-1111-1111-1111-111111111111',
+    });
+
+    const submitBtn = await screen.findByTestId('submit-for-review-btn');
+    await user.click(submitBtn);
+
+    expect(await screen.findByTestId('screen-08-stub')).toBeInTheDocument();
+    expect(screen.getByTestId('spy-was-review-needed')).toHaveTextContent('true');
+  });
+
+  it('forwards wasReviewNeeded as false when evidence did not require review (regression)', async () => {
+    const user = userEvent.setup();
+    renderScreen7();
+
+    const continueBtn = await screen.findByTestId('continue-apply-btn');
+    await user.click(continueBtn);
+
+    expect(await screen.findByTestId('screen-08-stub')).toBeInTheDocument();
+    expect(screen.getByTestId('spy-was-review-needed')).toHaveTextContent('false');
+  });
+
   it('renders review notice when requires_review is true', async () => {
     const reviewEvidence: EvidenceResponse = {
       ...mockEvidenceResponse,
@@ -217,6 +265,113 @@ describe('Screen07AiAnalysis (F20)', () => {
 
     expect(await screen.findByTestId('apply-error-banner')).toBeInTheDocument();
     expect(screen.queryByTestId('screen-08-stub')).not.toBeInTheDocument();
+  });
+
+  it('never shows the positive "looks good" header for unverified evidence (regression)', async () => {
+    // Real-user QA finding: this card's "looks good" header/green styling
+    // used to render unconditionally regardless of interpretation.verified -
+    // a genuinely wrong document, correctly described as such by the very
+    // next line's AI summary text, was shown directly under a green
+    // checkmark reading "This document looks good!". Found via a real
+    // browser session against the live backend, not by static inspection.
+    const unverifiedEvidence: EvidenceResponse = {
+      ...mockEvidenceResponse,
+      interpretation: {
+        ...mockEvidenceResponse.interpretation,
+        verified: false,
+        detected: [],
+        summary: 'This does not look like the expected Salary Slip. It looks like a Office Id Card instead.',
+      },
+      consequence_preview: null,
+      diff_preview: null,
+      requires_review: true,
+    };
+
+    renderScreen7('/j/11111111-1111-1111-1111-111111111111/analysis', {
+      evidenceResponse: unverifiedEvidence,
+      journeyId: '11111111-1111-1111-1111-111111111111',
+      snapshotId: '11111111-1111-1111-1111-111111111111',
+    });
+
+    await screen.findByTestId('ai-summary-card');
+    expect(screen.queryByTestId('ai-summary-heading')).not.toHaveTextContent('This document looks good!');
+    expect(screen.getByTestId('ai-summary-text')).toHaveTextContent(/does not look like the expected/i);
+  });
+
+  it('still shows the positive "looks good" header for genuinely verified evidence', async () => {
+    renderScreen7();
+    await screen.findByTestId('ai-summary-card');
+    expect(screen.getByTestId('ai-summary-heading')).toHaveTextContent('This document looks good!');
+  });
+
+  it('distinguishes "recognized but needs review" from "needs a closer look" (CASE A regression)', async () => {
+    // Real-browser QA finding: a document that WAS correctly recognized
+    // and extracted (a real salary slip, income extracted and validated,
+    // no conflicts) but fell below the manifest's confidence threshold
+    // for automatic verification was given the EXACT SAME "This document
+    // needs a closer look" heading as a genuinely wrong/unreadable
+    // document. That heading reads as if something might be wrong with
+    // the extracted value itself, which it isn't - the deterministic
+    // consequence_preview below still shows the real value being applied.
+    const belowThresholdEvidence: EvidenceResponse = {
+      ...mockEvidenceResponse,
+      interpretation: {
+        ...mockEvidenceResponse.interpretation,
+        verified: false,
+        detected: [
+          { key: 'monthly_income', label: 'Monthly Net Income', display_value: '₹1,33,000' },
+        ],
+        summary:
+          'Salary Slip recognized and Monthly Net Income extracted successfully. This ' +
+          'document doesn\'t meet the confidence needed for automatic verification, so ' +
+          'it will be sent for manual review instead of applied immediately - the ' +
+          'extracted value itself is not in question.',
+      },
+      requires_review: true,
+    };
+
+    renderScreen7('/j/11111111-1111-1111-1111-111111111111/analysis', {
+      evidenceResponse: belowThresholdEvidence,
+      journeyId: '11111111-1111-1111-1111-111111111111',
+      snapshotId: '11111111-1111-1111-1111-111111111111',
+    });
+
+    await screen.findByTestId('ai-summary-card');
+    const heading = screen.getByTestId('ai-summary-heading');
+    expect(heading).not.toHaveTextContent('This document looks good!');
+    expect(heading).not.toHaveTextContent('This document needs a closer look');
+    expect(heading).toHaveTextContent(/manual review/i);
+    expect(screen.getByTestId('ai-summary-text')).toHaveTextContent(/not in question/i);
+    // The extracted value is still shown, not hidden or flagged invalid.
+    expect(screen.getByText('₹1,33,000')).toBeInTheDocument();
+  });
+
+  it('keeps the "needs a closer look" header when nothing was extracted at all', async () => {
+    const noExtractionEvidence: EvidenceResponse = {
+      ...mockEvidenceResponse,
+      interpretation: {
+        ...mockEvidenceResponse.interpretation,
+        verified: false,
+        detected: [],
+        summary:
+          'Recognized this as a Salary Slip, but could not reliably extract the required ' +
+          'value from it. Please try a clearer copy, or enter the details manually.',
+      },
+      consequence_preview: null,
+      diff_preview: null,
+      requires_review: true,
+    };
+
+    renderScreen7('/j/11111111-1111-1111-1111-111111111111/analysis', {
+      evidenceResponse: noExtractionEvidence,
+      journeyId: '11111111-1111-1111-1111-111111111111',
+      snapshotId: '11111111-1111-1111-1111-111111111111',
+    });
+
+    await screen.findByTestId('ai-summary-card');
+    expect(screen.getByTestId('ai-summary-heading')).toHaveTextContent(
+      'This document needs a closer look'
+    );
   });
 
   it('strictly contains no prohibited words or percentage indicators', async () => {

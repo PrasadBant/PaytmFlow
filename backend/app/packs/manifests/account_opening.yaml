@@ -173,10 +173,6 @@ evidence_mappings:
     target_field: signature_uploaded
     confidence_threshold: 0.85
     action_id: upload_wet_signature
-  - doc_type: PAN_CARD_IMAGE
-    target_field: pan_authenticated
-    confidence_threshold: 0.80
-    action_id: upload_wet_signature
   - doc_type: AADHAAR_FRONT_BACK
     target_field: signature_uploaded
     confidence_threshold: 0.80
