@@ -8,5 +8,6 @@ export * from './Screen07AiAnalysis';
 export * from './Screen08UpdatedStatus';
 export * from './Screen09CompleteJourney';
 export * from './Screen10MyJourneys';
+export * from './HelpScreen';
 export * from './NotFoundScreen';
 export * from './KitchenSink';

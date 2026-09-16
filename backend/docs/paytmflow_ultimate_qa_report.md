@@ -1727,3 +1727,178 @@ technical debt, an explicit product decision, or an honestly-disclosed
 test-coverage gap — none of which block prototype use. This is a
 prototype-readiness assessment, **not** a claim of production
 financial-system readiness.
+
+---
+
+## §22 HELP ROUTING FIX
+
+**Date:** 2026-09-16 (continuation session)
+
+### Root cause
+
+`frontend/src/app/routes.tsx` line 34 (pre-fix):
+
+```tsx
+{ path: 'help', element: <Screen01Home /> },
+```
+
+The `/help` route was wired directly to the `Screen01Home` component. This is
+why the sidebar correctly highlighted "Help" (React Router's `NavLink`
+active-state matching works off the URL, independent of what the route
+renders) while the main content area kept showing the Home hero — the route
+itself never pointed at a Help page, because no Help page component existed
+anywhere in the codebase. A repo-wide search found only `AssistantHelpCard.tsx`,
+a small unrelated card component - not a page, and not wired into any route.
+The Help page referenced as "created in a previous task" was not present in
+this repository; it was built fresh in this pass per the exact content spec
+supplied in the fix request.
+
+This was a routing/rendering defect, not a design request: the fix is
+limited to (1) building the missing page and (2) pointing the existing route
+at it - nothing about the sidebar, navigation architecture, or any other
+route was touched.
+
+### Fix
+
+1. Created `frontend/src/screens/HelpScreen.tsx` - a new, real page
+   component (not reusing or duplicating any Home content) containing:
+   header ("How can we help?"), subtitle, a search input that filters FAQs
+   live, six category filter buttons (Getting Started / My Journeys /
+   Documents & Verification / Forms & Information / Account & Security /
+   Common Questions), an accessible FAQ accordion (aria-expanded,
+   aria-controls, keyboard-operable via native button elements), and a
+   closing "Still need help?" panel with "View My Journeys" and "Back to
+   Home" buttons. Built entirely from the project's existing primitives
+   (Card, Input, Button) and existing Tailwind design tokens - no new
+   dependencies, no new design system.
+2. `frontend/src/screens/index.ts` - added the HelpScreen export alongside
+   the existing screen exports.
+3. `frontend/src/app/routes.tsx` - changed the /help route's element from
+   Screen01Home to HelpScreen. This is the entire routing fix; route path,
+   order, and every other route were left untouched.
+
+No backend files were touched. No API contract, journey logic, Document AI,
+sidebar component, or sidebar design was changed.
+
+### Regression tests added
+
+- `frontend/src/app/router.test.tsx`: new test asserting the /help route
+  renders screen-help with the literal "How can we help?" header, and that
+  both screen-01-home and the Home hero copy ("Your Financial Journey") are
+  absent. This is the test that would have caught the original bug - the
+  previous suite had no assertion at all for the /help route's rendered
+  content.
+- `frontend/tests/unit/screens/HelpScreen.test.tsx` (new file, 6 tests):
+  header/subtitle/search render and Home content is absent; all six
+  categories render; an FAQ item expands and collapses on click
+  (aria-expanded toggles); search filters the FAQ list to matching items
+  only; a "no results" state renders for a non-matching query; the closing
+  panel renders both CTA buttons.
+- No existing test had to be changed to accommodate the fix - nothing
+  previously pinned the buggy /help-renders-Home behavior as expected, so
+  this was a pure addition, not a correction of a stale assertion.
+
+### Frontend test result
+
+| Suite | Result |
+|---|---|
+| TypeScript (tsc --noEmit) | Clean, 0 errors |
+| ESLint (--max-warnings 0) | Clean, 0 warnings/errors |
+| Targeted (router.test.tsx + HelpScreen.test.tsx) | 19/19 passed |
+| Full frontend unit suite | 339/339 passed (332 prior baseline + 7 new: 6 in HelpScreen.test.tsx + 1 new case in router.test.tsx) - no regressions |
+
+### Chromium verification (real browser, real dev server at localhost:5173)
+
+Ran a standalone Playwright script (temporary, deleted after use, not
+committed) against the live Vite dev server:
+
+- Desktop (1440px), starting from /my-journeys (a page where the sidebar is
+  visible - see note below on why / itself was not used as the starting
+  point):
+  - Clicked the sidebar "Help" link: URL became .../help, screen-help
+    present, screen-01-home absent (count 0), "How can we help?" header
+    present, the Help nav item carried the active-styling classes
+    (bg-paytm-blue-action text-content-inverted font-semibold).
+  - Refresh: still on /help, screen-help still present.
+  - Direct navigation to /: real Home page renders (screen-01-home present,
+    "How can we help?" absent) - confirms the fix didn't break Home or make
+    Help leak into it.
+  - Navigated back to a non-landing page and clicked Help again: renders
+    correctly a second time (not a one-time fluke).
+  - Browser Back: returned to /my-journeys. Browser Forward: returned to
+    /help, content correct both times.
+  - Direct navigation straight to /help: renders correctly.
+  - Zero console errors across the entire sequence.
+- Mobile (375px), starting from / and using the mobile hamburger menu to
+  open the sidebar, then tapping "Help": URL became .../help, Help header
+  present, Home hero absent, no horizontal overflow (scrollWidth equaled the
+  375px viewport width exactly). Additionally exercised a category filter
+  click and an FAQ accordion expand on this viewport to confirm real
+  interactivity, not just presence - aria-expanded correctly flipped to
+  "true".
+
+**One pre-existing, out-of-scope note surfaced during verification, not a
+new bug and not touched:** `AppShell.tsx` intentionally hides the desktop
+sidebar entirely while the current route is exactly `/` (`hideOnDesktop`),
+and the mobile hamburger toggle button is itself `md:hidden` - so at desktop
+widths there is currently no way to open the sidebar from the landing page
+specifically (only from any other page, where the sidebar is always
+visible). This is pre-existing, deliberate landing-page layout behavior
+(there is an explanatory code comment in Sidebar.tsx about exactly this),
+unrelated to the Help routing bug, and explicitly out of scope per this
+task's "do not change the sidebar design" constraint - it is why the desktop
+verification above started from /my-journeys rather than /. Documented here
+for transparency, not fixed.
+
+### Responsive verification
+
+| Viewport | Help header renders | Horizontal overflow |
+|---|---|---|
+| 375px | Yes | No |
+| 768px | Yes | No |
+| 1024px | Yes | No |
+| 1440px | Yes | No |
+
+### Console result
+
+Zero console errors or warnings-as-errors observed across every navigation
+sequence tested (desktop and mobile), including refresh, back/forward, and
+direct navigation.
+
+### Files changed (this pass only)
+
+- `frontend/src/screens/HelpScreen.tsx` (new)
+- `frontend/tests/unit/screens/HelpScreen.test.tsx` (new)
+- `frontend/src/screens/index.ts` (added export)
+- `frontend/src/app/routes.tsx` (the actual fix: one line, Screen01Home to
+  HelpScreen for the /help route)
+- `frontend/src/app/router.test.tsx` (added one regression test)
+
+No backend files changed in this pass.
+
+### Playwright E2E
+
+Executed via `npx playwright test`. Playwright's config (`reuseExistingServer:
+!CI`) reuses whatever dev server is already running rather than starting its
+own - and the running dev server was in `VITE_API_MODE=live` (this session's
+deliberate live-mode configuration, unrelated to this fix). Since this suite
+is built around MSW mock scenarios (`?scenario=` query param, per its own
+top-of-file comment), a first run against the live server produced 20
+failures - none of them Help-related, all pre-existing journey/evidence/
+resume-flow tests that depend on deterministic mock fixture data unavailable
+in live mode.
+
+To confirm this was a pre-existing environment mismatch and not a regression
+from this fix, `VITE_API_MODE` was temporarily switched to `mock`, the dev
+server restarted, and the suite re-run:
+
+**Result: 52/52 passed** (36.1s) - the suite's full intended baseline, with
+zero failures. `VITE_API_MODE` was then switched back to `live` and the dev
+server restarted again, confirmed serving correctly (curl 200, proxy to
+`/api/v1/journey-packs` responding) - returning the working tree to the
+exact same state as before this verification (`git status` showed no diff
+on `frontend/.env` afterward).
+
+This confirms the Help routing fix introduced zero E2E regressions.
+
+**HELP ROUTING FIXED - SIDEBAR HELP NOW RENDERS THE ACTUAL HELP PAGE.**

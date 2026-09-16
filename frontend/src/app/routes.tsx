@@ -12,6 +12,7 @@ import {
   Screen08UpdatedStatus,
   Screen09CompleteJourney,
   Screen10MyJourneys,
+  HelpScreen,
   NotFoundScreen,
   KitchenSink,
 } from '../screens';
@@ -31,7 +32,7 @@ export const routes: RouteObject[] = [
       { path: 'j/:id/updated', element: <Screen08UpdatedStatus /> },
       { path: 'j/:id/complete', element: <Screen09CompleteJourney /> },
       { path: 'my-journeys', element: <Screen10MyJourneys /> },
-      { path: 'help', element: <Screen01Home /> },
+      { path: 'help', element: <HelpScreen /> },
       { path: 'dev/kitchen-sink', element: <KitchenSink /> },
       { path: '*', element: <NotFoundScreen /> },
     ],
