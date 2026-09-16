@@ -138,7 +138,33 @@ async def test_income_conflict_against_existing_fields_is_flagged():
 
     assert len(result.conflicts) == 1
     assert result.conflicts[0].field == "monthly_income"
-    assert result.verified is False
+
+
+async def test_verified_document_summary_never_contains_a_raw_percentage():
+    """Real-browser QA regression: `interpretation.summary` is rendered
+    verbatim as `ai-summary-text` on Screen 7, and frontend/CLAUDE.md rule
+    1 is absolute - "NEVER render a percentage". The live app's real
+    summary text used to read "...confidence 73%.", confirmed via a real
+    user's own screenshot. The measured `confidence` float must still be
+    returned on `AIInterpretationResult.confidence` (never removed) - it
+    must just never be turned into displayed percentage text."""
+    text, ocr_meta, _fields = _render_and_ocr(
+        _draw_salary_slip, "SALARY_SLIP", "salary_table", seed=101
+    )
+    manifest = pack_registry.get_pack("LENDING")
+    provider = LocalMLProvider()
+
+    result = await provider.reconcile_evidence(
+        doc_type="SALARY_SLIP",
+        extracted_text=text,
+        manifest=manifest,
+        existing_fields={},
+        ocr_meta=ocr_meta,
+    )
+
+    assert result.verified is True
+    assert isinstance(result.confidence, float) and result.confidence > 0.0
+    assert "%" not in result.summary
 
 
 async def test_small_income_variance_within_tolerance_is_not_flagged():

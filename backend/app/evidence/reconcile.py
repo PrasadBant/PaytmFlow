@@ -276,11 +276,26 @@ class EvidenceReconciliationService:
         )
 
         # 6. Verification & confidence threshold check against manifest mapping
+        #
+        # Human-first real-browser QA finding: an action can accept
+        # MULTIPLE doc_types (e.g. Lending's UPLOAD_INCOME_PROOF: SALARY_
+        # SLIP or BANK_STATEMENT, independently thresholded). The client
+        # only ever declares ONE when uploading, so a genuinely correct
+        # document of the OTHER accepted type was being scored against the
+        # WRONG mapping's threshold (or, before the local_ml.py-side fix,
+        # never even reached here at all - flagged WRONG_DOCUMENT first).
+        # `ai_res.resolved_doc_type` (set only by LocalMLProvider, only on
+        # a genuine CORRECT_DOCUMENT classification) is the document's
+        # real, classifier-verified type; fall back to the client-declared
+        # `doc_type` for MockAI/LLM (which never set it) - unchanged
+        # behavior for both.
+        effective_doc_type = ai_res.resolved_doc_type or doc_type
         mapping = next(
             (
                 m
                 for m in manifest.evidence_mappings
-                if m.doc_type.upper() == doc_type.upper() or m.doc_type == doc_type
+                if m.doc_type.upper() == effective_doc_type.upper()
+                or m.doc_type == effective_doc_type
             ),
             None,
         )
@@ -310,6 +325,37 @@ class EvidenceReconciliationService:
         # before, informing `EvidenceInterpretation`/`consequence_preview`
         # only, never gating whether the action can be attempted.
         evidence_is_genuine = ai_res.verified and not has_conflicts
+
+        # Real-browser QA finding: a genuinely correct, correctly-classified
+        # document whose only shortfall is confidence below the manifest's
+        # auto-verification threshold (this exact case, live: SALARY_SLIP
+        # recognized correctly, income extracted and validated, no
+        # conflicts, composed confidence ~0.74 vs. a 0.85 threshold) was
+        # given the SAME generic AI-authored summary text as any other
+        # verified extraction. Screen 7 then paired that text with its
+        # "needs a closer look" / Review Needed presentation, which reads
+        # as if something might be WRONG with the extracted value - it
+        # isn't; the value is real and will be applied as shown in
+        # `consequence_preview` once a human confirms it. This is a
+        # deterministic, server-authored explanation (not the AI's own
+        # text) precisely because it depends on the manifest's own
+        # threshold, which the AI provider never sees.
+        display_summary = ai_res.summary
+        needs_confidence_review = (
+            evidence_is_genuine
+            and ai_res.detected
+            and not is_confidence_sufficient
+            and not has_conflicts
+        )
+        if needs_confidence_review:
+            doc_name_clean = effective_doc_type.replace("_", " ").title()
+            field_list = ", ".join(d.label for d in ai_res.detected)
+            display_summary = (
+                f"{doc_name_clean} recognized and {field_list} extracted successfully. "
+                "This document doesn't meet the confidence needed for automatic "
+                "verification, so it will be sent for manual review instead of applied "
+                "immediately - the extracted value itself is not in question."
+            )
 
         # 7. Persist evidence record in database
         # Auxiliary facts (name / doc_type-scoped identifier) merged in
@@ -368,10 +414,28 @@ class EvidenceReconciliationService:
         proposed_action_id = proposed_action.action_id if proposed_action else None
 
         # 10. Compute deterministic simulation preview and diff preview
+        #
+        # Real-user QA finding: this block used to run for ANY evidence whose
+        # CLIENT-DECLARED doc_type matched some action's `accepts`, regardless
+        # of whether the AI actually verified the uploaded document as that
+        # doc_type. For a genuinely wrong document (verified=False,
+        # raw_values={}), `simulate()` had no real extracted values to work
+        # with and silently fell back to `manifest.simulation_defaults` -
+        # producing a confident "this will satisfy monthly_income -> Rs.
+        # 85,000, progress 5/7" preview directly alongside an AI summary
+        # correctly saying the document was rejected. That preview is never
+        # actually applied (only `deterministic_check()`, gated on the real
+        # persisted `verified` result, can do that - see
+        # app/core/deterministic_check.py), so no state was ever corrupted,
+        # but it is a real, confirmed, misleading-preview defect: it must
+        # only ever be computed for evidence the AI genuinely verified.
+        # `proposed_action_id` itself is left untouched below - it is
+        # correctly-scoped informational routing metadata ("this doc_type
+        # would route to this action"), not a prediction of what will happen.
         consequence_preview: SimulationPreview | None = None
         diff_preview: JourneyDiff | None = None
 
-        if proposed_action:
+        if proposed_action and evidence_is_genuine:
             action_input: dict[str, Any] = {
                 "evidence_id": str(evidence_record.id),
             }
@@ -514,7 +578,7 @@ class EvidenceReconciliationService:
                     )
                     for d in ai_res.detected
                 ],
-                summary=ai_res.summary,
+                summary=display_summary,
                 conflicts=[
                     EvidenceConflict(
                         ambiguity_id=c.ambiguity_id,

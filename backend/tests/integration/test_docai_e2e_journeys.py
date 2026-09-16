@@ -410,6 +410,15 @@ async def test_wrong_document_does_not_advance_lending_state(
     )
     assert ev["interpretation"]["verified"] is False
     assert ev["interpretation"]["detected"] == []
+    # Real-user QA regression: a wrong/unverified document must not produce
+    # a confident "here's what will happen" preview either - before this
+    # fix, `consequence_preview`/`diff_preview` were computed unconditionally
+    # from manifest.simulation_defaults whenever the evidence's doc_type
+    # nominally matched an action's `accepts`, regardless of whether the AI
+    # actually verified it. Found via a real browser session against the
+    # live backend, not by static inspection.
+    assert ev["consequence_preview"] is None
+    assert ev["diff_preview"] is None
     proposed_action_id = ev["proposed_action_id"]
 
     # Confirm the deterministic snapshot genuinely did not change from
@@ -480,6 +489,15 @@ async def test_wrong_document_does_not_set_boolean_field_true_on_execution(
     )
     assert ev["interpretation"]["verified"] is False
     assert ev["interpretation"]["detected"] == []
+    # Real-user QA regression: a wrong/unverified document must not produce
+    # a confident "here's what will happen" preview either - before this
+    # fix, `consequence_preview`/`diff_preview` were computed unconditionally
+    # from manifest.simulation_defaults whenever the evidence's doc_type
+    # nominally matched an action's `accepts`, regardless of whether the AI
+    # actually verified it. Found via a real browser session against the
+    # live backend, not by static inspection.
+    assert ev["consequence_preview"] is None
+    assert ev["diff_preview"] is None
     proposed_action_id = ev["proposed_action_id"]
     assert proposed_action_id == "upload_salary_statement"
 
@@ -539,3 +557,363 @@ async def test_stale_snapshot_returns_409_for_real_evidence_upload(
 # `test_evidence_endpoints.py::test_upload_evidence_cross_session_404` -
 # not duplicated here; this file's job is proving the REAL local-AI path
 # specifically, not re-proving session isolation a second time.
+
+
+async def test_genuine_unrelated_pdf_is_not_shown_as_verified_salary_slip(
+    client: AsyncClient, session_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+):
+    """Real-user-reported regression (BUG-001 in docs/
+    paytmflow_final_full_flow_audit.md): a real user uploaded a genuine,
+    unrelated presentation-style PDF (a hackathon slide deck, containing no
+    salary-slip vocabulary at all) where a SALARY_SLIP was expected, and the
+    then-running server showed it as `verified`/`92% confidence`/`₹85,000
+    Monthly Net Income` - the exact manifest `simulation_defaults` value.
+    Root cause (confirmed): the server the user tested against was actually
+    running `AI_PROVIDER=mock` (MockAI is a DELIBERATE, documented, fixed-
+    output stub for frontend dev with no real document analysis at all -
+    see app/ai/mock.py's own docstring), not the real `local_ml` pipeline.
+    This test proves the REAL pipeline (`AI_PROVIDER=local_ml`, explicitly
+    set here exactly as every other test in this file does) correctly
+    refuses to fabricate a verified result for a genuinely unrelated,
+    low-text PDF - reproducing the user's exact document shape (a title +
+    a handful of short unrelated lines, no salary-slip labels), not a
+    synthetic OTHER-class receipt like the other wrong-document tests in
+    this file."""
+    monkeypatch.setattr(settings, "AI_PROVIDER", "local_ml")
+
+    journey_id, snap = await _create_journey(
+        client,
+        session_headers,
+        "LENDING",
+        {"loan_amount": 200000, "loan_purpose": "HOME_RENOVATION", "tenure_months": 24},
+    )
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    w, h = A4
+    c.setFont("Helvetica-Bold", 20)
+    c.drawCentredString(w / 2, h - 60, "FIN-SHIELD")
+    c.setFont("Helvetica", 14)
+    c.drawCentredString(w / 2, h - 90, "Hackathon Presentation")
+    c.setFont("Helvetica", 11)
+    for i, line in enumerate(
+        [
+            "Team: Alpha Squad",
+            "Problem Statement: Financial fraud detection at scale",
+            "Solution Architecture: Real-time anomaly detection pipeline",
+            "Tech Stack: Python, Kafka, PostgreSQL, React",
+            "Demo Roadmap: Q1 - Q4 milestones",
+            "Thank you for your attention!",
+        ]
+    ):
+        c.drawString(60, h - 140 - i * 24, line)
+    c.showPage()
+    c.save()
+    pdf_bytes = buf.getvalue()
+
+    resp = await client.post(
+        f"/api/v1/journeys/{journey_id}/evidence",
+        data={"doc_type": "SALARY_SLIP", "expected_snapshot_id": snap},
+        files={
+            "file": (
+                "FIN-SHIELD_Hackathon_Presentation.pdf",
+                pdf_bytes,
+                "application/pdf",
+            )
+        },
+        headers=session_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    ev = resp.json()
+
+    # The exact runtime fields a real user (and Screen 7) sees.
+    assert ev["interpretation"]["verified"] is False
+    assert ev["interpretation"]["detected"] == []
+    assert "85,000" not in ev["interpretation"]["summary"]
+    assert "85000" not in ev["interpretation"]["summary"]
+    # No fabricated "here's what will happen" preview either (the same
+    # `evidence_is_genuine` gate fixed in the prior P1 phase, re-confirmed
+    # here for the AMBIGUOUS/UNREADABLE outcome path specifically, not just
+    # the WRONG_DOCUMENT path the other tests in this file exercise).
+    assert ev["consequence_preview"] is None
+    assert ev["diff_preview"] is None
+
+    # And confirm no state was mutated by merely uploading it (POST
+    # /evidence is preview-only, unchanged architectural invariant).
+    check = await client.get(f"/api/v1/journeys/{journey_id}", headers=session_headers)
+    income_field = next(f for f in check.json()["fields"] if f["key"] == "monthly_income")
+    assert income_field["value"] is None
+    assert check.json()["version_number"] == 1
+
+
+async def test_alternate_accepted_doc_type_is_not_falsely_rejected(
+    client: AsyncClient, session_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+):
+    """Human-first real-browser QA regression (BUG-005 in docs/
+    paytmflow_human_first_final_qa.md): UPLOAD_INCOME_PROOF accepts EITHER
+    SALARY_SLIP or BANK_STATEMENT (two real, independently-thresholded
+    evidence_mappings entries in lending.yaml, same action_id, same
+    target_field) - but the frontend always declares `doc_type` as
+    `action.accepts[0]` ("SALARY_SLIP") when uploading, since it has no
+    way to know in advance which of the two accepted types the user's real
+    file actually is. Before this fix, a genuine BANK_STATEMENT (the
+    SECOND accepted type) uploaded this way was always flagged
+    WRONG_DOCUMENT ("This does not look like the expected Salary Slip")
+    purely because of its position in the manifest's accepts list, not
+    because of anything wrong with the document. Reproduced here exactly
+    as the real frontend does: upload a genuine BANK_STATEMENT image while
+    declaring doc_type=SALARY_SLIP."""
+    from app.docai.dataset.generate import _draw_bank_statement, _make_fields
+
+    monkeypatch.setattr(settings, "AI_PROVIDER", "local_ml")
+
+    journey_id, snap = await _create_journey(
+        client,
+        session_headers,
+        "LENDING",
+        {"loan_amount": 200000, "loan_purpose": "HOME_RENOVATION", "tenure_months": 24},
+    )
+
+    rng = random.Random(9301)
+    fake = Faker()
+    Faker.seed(9301)
+    fields = _make_fields(rng, fake, "BANK_STATEMENT", "symbol")
+    image_bytes = _generate_jpeg(_draw_bank_statement, fields, "bank_hdfc", 9302)
+
+    # Declares SALARY_SLIP (accepts[0]) - exactly what the real frontend
+    # does today, regardless of which accepted type the file actually is.
+    ev = await _upload_evidence(
+        client, session_headers, journey_id, snap, "SALARY_SLIP", image_bytes
+    )
+
+    # NOT rejected as a wrong document - the core of this regression. Wire-
+    # level `verified` may still be False purely from the same, separate,
+    # already-disclosed confidence-threshold-vs-genuine-correctness gap
+    # every other real-document test in this session hits (composed
+    # confidence often lands below the manifest threshold even for
+    # genuinely correct documents) - that is NOT what this test is about.
+    # The summary text itself is one of two genuine, real strings depending
+    # on whether THIS run's composed confidence cleared the manifest
+    # threshold: the plain local_ml.py extraction summary, or (below
+    # threshold) reconcile.py's CASE A explanation (see
+    # test_genuinely_recognized_document_below_confidence_threshold_
+    # explains_review) - both mention the real recognized doc_type and
+    # neither ever says the document doesn't look like what was expected.
+    summary = ev["interpretation"]["summary"]
+    assert "does not look like the expected" not in summary
+    assert "bank statement" in summary.lower()
+    assert "recognized" in summary.lower()
+    assert ev["interpretation"]["detected"], "alternate accepted doc_type must not be rejected"
+    detected_keys = {d["key"] for d in ev["interpretation"]["detected"]}
+    assert "monthly_income" in detected_keys
+
+    # And executing the resulting action must use the REAL extracted value
+    # (whatever the local OCR/extraction pipeline genuinely read from this
+    # document - decoupled here from ground truth, since OCR-quality
+    # variance on a randomly-degraded synthetic image is a separate,
+    # already-covered-elsewhere concern; this test is about the routing/
+    # acceptance fix, not extraction accuracy), never the manifest's
+    # simulation_defaults constant (85000) or the OTHER document's value.
+    expected_display = next(
+        d["display_value"] for d in ev["interpretation"]["detected"] if d["key"] == "monthly_income"
+    )
+    act = await _execute_action(
+        client,
+        session_headers,
+        journey_id,
+        snap,
+        "UPLOAD_INCOME_PROOF",
+        {"evidence_id": ev["evidence_id"]},
+    )
+    assert act.status_code == 200, act.text
+    income_field = next(f for f in act.json()["journey"]["fields"] if f["key"] == "monthly_income")
+    assert income_field["value"] is not None
+    assert income_field["value"] != 85000
+    assert f"₹{income_field['value']:,}" == expected_display
+
+
+async def test_genuinely_wrong_document_still_rejected_when_action_accepts_multiple_types(
+    client: AsyncClient, session_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+):
+    """Regression-safety companion to the test above: fixing the false
+    NEGATIVE for a genuinely-accepted alternate type must not turn into a
+    false POSITIVE - a document that is neither SALARY_SLIP nor
+    BANK_STATEMENT must still be correctly rejected for
+    UPLOAD_INCOME_PROOF."""
+    from app.docai.dataset.generate import _draw_other, _make_fields
+
+    monkeypatch.setattr(settings, "AI_PROVIDER", "local_ml")
+
+    journey_id, snap = await _create_journey(
+        client,
+        session_headers,
+        "LENDING",
+        {"loan_amount": 200000, "loan_purpose": "HOME_RENOVATION", "tenure_months": 24},
+    )
+
+    rng = random.Random(9303)
+    fake = Faker()
+    Faker.seed(9303)
+    fields = _make_fields(rng, fake, "OTHER", "symbol")
+    image_bytes = _generate_jpeg(_draw_other, fields, "receipt", 9304)
+
+    ev = await _upload_evidence(
+        client, session_headers, journey_id, snap, "SALARY_SLIP", image_bytes
+    )
+    assert ev["interpretation"]["verified"] is False
+    assert ev["interpretation"]["detected"] == []
+    assert ev["consequence_preview"] is None
+
+
+async def test_native_text_pdf_with_label_value_in_table_columns_is_extracted(
+    client: AsyncClient, session_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+):
+    """Human-real-user QA regression (BUG-008): a real, genuine, born-
+    digital PDF (not rasterized/OCR'd - a real PyMuPDF text layer) laying
+    its income label and value out as two side-by-side table cells on the
+    same printed row, uploaded through the REAL HTTP evidence endpoint
+    exactly as a real user did. Before the fix, `extract_pdf_text_layer()`
+    never populated per-line position data at all, so this genuinely
+    correct document's income value could not be extracted -
+    "Recognized this as a Salary Slip, but could not reliably extract the
+    required value from it." Reproduces the real user-reported document's
+    LAYOUT PATTERN generically (any label/value pair in table columns),
+    not the literal file."""
+    monkeypatch.setattr(settings, "AI_PROVIDER", "local_ml")
+
+    journey_id, snap = await _create_journey(
+        client,
+        session_headers,
+        "LENDING",
+        {"loan_amount": 200000, "loan_purpose": "HOME_RENOVATION", "tenure_months": 24},
+    )
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    w, h = A4
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(60, h - 60, "MONTHLY SALARY SLIP")
+    c.setFont("Helvetica", 10)
+    c.drawString(60, h - 100, "Field")
+    c.drawString(300, h - 100, "Value")
+    c.drawString(60, h - 130, "Document Type")
+    c.drawString(300, h - 130, "SALARY_SLIP")
+    c.drawString(60, h - 160, "Monthly Net Income")
+    c.drawString(300, h - 160, "1,42,000 INR")
+    c.showPage()
+    c.save()
+    pdf_bytes = buf.getvalue()
+
+    resp = await client.post(
+        f"/api/v1/journeys/{journey_id}/evidence",
+        data={"doc_type": "SALARY_SLIP", "expected_snapshot_id": snap},
+        files={
+            "file": (
+                "salary_slip_table_layout.pdf",
+                pdf_bytes,
+                "application/pdf",
+            )
+        },
+        headers=session_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    ev = resp.json()
+
+    assert ev["interpretation"]["detected"], "table-layout label/value must be extracted"
+    detected_keys = {d["key"] for d in ev["interpretation"]["detected"]}
+    assert "monthly_income" in detected_keys
+    income_display = next(
+        d["display_value"] for d in ev["interpretation"]["detected"] if d["key"] == "monthly_income"
+    )
+    assert "142,000" in income_display
+    assert "could not reliably extract" not in ev["interpretation"]["summary"]
+
+
+async def test_genuinely_recognized_document_below_confidence_threshold_explains_review(
+    client: AsyncClient, session_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+):
+    """Human-real-user QA regression (CASE A / confidence-threshold UX): a
+    real user uploaded their own real salary slip PDF and got "Review
+    Needed" with a summary saying "...confidence 73%.". Traced live: the
+    document WAS correctly classified as SALARY_SLIP (CORRECT_DOCUMENT),
+    the income value WAS correctly extracted and passed validation
+    (133000, no conflicts), but composed confidence (ocr_confidence *
+    classification_confidence, since field_found+validated -> no penalty)
+    landed below SALARY_SLIP's manifest threshold (0.85) - a legitimate,
+    NOT-a-bug review-routing decision. The bugs were in the UX/copy: (1)
+    the summary text exposed a raw confidence percentage, violating
+    frontend/CLAUDE.md rule 1 ("never render a percentage") - confirmed
+    live on this exact document; (2) the review reason was not
+    distinguishable from a genuinely wrong/unreadable document.
+
+    This test reproduces the SAME real scenario generically: a minimal,
+    sparse two-column-layout PDF (built with reportlab, not the user's
+    literal file) that the real trained classifier - unmodified, no
+    threshold change - genuinely scores below the real SALARY_SLIP
+    threshold precisely because it is sparse (little text for the
+    classifier to work with), while extraction still succeeds and
+    validates for real. This is a real, live, below-threshold document,
+    not a mocked one.
+    """
+    monkeypatch.setattr(settings, "AI_PROVIDER", "local_ml")
+
+    journey_id, snap = await _create_journey(
+        client,
+        session_headers,
+        "LENDING",
+        {"loan_amount": 200000, "loan_purpose": "HOME_RENOVATION", "tenure_months": 24},
+    )
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    w, h = A4
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(60, h - 60, "MONTHLY SALARY SLIP")
+    c.setFont("Helvetica", 10)
+    c.drawString(60, h - 100, "Field")
+    c.drawString(300, h - 100, "Value")
+    c.drawString(60, h - 130, "Document Type")
+    c.drawString(300, h - 130, "SALARY_SLIP")
+    c.drawString(60, h - 160, "Monthly Net Income")
+    c.drawString(300, h - 160, "133,000 INR")
+    c.showPage()
+    c.save()
+    pdf_bytes = buf.getvalue()
+
+    resp = await client.post(
+        f"/api/v1/journeys/{journey_id}/evidence",
+        data={"doc_type": "SALARY_SLIP", "expected_snapshot_id": snap},
+        files={"file": ("sparse_salary_slip.pdf", pdf_bytes, "application/pdf")},
+        headers=session_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    ev = resp.json()
+
+    interp = ev["interpretation"]
+    # Real, below-threshold classification - the whole point of this test.
+    assert 0.0 < interp["confidence"] < 0.85
+    assert interp["conflicts"] == []
+    assert interp["verified"] is False
+    assert ev["requires_review"] is True
+
+    # Extraction genuinely succeeded - the value itself is not in question.
+    detected_keys = {d["key"] for d in interp["detected"]}
+    assert "monthly_income" in detected_keys
+
+    # CASE A UX fix: the summary must explain that the document WAS
+    # recognized and extracted, and that review is a confidence routing
+    # decision - not imply the extracted value is wrong - and must never
+    # contain a raw percentage (frontend/CLAUDE.md rule 1).
+    summary = interp["summary"]
+    assert "%" not in summary
+    assert "recognized" in summary.lower()
+    assert "extracted successfully" in summary.lower()
+    assert "not in question" in summary.lower()
+    assert "could not reliably extract" not in summary
+
+    # The deterministic preview must still reflect the real, genuine
+    # extraction - a low-confidence-but-genuine document is not a wrong
+    # document; consequence_preview must not be suppressed or fabricated.
+    assert ev["consequence_preview"] is not None
+    newly_satisfied_keys = {f["key"] for f in ev["consequence_preview"]["newly_satisfied"]}
+    assert "monthly_income" in newly_satisfied_keys

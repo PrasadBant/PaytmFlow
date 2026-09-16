@@ -55,7 +55,7 @@ async def test_health_endpoint(client_with_db: AsyncClient):
     assert health.db is True
     assert health.packs_loaded == 6
     assert health.packs_supported == 6
-    assert health.ai_provider in ["mock", "llm"]
+    assert health.ai_provider in ["mock", "llm", "local_ml"]
 
 
 @pytest.mark.asyncio

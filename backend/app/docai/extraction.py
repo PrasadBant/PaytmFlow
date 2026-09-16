@@ -64,6 +64,15 @@ INCOME_LABELS_SALARY_SLIP = [
     r"net\s*salary(?:\s*credited)?",
     r"take\s*home",
     r"net\s*amount\s*payable",
+    # "Monthly Net Income" - a real, common Indian payslip label wording,
+    # same class as the four above (human-QA-found generalization gap: a
+    # genuine salary slip using this exact common phrasing was correctly
+    # classified as SALARY_SLIP but its income could not be extracted
+    # because this specific synonym was missing from the vocabulary -
+    # not a filename-specific fix, not a hardcoded value; this is the
+    # extractor recognizing one more real-world phrasing of the same
+    # concept it already extracts, per this file's own stated design).
+    r"monthly\s*net\s*income",
 ]
 
 # Real-world synonym labels for a salary credit line inside a bank

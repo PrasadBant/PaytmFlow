@@ -87,6 +87,25 @@ describe('Screen10MyJourneys (F24)', () => {
     window.sessionStorage.clear();
   });
 
+  it('resumes a journey via keyboard alone - Tab then Enter (regression)', async () => {
+    // Real-user QA finding: this row - the primary way to resume a
+    // journey - was a plain <div onClick>, unreachable and unusable via
+    // keyboard alone (no Tab stop, no Enter/Space activation).
+    const user = userEvent.setup();
+    renderScreen10();
+
+    const row = await screen.findByTestId('journey-row-11111111-1111-1111-1111-111111111111');
+    expect(row).toHaveAttribute('tabIndex', '0');
+    expect(row).toHaveAttribute('role', 'button');
+
+    row.focus();
+    expect(row).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    // journey.resume_screen: 'STATUS' -> navigates to /j/:id
+    expect(await screen.findByTestId('screen-04-stub')).toBeInTheDocument();
+  });
+
   it('renders title, tabs, start journey button, and all journeys by default', async () => {
     renderScreen10();
 

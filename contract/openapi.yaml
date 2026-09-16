@@ -39,7 +39,7 @@ paths:
                   db: { type: boolean }
                   packs_loaded: { type: integer }
                   packs_supported: { type: integer }
-                  ai_provider: { type: string, enum: [mock, llm] }
+                  ai_provider: { type: string, enum: [mock, llm, local_ml] }
                   git_sha: { type: string }
 
   /api/v1/session:

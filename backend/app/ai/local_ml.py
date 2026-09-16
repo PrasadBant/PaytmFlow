@@ -145,11 +145,36 @@ class LocalMLProvider:
                 raw_values={},
             )
 
+        # An action can legitimately accept MULTIPLE doc_types (real
+        # manifest example: Lending's UPLOAD_INCOME_PROOF accepts either
+        # SALARY_SLIP or BANK_STATEMENT, two separate evidence_mappings
+        # entries sharing one action_id) - the client only ever declares
+        # ONE when uploading. Build the full acceptable set from every
+        # evidence_mappings entry that shares the declared doc_type's own
+        # action_id, so a genuinely correct document of the OTHER accepted
+        # type is not falsely flagged WRONG_DOCUMENT. Falls back to just
+        # the declared type alone when it isn't a real manifest mapping at
+        # all (unchanged, strict behavior for that case).
+        declared_mapping = next(
+            (m for m in manifest.evidence_mappings if m.doc_type.upper() == doc_type.upper()),
+            None,
+        )
+        accepted_doc_types = (
+            {
+                m.doc_type.upper()
+                for m in manifest.evidence_mappings
+                if m.action_id == declared_mapping.action_id
+            }
+            if declared_mapping
+            else {doc_type.upper()}
+        )
+
         classification = classifier.classify(
             text=text,
             expected_doc_type=doc_type,
             ocr_confidence=ocr_confidence,
             word_count=word_count,
+            accepted_doc_types=accepted_doc_types,
         )
         classification_confidence = classification.probabilities.get(
             classification.predicted_doc_type, 0.0
@@ -177,8 +202,19 @@ class LocalMLProvider:
                 raw_values={},
             )
 
+        # The classifier landed on CORRECT_DOCUMENT against the acceptable
+        # SET, but that may be a different doc_type string than the client
+        # declared (e.g. declared SALARY_SLIP, real file is a
+        # BANK_STATEMENT - both accepted for the same action). From here
+        # on, treat the classifier's own real prediction as the document's
+        # actual type - extraction dispatch and the target-field/
+        # confidence-threshold mapping lookup (both here and in the
+        # caller, app/evidence/reconcile.py) must reflect what the
+        # document REALLY is, not what the client guessed when uploading.
+        effective_doc_type = classification.predicted_doc_type
+
         state_schema_map = {f.key: f for f in manifest.state_schema}
-        extracted = extract_fields_for_doc_type(text, doc_type, lines=ocr_lines)
+        extracted = extract_fields_for_doc_type(text, effective_doc_type, lines=ocr_lines)
 
         detected_fields: list[AIDetectedField] = []
         raw_values: dict[str, Any] = {}
@@ -197,7 +233,11 @@ class LocalMLProvider:
         # Insurance's manifest (Lending has no boolean evidence_mappings
         # target, so this path was never exercised until now).
         mapping = next(
-            (m for m in manifest.evidence_mappings if m.doc_type.upper() == doc_type.upper()),
+            (
+                m
+                for m in manifest.evidence_mappings
+                if m.doc_type.upper() == effective_doc_type.upper()
+            ),
             None,
         )
         if mapping:
@@ -241,7 +281,7 @@ class LocalMLProvider:
                     # regardless of which document type printed it, so
                     # it is compared across ANY doc_type within the
                     # journey.
-                    aux_key = "name" if field.key == "name" else f"identifier::{doc_type}"
+                    aux_key = "name" if field.key == "name" else f"identifier::{effective_doc_type}"
                     auxiliary_facts[aux_key] = field.value
 
                     existing_aux_value = existing_fields.get(aux_key)
@@ -365,19 +405,28 @@ class LocalMLProvider:
                 confidence=confidence,
                 detected=[],
                 summary=(
-                    f"Recognized this as a {doc_type.replace('_', ' ').title()}, but could not "
+                    f"Recognized this as a "
+                    f"{effective_doc_type.replace('_', ' ').title()}, but could not "
                     "reliably extract the required value from it. Please try a clearer copy, "
                     "or enter the details manually."
                 ),
                 conflicts=[],
                 raw_values={},
                 auxiliary_facts=auxiliary_facts,
+                resolved_doc_type=effective_doc_type,
             )
 
-        doc_name_clean = doc_type.replace("_", " ").title()
+        doc_name_clean = effective_doc_type.replace("_", " ").title()
+        # No numeric confidence percentage in this user-facing string - the
+        # frontend's absolute rule (frontend/CLAUDE.md #1) is "never render a
+        # percentage", and this summary is rendered verbatim as
+        # `ai-summary-text` on Screen 7. The measured `confidence` float is
+        # still returned in full on `AIInterpretationResult.confidence` /
+        # `EvidenceInterpretation.confidence` for any caller that needs the
+        # real number - it is just never turned into displayed text here.
         summary = (
             f"Recognized as {doc_name_clean} and extracted {len(detected_fields)} field(s) "
-            f"(local document AI, confidence {int(confidence * 100)}%)."
+            "using local document AI."
         )
         return AIInterpretationResult(
             verified=len(conflicts) == 0,
@@ -387,6 +436,7 @@ class LocalMLProvider:
             conflicts=conflicts,
             raw_values=raw_values,
             auxiliary_facts=auxiliary_facts,
+            resolved_doc_type=effective_doc_type,
         )
 
     async def select_action(

@@ -81,6 +81,52 @@ class OcrResult:
     lines: list[OcrLine] = field(default_factory=list)
 
 
+# Real PyMuPDF text-layer coordinates are in PDF points (72/inch); the
+# row-band-tolerance constants in app/docai/extraction.py
+# (_MIN/MAX_ROW_BAND_TOLERANCE_PX) were tuned against Tesseract's pixel
+# coordinates from images rasterized at `rasterize_pdf_to_images`'s own
+# 200 DPI default elsewhere in this file. Scaling by that same DPI/72
+# factor keeps a native-text PDF's line positions on the same coordinate
+# scale those constants actually assume, rather than coincidentally
+# relying on a particular document's font size landing in range.
+_POINTS_TO_PIXELS = 200 / 72
+
+
+def _pdf_page_lines(page: pymupdf.Page) -> list[OcrLine]:
+    """Real per-line text + vertical position for one native-text PDF
+    page, in the SAME shape `ocr_image()` already produces for Tesseract
+    (OcrLine.top/bottom) - genuine PyMuPDF layout data (each line's own
+    bounding box), not inferred or guessed. This is what lets
+    `_find_amount_near_label`'s existing cross-line, same-visual-row
+    matching (already built for Tesseract's OCR-segmented two-column
+    layouts) also work for a born-digital PDF whose label and value sit
+    in separate columns of the SAME printed row - a real, common table
+    layout (e.g. "Net Monthly Income" | "133,000" as two side-by-side
+    cells) that a same-printed-LINE-only text search can never find,
+    since the two cells are different lines in the flat text string even
+    though they are the same visual row."""
+    lines: list[OcrLine] = []
+    text_dict = page.get_text("dict")
+    for block in text_dict.get("blocks", []):
+        for line in block.get("lines", []):
+            spans = line.get("spans", [])
+            line_text = "".join(span.get("text", "") for span in spans).strip()
+            if not line_text:
+                continue
+            bbox = line.get("bbox")
+            if not bbox:
+                continue
+            _x0, y0, _x1, y1 = bbox
+            lines.append(
+                OcrLine(
+                    text=line_text,
+                    top=int(y0 * _POINTS_TO_PIXELS),
+                    bottom=int(y1 * _POINTS_TO_PIXELS),
+                )
+            )
+    return lines
+
+
 def extract_pdf_text_layer(content: bytes) -> OcrResult:
     """Real PyMuPDF text-layer extraction for native-text PDFs. If the PDF
     has no embedded text (i.e. it's a scanned PDF with no text layer),
@@ -90,6 +136,10 @@ def extract_pdf_text_layer(content: bytes) -> OcrResult:
     try:
         doc = pymupdf.open(stream=content, filetype="pdf")
         pages_text = [page.get_text().strip() for page in doc if page.get_text().strip()]
+        combined_lines: list[OcrLine] = []
+        for page in doc:
+            if page.get_text().strip():
+                combined_lines.extend(_pdf_page_lines(page))
     except Exception as exc:
         logger.warning("pdf_text_layer_extraction_failed", error=str(exc))
         return OcrResult(text="", mean_word_confidence=0.0, engine="none", degraded_reason=str(exc))
@@ -108,6 +158,7 @@ def extract_pdf_text_layer(content: bytes) -> OcrResult:
         mean_word_confidence=1.0,
         engine="pymupdf_text_layer",
         word_count=len(text.split()),
+        lines=combined_lines,
     )
 
 

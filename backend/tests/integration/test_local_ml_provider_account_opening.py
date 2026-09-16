@@ -99,7 +99,23 @@ async def test_signature_specimen_satisfies_boolean_signature_field():
     assert result.raw_values.get("signature_uploaded") is True
 
 
-async def test_pan_card_satisfies_boolean_pan_authenticated_field():
+async def test_pan_card_no_longer_satisfies_pan_authenticated_after_dead_mapping_removed():
+    """Regression coverage for the orphaned-mapping fix (QA closure pass):
+    `evidence_mappings` used to map PAN_CARD_IMAGE -> `pan_authenticated`
+    via `action_id: upload_wet_signature`, an action whose own `accepts`
+    never listed PAN_CARD_IMAGE and whose `satisfies` is
+    `signature_uploaded`, not `pan_authenticated` - live-reproduced as a
+    real defect (a PAN card uploaded through the signature action could
+    falsely claim `pan_authenticated` verified). The dead mapping was
+    removed; PAN authentication in this journey is FORM-only
+    (`verify_pan_for_banking`), by design, never a document upload.
+    `LocalMLProvider` looks up `manifest.evidence_mappings` (see
+    app/ai/local_ml.py's boolean-target-field short-circuit) to know which
+    field a given doc_type's evidence should satisfy - with no mapping for
+    PAN_CARD_IMAGE at all now, there is nothing for the provider to
+    short-circuit-satisfy, and generic extraction correctly does not
+    fabricate a `pan_authenticated` value out of a document that was never
+    routed to any action satisfying that field."""
     text, ocr_meta, _fields = _render_and_ocr(
         _draw_pan_card, "PAN_CARD_IMAGE", "pan_standard", seed=4002
     )
@@ -114,8 +130,8 @@ async def test_pan_card_satisfies_boolean_pan_authenticated_field():
         ocr_meta=ocr_meta,
     )
 
-    assert result.verified is True
-    assert result.raw_values.get("pan_authenticated") is True
+    assert result.raw_values.get("pan_authenticated") is not True
+    assert "pan_authenticated" not in {d.key for d in result.detected}
 
 
 async def test_aadhaar_satisfies_signature_uploaded_per_actual_manifest_mapping():

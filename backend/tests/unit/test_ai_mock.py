@@ -130,6 +130,13 @@ async def test_reconcile_evidence_all_six_packs():
             for w in BANNED_WORDS:
                 assert w not in summary_lower, f"Found banned word '{w}' in summary"
 
+            # Real-browser QA regression: `summary` is rendered verbatim on
+            # Screen 7 (`ai-summary-text`); frontend/CLAUDE.md rule 1 is
+            # absolute - "NEVER render a percentage" - and the live app's
+            # real summary text used to read "...with high confidence
+            # (96%)." for exactly this MockAI code path.
+            assert "%" not in res.summary, f"Found a raw percentage in summary: {res.summary!r}"
+
 
 @pytest.mark.asyncio
 async def test_reconcile_evidence_conflict_detection():
