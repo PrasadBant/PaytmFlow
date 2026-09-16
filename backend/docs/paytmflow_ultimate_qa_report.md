@@ -1902,3 +1902,276 @@ on `frontend/.env` afterward).
 This confirms the Help routing fix introduced zero E2E regressions.
 
 **HELP ROUTING FIXED - SIDEBAR HELP NOW RENDERS THE ACTUAL HELP PAGE.**
+
+---
+
+## §23 FINAL REPOSITORY CLEANUP AUDIT
+
+**Date:** 2026-09-16 (continuation session)
+**Scope:** A conservative audit for unwanted, obsolete, duplicated,
+generated, or accidentally-committed files across the entire tracked
+repository. Not a refactor - no application behavior, API contract,
+backend/frontend logic, Document AI models, manifests, database schema,
+tests, or security behavior was changed. Per the mandate's own final rule:
+files were deleted only where all seven of its conditions were provably
+true; everything else was left alone rather than manufactured into cleanup
+work.
+
+### Files inspected
+
+**537 tracked files** (`git ls-files | wc -l`, baseline before this pass),
+covering `backend/` (331), `frontend/` (167), `contract/` (36), and 3 root
+files. Every file was included in the sha256 hash-duplication pass; every
+suspicious pattern, doc, script, and config file was individually reviewed
+for references before any deletion decision.
+
+### Files removed
+
+**One file removed:**
+
+- **`frontend/scripts/capture-visual-qa.mjs`** (193 lines)
+  - **Reason:** a one-off Playwright screenshot-capture utility that hardcoded
+    an absolute output path belonging to a different individual's machine
+    and a third-party AI-IDE tool's local data directory (identified by
+    inspecting the file's contents - not reproduced here since it names a
+    real person and a specific local file path, matching the audit's
+    "accidentally committed personal files" category from §9 of the
+    mandate). As committed, the script could not function correctly on any
+    machine other than the one it was written on. It was not referenced by
+    `package.json` scripts, not imported by any other file, not part of any
+    test suite or build step, and a repo-wide `git grep` for the same
+    identifying strings found no other occurrences anywhere in the tracked
+    tree - this was an isolated, one-time accidental commit.
+  - **Classification:** G (TEMPORARY) / a personal-environment artifact
+    under §9. Also incidentally the kind of detail a public-facing
+    repository should not expose about a contributor's local environment or
+    tooling.
+  - **Verification before deletion:** confirmed via `grep -n "capture-visual-qa"
+    frontend/package.json` (no match), and `git grep` across the full tracked
+    tree for the file's identifying strings (only the file itself matched).
+    All seven of the mandate's §11 conditions were satisfied: unnecessary,
+    unreferenced, not required by tests/runtime, not documentation, not a
+    model/data asset, not required for reproducibility (it could not even
+    run on another machine as committed), and its removal changes no
+    application behavior.
+  - `frontend/scripts/` is now empty and untracked (git does not track
+    empty directories - no further action needed).
+
+**No other files met the full deletion bar.** Several files that initially
+looked like candidates were investigated and confirmed required - see
+"Files retained" below for exactly why each was kept, including two cases
+where the first-pass reference search gave a misleading negative result and
+a deeper check reversed the initial impression.
+
+### Files retained
+
+Suspicious-looking files that were deliberately investigated and kept,
+with the specific evidence that justified keeping each one:
+
+- **`contract/fixtures/**/*.json`** (34 files) - looked like it might be a
+  stale, pre-implementation snapshot of the "frozen contract" fixtures,
+  superseded by `frontend/src/mocks/fixtures/`. A literal-string grep for
+  "contract/fixtures" across `backend/tests/` found nothing, which would
+  have wrongly suggested these were unused. A closer read of
+  `backend/tests/contract/test_fixtures_match_schema.py` showed it
+  constructs the fixtures directory path dynamically
+  (`Path(__file__).parents[3] / "contract" / "fixtures"`) and loads every
+  fixture file to validate it against its corresponding Pydantic response
+  schema - this is an active, required contract test suite, not dead
+  weight. **Retained, category C (REQUIRED TEST/QA ARTIFACT).**
+- **`backend/README.md`** (3 lines, a minimal stub) - looked like a stray
+  duplicate of the root `README.md` that was just rewritten this session.
+  It is not a duplicate in the harmful sense: `backend/pyproject.toml`
+  declares `readme = "README.md"`, which Python packaging tooling (build/
+  setuptools) resolves relative to `backend/` - removing this file would
+  break package metadata resolution for the `paytmflow-backend`
+  distribution. **Retained, category A (REQUIRED), referenced by
+  `pyproject.toml`.**
+- **`backend/app/docai/bench_dl_classifier.py`, `bench_dl_extraction.py`,
+  `bench_ocr_doctr.py`, `bench_ocr_paddleocr.py`,
+  `bench_ocr_paddleocr_small.py`**, and their corresponding report JSON
+  files under `backend/data/docai/lending/reports/` (`dl_classifier_bench.json`,
+  `dl_extraction_bench_small8.json`, `ocr_bench_doctr.json`,
+  `ocr_bench_small_8doc.json`, `ocr_robustness_by_tier.json`) - these exist
+  only for the Lending journey (not all six), which initially looked like
+  an asymmetric, possibly-abandoned experiment. `grep -rl` across
+  `backend/docs/` confirmed `docai_report.md` explicitly cites and
+  discusses these benchmark scripts and their results - they document the
+  actual technology decision (why Tesseract + a lightweight classifier was
+  chosen over PaddleOCR/docTR/a deep-learning classifier), run once against
+  the flagship journey to inform that choice. **Retained, category B
+  (USEFUL DOCUMENTATION) - referenced, historical decision evidence.**
+- **`backend/data/docai/{account_opening,credit_card,insurance,investment,kyc}/dataset_manifest.json`**
+  (5 files) - the sha256 hash-duplication pass flagged these as
+  byte-identical. Inspection showed each is a small, four-field JSON
+  (`{"train": 75, "val": 21, "test": 27, "unseen_template": 39}`) written
+  by that journey's own `generate_<journey>.py` dataset script at its own
+  required path, and read back by the same script. The five journeys
+  happen to share identical split sizes, which is why the content matches
+  - it is not the same file committed twice. **Retained, category E
+  (GENERATED BUT REQUIRED)**, one per journey, each independently written
+  and read by that journey's generation script.
+- **`backend/app/docai/models/*.joblib` and `*.meta.json`** (12 files, all
+  six journeys) - verified each is loaded by exact filename pattern in
+  `backend/app/docai/classifier.py` (`MODELS_DIR / f"{journey_type.lower()}_classifier.joblib"`).
+  **Retained, category D (REQUIRED MODEL/DATA ASSET)** - all twelve are
+  load-bearing at runtime.
+- **`backend/data/docai/**/*.pdf` and `*.jpg`** (the bulk generated test
+  document corpus, used extensively in this session's document-AI QA
+  testing) - these are **not tracked in git at all**, by design: `.gitignore`
+  explicitly excludes them with a documented rationale (regenerable via
+  `uv run python -m app.docai.dataset.generate`), while the small
+  `labels.jsonl`/`ocr_cache.jsonl`/report files that make the results
+  reproducible without the multi-hundred-file binary corpus ARE tracked.
+  Verified this split is intact and intentional, not an accident - nothing
+  changed here.
+- **`backend/docs/*.md`** (17 files total) - every report was read and
+  confirmed to document genuinely distinct work: per-journey Document AI
+  reports (one each for account_opening, credit_card, insurance,
+  investment, kyc, plus a shared `docai_report.md` and a cross-document
+  consistency report), a hardening report, a prototype audit, a
+  human-first QA pass, a full-flow audit, an end-to-end release report,
+  and the actively-maintained master (`paytmflow_ultimate_qa_report.md`,
+  now 23 sections). None were found to be a byte-identical or
+  content-redundant duplicate of another (confirmed via the sha256 pass -
+  none of these hashed the same). Per the mandate's explicit instruction in
+  §6, none were deleted; none are flagged as unambiguously superseded
+  either - each covers a distinct phase or subsystem of a long development
+  and QA history and has standalone value as a historical record.
+- **`PaytmFlow.code-workspace`** (root, 8 lines, a minimal generic VS Code
+  workspace file with no machine-specific paths or settings) - harmless,
+  contains nothing identifying or broken, plausibly a deliberate
+  convenience file for a consistent editor setup. Not proven unwanted.
+  **Retained, category J (UNKNOWN) but zero risk.**
+- **`frontend/.env`** (tracked in git) - confirmed this is intentional, not
+  an accidental secret commit: it contains only three non-sensitive
+  Vite build-time flags (`VITE_API_MODE`, `VITE_API_BASE`,
+  `VITE_SHOW_DEV_BADGES`), no credentials. `VITE_`-prefixed variables are
+  compiled into the public client bundle regardless of whether the source
+  `.env` file is tracked, so there is no actual exposure difference. Backend
+  secrets (`backend/.env`) remain correctly gitignored throughout.
+
+### Files requiring human review
+
+None. Every suspicious file encountered during this pass was either
+confirmed required (see above) or unambiguously safe to remove (the one
+file that was removed). Nothing fell into a genuinely ambiguous middle
+ground this time.
+
+### Git cleanup
+
+- `.gitignore` was reviewed in full and found already well-maintained: it
+  correctly excludes Python caches (`__pycache__/`, `.pytest_cache/`,
+  `.mypy_cache/`, `.ruff_cache/`, `.import_linter_cache/`), Node artifacts
+  (`node_modules/`, `dist/`, `test-results/`, `playwright-report/`,
+  `coverage/`, `.vite/`), OS/editor files (`.DS_Store`, `Thumbs.db`,
+  `.vscode/`, `.idea/`), both `.env` files that should never be tracked
+  (`backend/.env`, `frontend/.env.local`), the evidence-upload storage
+  directory (with an explicit `.gitkeep` exception to keep the directory
+  itself present), and the bulk Document AI document corpus (with a
+  documented rationale for what's excluded vs. kept). **No changes made** -
+  it does not need improvement and nothing broad was added.
+- Confirmed no generated/temporary file is currently tracked: a full
+  filename-pattern sweep of all 537 tracked files for cache/log/temp/OS-cruft
+  extensions (`.pyc`, `.log`, `.tmp`, `.bak`, `.orig`, `.swp`, `DS_Store`,
+  `Thumbs.db`, `desktop.ini`) found zero matches.
+- Confirmed no stray untracked scratch/temp/output directories exist
+  anywhere in the working tree outside the already-gitignored heavy
+  dependency directories.
+- No accidental source-hiding risk: no `.gitignore` change was made in this
+  pass, so there is nothing new to verify on that front.
+
+### Security cleanup
+
+- **One finding, already remediated above**: `frontend/scripts/capture-visual-qa.mjs`
+  hardcoded a local file-system path revealing a specific individual's name
+  and a third-party AI-tooling directory structure. This is not a
+  credential/secret leak (no password, key, or token was present), but it
+  is exactly the kind of accidentally-committed personal/environment
+  artifact the mandate's §9 asked to look for. Removed.
+- **No `.env` file with real secrets was found tracked.** `backend/.env` is
+  correctly gitignored and was never tracked. The two tracked frontend env
+  files (`.env`, `.env.production`) and the two `.env.example` files
+  (frontend and backend) contain only non-sensitive configuration or
+  placeholder values, confirmed by direct inspection - `backend/.env.example`'s
+  `SESSION_SECRET`/`DEMO_RESET_SECRET` are the well-known literal
+  placeholder strings the application's own startup guard
+  (`app/config.py::_reject_placeholder_secrets_outside_local_or_ci`)
+  refuses to run with outside `local`/`ci` - not real secrets.
+- **No credentials, private keys, certificates, tokens, or database dumps**
+  were found anywhere in the tracked tree (swept by filename pattern:
+  `credential`, `secret`, `private.*key`, `.pem`, `.p12`, `.pfx`, `.key`,
+  `dump.sql`, `.sqlite`, `.db`).
+- No secret values are reproduced anywhere in this report, per the
+  mandate's explicit instruction.
+
+### Regression results
+
+All suites re-run after the single deletion above, against the isolated
+`_test`-suffixed database (never the demo database):
+
+| Suite | Result |
+|---|---|
+| Backend pytest (`DATABASE_URL` -> port 5433's `_test` DB, `AI_PROVIDER=mock`) | **501/501 passed** (63.6s) - baseline held |
+| Backend ruff (`uv run ruff check .`) | Clean |
+| Backend import-linter (`uv run lint-imports`) | Clean - 1 contract kept, 0 broken (91 files, 263 dependencies analyzed) |
+| Frontend typecheck (`tsc --noEmit`) | Clean |
+| Frontend lint (ESLint, `--max-warnings 0`) | Clean |
+| Frontend unit tests (Vitest) | **339/339 passed**, 40 files - baseline held (332 original + 7 from the earlier Help-routing-fix pass this session; the mandate's stated 332 baseline predates that fix and is not a regression) |
+| Playwright E2E (`npx playwright test`, mock mode - the suite's intended environment) | **52/52 passed** (39.9s) - baseline held |
+
+Mypy was intentionally **not** re-run as part of this pass's regression
+gate, per the mandate's own instruction ("Do not attempt unrelated mypy
+cleanup") - the single file removed was a frontend `.mjs` script with no
+Python type-checking surface, so it cannot affect the documented 126/23
+baseline. No backend Python source was touched.
+
+### Real application sanity check
+
+Performed against the live dev stack (frontend `:5173`, backend `:8000`,
+PostgreSQL in the `paytmflow-postgres` container) after all of the above:
+
+- **Backend health**: `GET /api/v1/health` -> `{"status":"ok","db":true,"packs_loaded":6,"packs_supported":6,"ai_provider":"local_ml","git_sha":"dev"}` -
+  confirms the database connection, all six journey packs loaded, and the
+  real local Document AI provider active (not mock).
+- **All six journey packs load**: `GET /api/v1/journey-packs` returned
+  exactly `['LENDING', 'INSURANCE', 'CREDIT_CARD', 'KYC', 'ACCOUNT_OPENING', 'INVESTMENT']`.
+- **Help page**: proven by the passing `router.test.tsx` regression test
+  (asserts `/help` renders `screen-help` with the real "How can we help?"
+  header and that `screen-01-home`/the Home hero text are absent) re-run as
+  part of the 339/339 suite above, immediately after this pass's file
+  removal - `curl` against the SPA route was not used for this check since
+  it cannot execute client-side React rendering and would give a false
+  negative regardless of correctness.
+- **One complete journey end-to-end**: a real Lending journey was created
+  via the live API (`POST /journeys` -> 201, `readiness: NOT_READY`),
+  its status fetched (`GET /journeys/{id}` -> 200, 7 real manifest-driven
+  fields), and its recommendation fetched (`GET /journeys/{id}/recommendation`
+  -> 200, real `SUBMIT_EMPLOYMENT_INFO` action) - all against the real
+  backend and real PostgreSQL, no mocking.
+- **No missing static/model/config file errors**: backend server log
+  output was checked for `error`/`exception`/`traceback`/`missing` across
+  this entire session - none found.
+- A benign, content-free git line-ending flag on `frontend/.env` (from
+  temporarily toggling `VITE_API_MODE` to `mock` for the Playwright run and
+  back to `live` afterward, required to get an accurate Playwright result)
+  was confirmed via `git diff` to carry zero actual content change before
+  restarting the frontend server in its original `live` configuration.
+
+### Final repository state
+
+- **Clean.** One accidental personal-environment artifact removed;
+  everything else in the tracked tree was confirmed required, referenced,
+  or intentionally retained with documented justification.
+- **Application starts and runs correctly** - frontend, backend, and
+  PostgreSQL all verified live and responding after cleanup.
+- **Document AI loads correctly** - `AI_PROVIDER=local_ml` active, all six
+  journey classifiers present and loadable, health endpoint confirms
+  `packs_loaded: 6`.
+- No regressions introduced: backend 501/501, frontend unit 339/339,
+  Playwright 52/52, ruff/typecheck/lint/import-linter all clean - identical
+  to the pre-cleanup baseline in every dimension except the one
+  intentional, justified deletion.
+
+No commits were made as part of this pass - the single deletion is staged
+in the working tree for review.
