@@ -1,3 +1,7 @@
+from pathlib import Path
+
+from PIL import Image
+
 from app.docai.extraction import (
     extract_document_date,
     extract_employer_name,
@@ -6,7 +10,7 @@ from app.docai.extraction import (
     extract_monthly_income,
     extract_name,
 )
-from app.docai.ocr import OcrLine
+from app.docai.ocr import TESSERACT_AVAILABLE, OcrLine, ocr_image
 
 
 class TestExtractMonthlyIncomeSalarySlip:
@@ -398,3 +402,157 @@ class TestLabelMatchingSafety:
         text = "OFFICE OF THE ELECTRICITY SUPPLY BOARD\nBilled to: Eric Goodwin"
         field = extract_name(text)
         assert field.value == "Eric Goodwin"
+
+
+class TestMonthlyNetIncomeExtractionRegression:
+    """Regression suite for P1 bug: Monthly Net Income extraction must correctly
+    extract the net take-home figure without summing multiple monetary amounts
+    or confusing gross earnings / deductions with net income.
+    """
+
+    def test_case_a_gross_deductions_monthly_net_income_plain_text(self):
+        """CASE A (plain text):
+        Gross Earnings = ₹1,00,000
+        Total Deductions = ₹15,000
+        MONTHLY NET INCOME = ₹85,000
+        Expected: 85000 (not 185000, not 100000).
+        """
+        text = (
+            "Acme Technologies India Pvt Ltd\n"
+            "Payslip for March 2026\n"
+            "Employee Name: Rahul Sharma\n"
+            "Gross Earnings = ₹1,00,000\n"
+            "Total Deductions = ₹15,000\n"
+            "MONTHLY NET INCOME = ₹85,000\n"
+        )
+        field = extract_monthly_income(text, "SALARY_SLIP")
+        assert field.value == 85000
+        assert field.validated
+
+    def test_case_a_gross_deductions_monthly_net_income_table_boxes(self):
+        """CASE A (two-column / table layout with OCR bounding boxes):
+        In reading order, Gross (top row) appears before Net (bottom row), but
+        bounding-box vertical row alignment must correctly match MONTHLY NET INCOME
+        with ₹85,000 on the exact same row band.
+        """
+        text = (
+            "Acme Technologies India Pvt Ltd\n"
+            "Gross Earnings\n"
+            "Total Deductions\n"
+            "MONTHLY NET INCOME\n"
+            "₹1,00,000\n"
+            "₹15,000\n"
+            "₹85,000"
+        )
+        lines = [
+            OcrLine(text="Acme Technologies India Pvt Ltd", top=50, bottom=70),
+            OcrLine(text="Gross Earnings", top=100, bottom=120),
+            OcrLine(text="Total Deductions", top=140, bottom=160),
+            OcrLine(text="MONTHLY NET INCOME", top=180, bottom=200),
+            OcrLine(text="₹1,00,000", top=100, bottom=120),
+            OcrLine(text="₹15,000", top=140, bottom=160),
+            OcrLine(text="₹85,000", top=180, bottom=200),
+        ]
+        field = extract_monthly_income(text, "SALARY_SLIP", lines=lines)
+        assert field.value == 85000
+        assert field.validated
+
+    def test_case_b_multiple_monetary_amounts_not_summed(self):
+        """CASE B:
+        A salary slip containing multiple earnings and deductions components:
+        - Basic Salary: ₹50,000
+        - HRA: ₹25,000
+        - Special Allowance: ₹25,000
+        - Gross Earnings: ₹1,00,000
+        - Provident Fund: ₹10,000
+        - Professional Tax: ₹5,000
+        - Total Deductions: ₹15,000
+        - Net Salary Payable / Take Home: ₹85,000
+
+        Expected extraction = 85000 (strictly the net salary, NOT the sum of amounts).
+        """
+        text = (
+            "Horizon Financial Solutions Pvt Ltd\n"
+            "Salary Slip - February 2026\n"
+            "Employee: Priya Patel\n"
+            "Basic Salary: ₹50,000\n"
+            "HRA: ₹25,000\n"
+            "Special Allowance: ₹25,000\n"
+            "Gross Earnings: ₹1,00,000\n"
+            "Provident Fund: ₹10,000\n"
+            "Professional Tax: ₹5,000\n"
+            "Total Deductions: ₹15,000\n"
+            "Net Salary Payable: ₹85,000\n"
+        )
+        field = extract_monthly_income(text, "SALARY_SLIP")
+        assert field.value == 85000
+        assert field.validated
+
+    def test_case_b_take_home_with_multiple_amounts_table_layout(self):
+        """CASE B (table layout):
+        Verify that multiple breakdown lines do not mislead candidate ranking.
+        """
+        text = (
+            "Basic: ₹50,000\n"
+            "HRA: ₹25,000\n"
+            "Gross Pay: ₹1,00,000\n"
+            "Deductions: ₹15,000\n"
+            "Take Home: ₹85,000\n"
+        )
+        lines = [
+            OcrLine(text="Basic: ₹50,000", top=100, bottom=120),
+            OcrLine(text="HRA: ₹25,000", top=130, bottom=150),
+            OcrLine(text="Gross Pay: ₹1,00,000", top=160, bottom=180),
+            OcrLine(text="Deductions: ₹15,000", top=190, bottom=210),
+            OcrLine(text="Take Home: ₹85,000", top=220, bottom=240),
+        ]
+        field = extract_monthly_income(text, "SALARY_SLIP", lines=lines)
+        assert field.value == 85000
+        assert field.validated
+
+    def test_case_c_existing_golden_path_lending_salary_slip(self):
+        """CASE C:
+        Existing golden-path Lending document (SALARY_SLIP_salary_takehome_0049.jpg).
+        Expected extraction must remain exactly 77,000.
+        """
+        if not TESSERACT_AVAILABLE:
+            return
+        fixture_path = (
+            Path(__file__).resolve().parents[2]
+            / "data"
+            / "docai"
+            / "lending"
+            / "unseen_template"
+            / "SALARY_SLIP_salary_takehome_0049.jpg"
+        )
+        if not fixture_path.exists():
+            return
+        img = Image.open(fixture_path)
+        ocr_res = ocr_image(img)
+        field = extract_monthly_income(ocr_res.text, "SALARY_SLIP", lines=ocr_res.lines)
+        assert field.value == 77000
+        assert field.validated
+
+    def test_case_d_bank_statement_income_proof(self):
+        """CASE D:
+        Bank Statement accepted as income proof (BANK_STATEMENT_bank_axis_unseen_0109.jpg).
+        Expected extraction must remain unchanged (₹1,34,000).
+        """
+        if not TESSERACT_AVAILABLE:
+            return
+        fixture_path = (
+            Path(__file__).resolve().parents[2]
+            / "data"
+            / "docai"
+            / "lending"
+            / "unseen_template"
+            / "BANK_STATEMENT_bank_axis_unseen_0109.jpg"
+        )
+        if not fixture_path.exists():
+            return
+        img = Image.open(fixture_path)
+        ocr_res = ocr_image(img)
+        field = extract_monthly_income(ocr_res.text, "BANK_STATEMENT", lines=ocr_res.lines)
+        assert field.value == 134000
+        assert field.validated
+

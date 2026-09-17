@@ -20,7 +20,12 @@ from dataclasses import dataclass
 
 from app.docai.normalize import normalize_date, normalize_indian_amount, try_fix_ocr_digit_confusion
 
-_AMOUNT_TOKEN = r"(₹|Rs\.?|INR)?\s*[\d,OoIlSB]{3,}(?:\.\d{1,2})?"
+_AMOUNT_TOKEN = (
+    r"(?<![A-Za-z])"
+    r"(?:(?:₹|Rs\.?|INR)\s*[\d,OoIlSB]{3,}|(?=(?:[\d,OoIlSB]*\d))[\d,OoIlSB]{3,})"
+    r"(?:\.\d{1,2})?"
+    r"(?![A-Za-z])"
+)
 
 # Common single-character OCR misreads among letters (distinct from the
 # digit-confusion table in normalize.py - this is the ALPHABETIC analogue).
@@ -73,7 +78,17 @@ INCOME_LABELS_SALARY_SLIP = [
     # extractor recognizing one more real-world phrasing of the same
     # concept it already extracts, per this file's own stated design).
     r"monthly\s*net\s*income",
+    r"net\s*income",
 ]
+
+# Labels belonging to other financial breakdown categories (e.g. gross earnings,
+# deductions) that must NOT be selected as the amount for a net income label.
+_EXCLUDED_INCOME_LABELS = re.compile(
+    r"\b(?:gross(?:\s*pay|\s*earnings|\s*salary)?|total\s*gross|total\s*earnings|"
+    r"deductions?|total\s*deductions?|provident\s*fund|\bpf\b|\btax\b|\btds\b|\besi\b|"
+    r"basic(?:\s*pay|\s*salary)?|hra|allowances?)\b",
+    re.IGNORECASE,
+)
 
 # Real-world synonym labels for a salary credit line inside a bank
 # statement, across differing issuer wording conventions.
@@ -83,16 +98,11 @@ INCOME_LABELS_BANK_STATEMENT = [
     r"by\s*salary",
     # Narration-code style ("SAL/<company>") - built fuzzy-tolerant via
     # `_fuzzy_literal` (so a traced real misread like "SAL" -> "SAU"
-    # still matches) with a mandatory dash-or-slash separator. The
-    # separator itself is still REQUIRED (not made fully optional):
-    # dropping that requirement would let a bare "sal" match as a
-    # substring prefix of any unrelated word (e.g. a company or place
-    # name starting with those letters), trading one narrow OCR failure
-    # mode for a much broader false-positive risk - not a trade this
-    # pipeline makes. Cases where OCR destroys the separator with no
-    # trace at all remain a disclosed residual limitation, not silently
-    # papered over (see docs/docai_report.md).
-    rf"{_fuzzy_literal('sal')}\s*[-/]\s*",
+    # still matches) with a dash/slash/backslash/pipe separator, tolerating
+    # the common OCR artifact where a forward slash is recognized as 'I' or 'l'
+    # before uppercase company initials (e.g. "SAL/SHAW" -> "SALISHAW").
+    rf"{_fuzzy_literal('sal')}\s*[-/\\|]\s*",
+    rf"{_fuzzy_literal('sal')}[Il/\\|-](?=[A-Z])\s*",
 ]
 
 
@@ -195,38 +205,18 @@ def _find_amount_near_label(
     """Returns (raw_amount_string, evidence_span) for an amount token
     associated with any of the given label patterns.
 
-    Builds ONE candidate pool per label pattern from every amount token
-    that could plausibly belong to it - the label's own OCR line, plus
-    (when `lines`, real OcrLine boxes with top/bottom pixel positions,
-    are supplied) every other line within a per-document, self-calibrated
-    row-band tolerance (`_row_band_tolerance`) - then ranks candidates by:
-
-      1. comma/currency-marked amounts before bare digit runs (a bare
-         number on or near the label is far more often a year/id/account
-         fragment than the actual figure);
-      2. among equally-marked candidates, closest ORDINAL LINE INDEX to
-         the label's own line - i.e. "how many printed lines away", not
-         raw pixel distance. This matters because two OCR text blocks
-         (e.g. a left description column and a right amount column split
-         apart by Tesseract's page segmentation) can each have slightly
-         different per-line bounding-box heights, which skews raw pixel
-         y-distance in ways that ordinal position in reading order does
-         not: when a label is the Nth line of its column and a value is
-         the Nth line of its column, they belong together regardless of
-         a few pixels of box-height noise - this is a standard structural
-         heuristic for OCR-segmented tables, not tuned to any one layout;
-      3. raw pixel distance, as a final tiebreaker.
-
-    Never short-circuits on the first source found - a weak bare number
-    on the label's own line (e.g. a transaction-date year) does not
-    pre-empt a stronger, correctly-associated candidate found elsewhere.
+    Builds candidate pool per label pattern from:
+      1. Same-line matches: an amount token on the exact same OCR/text line as the label.
+      2. Table/column-aligned matches (when `lines`, real OcrLine boxes with top/bottom
+         pixel positions, are supplied): associates table row labels with their corresponding
+         row amounts using vertical row-band proximity and row ranking, excluding candidate
+         amounts explicitly associated with opposing breakdown categories (e.g. Gross/Deductions).
     """
-    line_index = {id(ln): i for i, ln in enumerate(lines)} if lines else {}
     tolerance = _row_band_tolerance(lines) if lines else 0.0
 
     for label_pattern in label_patterns:
         label_re = re.compile(label_pattern, re.IGNORECASE)
-        # (is_marked, index_distance, pixel_distance, match, evidence)
+        # (is_marked, rank_distance, pixel_distance, match, evidence)
         candidates: list[tuple[bool, int, float, re.Match, str]] = []
 
         for line in text.splitlines():
@@ -237,20 +227,48 @@ def _find_amount_near_label(
         if lines:
             label_line = next((ln for ln in lines if label_re.search(ln.text)), None)
             if label_line:
-                label_idx = line_index[id(label_line)]
                 label_top = label_line.top
-                for candidate_line in lines:
-                    if candidate_line is label_line:
-                        continue
-                    pixel_distance = abs(candidate_line.top - label_top)
+
+                amount_lines = [
+                    ln for ln in lines
+                    if _amounts_in_line(ln.text) and ln is not label_line
+                ]
+
+                # Identify labeled rows in the table section to determine relative row ranking
+                if amount_lines:
+                    min_amt_top = min(a.top for a in amount_lines) - tolerance
+                    table_label_lines = [
+                        ln for ln in lines
+                        if ln not in amount_lines and ln.top >= min_amt_top
+                    ]
+                    label_rank = (
+                        table_label_lines.index(label_line)
+                        if label_line in table_label_lines
+                        else 0
+                    )
+                else:
+                    table_label_lines = []
+                    label_rank = 0
+
+                for candidate_line in amount_lines:
+                    pixel_distance = float(abs(candidate_line.top - label_top))
                     if pixel_distance > tolerance:
                         continue
-                    idx_distance = abs(line_index[id(candidate_line)] - label_idx)
+
+                    # Exclude candidate lines explicitly labeled with other breakdown categories
+                    if _EXCLUDED_INCOME_LABELS.search(candidate_line.text) and not label_re.search(
+                        candidate_line.text
+                    ):
+                        continue
+
+                    amount_rank = amount_lines.index(candidate_line)
+                    rank_diff = abs(label_rank - amount_rank)
+
                     for m in _amounts_in_line(candidate_line.text):
                         candidates.append(
                             (
                                 _is_marked_amount(m.group(0)),
-                                idx_distance,
+                                rank_diff,
                                 pixel_distance,
                                 m,
                                 f"{label_line.text.strip()} | {candidate_line.text.strip()}",
@@ -261,7 +279,7 @@ def _find_amount_near_label(
             continue
 
         candidates.sort(key=lambda c: (not c[0], c[1], c[2]))
-        chosen_marked, _idx, _px, chosen_match, chosen_evidence = candidates[0]
+        chosen_marked, _rank, _px, chosen_match, chosen_evidence = candidates[0]
         return chosen_match.group(0), chosen_evidence
 
     return None, None

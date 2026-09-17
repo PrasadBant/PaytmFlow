@@ -36,7 +36,7 @@ def extract_text_from_document(content: bytes, mime_type: str) -> str:
         try:
             doc = pymupdf.open(stream=content, filetype="pdf")
             pages_text = []
-            for page in doc:
+            for page in doc:  # type: ignore
                 text = page.get_text()
                 if text and text.strip():
                     pages_text.append(text.strip())

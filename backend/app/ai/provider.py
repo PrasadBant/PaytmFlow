@@ -66,6 +66,7 @@ class AIProvider(Protocol):
 
 def get_ai_provider(guardrailed: bool = True) -> AIProvider:
     """Factory retrieving the configured AI provider instance based on settings."""
+    base_provider: AIProvider
     if settings.AI_PROVIDER == "llm":
         from app.ai.llm import LLMProvider
 
@@ -77,7 +78,7 @@ def get_ai_provider(guardrailed: bool = True) -> AIProvider:
     else:
         from app.ai.mock import MockAI
 
-        base_provider = MockAI()
+        base_provider = MockAI()  # type: ignore
 
     if guardrailed:
         from app.ai.guardrails import GuardrailedAIProvider

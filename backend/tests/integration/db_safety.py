@@ -111,13 +111,22 @@ def assert_safe_for_destructive_db_setup(url: str) -> None:
     provably safe to destroy."""
     normalized = _normalize_scheme(url)
 
-    if normalized == KNOWN_DEMO_DATABASE_URL:
+    # The exact, literal default DATABASE_URL
+    known_demo = make_url(
+        _normalize_scheme(os.environ.get("DATABASE_URL", KNOWN_DEMO_DATABASE_URL))
+    )
+    parsed = make_url(normalized)
+
+    if (
+        parsed.database == known_demo.database
+        and parsed.host == known_demo.host
+        and parsed.port == known_demo.port
+    ):
         raise UnsafeTestDatabaseError(
             "Refusing to run destructive integration-test database setup "
-            f"against {normalized!r} - this is the exact, literal default "
-            "DATABASE_URL for the real PaytmFlow demo/dev database "
-            "(app/config.py, backend/docker-compose.yml). Running the "
-            "integration suite against it would DROP every real table. Set "
+            f"against {normalized!r} - this matches the configured "
+            "DATABASE_URL for the real PaytmFlow demo/dev database. "
+            "Running the integration suite against it would DROP every real table. Set "
             f"{TEST_DATABASE_URL_ENV_VAR} to a dedicated test database "
             "instead - there is no override for this specific URL."
         )

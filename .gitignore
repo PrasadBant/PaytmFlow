@@ -21,6 +21,9 @@ backend/*.egg-info/
 backend/storage/evidence/*
 !backend/storage/evidence/.gitkeep
 backend/.env
+backend/*.db
+backend/*.db_test
+backend/mypy_errors.txt
 
 # --- Agent / tooling scratch (not part of the product) ---
 .agents/

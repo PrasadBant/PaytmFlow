@@ -15,9 +15,7 @@ from app.config import settings
 if sys.platform == "win32":
     import asyncio
 
-    if not isinstance(
-        asyncio.get_event_loop_policy(), asyncio.WindowsSelectorEventLoopPolicy
-    ):
+    if not isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsSelectorEventLoopPolicy):
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # Format async connection string if necessary

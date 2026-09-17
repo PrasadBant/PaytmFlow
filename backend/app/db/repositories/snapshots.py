@@ -38,12 +38,9 @@ class SnapshotRepository:
     async def get_by_version(
         self, journey_id: UUID, version_number: int
     ) -> JourneySnapshotModel | None:
-        stmt = (
-            select(JourneySnapshotModel)
-            .where(
-                JourneySnapshotModel.journey_id == journey_id,
-                JourneySnapshotModel.version_number == version_number,
-            )
+        stmt = select(JourneySnapshotModel).where(
+            JourneySnapshotModel.journey_id == journey_id,
+            JourneySnapshotModel.version_number == version_number,
         )
         return await self.session.scalar(stmt)
 

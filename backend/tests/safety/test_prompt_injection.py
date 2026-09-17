@@ -132,8 +132,8 @@ def test_no_prohibited_claim_in_pack_copy(jtype: JourneyType):
             if term in text_lower:
                 violations.append(f"{jtype}.{location}: contains '{term}'")
 
-    assert not violations, (
-        f"Prohibited claims found in pack {jtype} copy:\n" + "\n".join(violations)
+    assert not violations, f"Prohibited claims found in pack {jtype} copy:\n" + "\n".join(
+        violations
     )
 
 
@@ -145,7 +145,6 @@ def test_cross_session_ownership_check():
 
     Tests the ownership dependency function directly without HTTP overhead.
     """
-
 
     # This is a pure logic test of the ownership dependency:
     # A journey owned by session A must be invisible to session B.
@@ -188,6 +187,4 @@ def test_x_session_id_ignored_in_demo_mode():
     assert '"local"' in src or "'local'" in src, (
         "resolve_session_id must accept X-Session-Id in local mode"
     )
-    assert '"ci"' in src or "'ci'" in src, (
-        "resolve_session_id must accept X-Session-Id in ci mode"
-    )
+    assert '"ci"' in src or "'ci'" in src, "resolve_session_id must accept X-Session-Id in ci mode"

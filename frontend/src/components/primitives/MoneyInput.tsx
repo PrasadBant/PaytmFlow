@@ -61,11 +61,12 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
       const rawInput = e.target.value;
       const parsedNum = parseIndianCurrency(rawInput);
 
+      // Keep user's exact typed string without aggressive reformatting mid-typing
+      setDisplayVal(rawInput);
+      
       if (parsedNum !== null) {
-        setDisplayVal(formatIndianCurrency(parsedNum));
         onChange?.(parsedNum);
       } else {
-        setDisplayVal(rawInput.replace(/[^0-9,]/g, ''));
         onChange?.(null);
       }
     };

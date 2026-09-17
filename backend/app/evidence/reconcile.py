@@ -133,7 +133,9 @@ class EvidenceReconciliationService:
         }
         current_statuses = {
             k: CoreFieldStatus(
-                v.get("status") if isinstance(v, dict) else getattr(v, "status", "BLOCKED")
+                (v.get("status") or "BLOCKED")
+                if isinstance(v, dict)
+                else getattr(v, "status", "BLOCKED")
             )
             for k, v in snapshot_model.fields.items()
         }

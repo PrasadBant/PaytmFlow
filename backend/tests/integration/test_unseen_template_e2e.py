@@ -129,8 +129,6 @@ async def test_unseen_wrong_document_never_advances_state(
     assert act_resp.json()["error"]["code"] == "EVIDENCE_CONFLICT"
 
     check_resp = await client.get(f"/api/v1/journeys/{journey_id}", headers=session_headers)
-    income_field = next(
-        f for f in check_resp.json()["fields"] if f["key"] == "monthly_income"
-    )
+    income_field = next(f for f in check_resp.json()["fields"] if f["key"] == "monthly_income")
     assert income_field["value"] is None
     assert check_resp.json()["version_number"] == 1

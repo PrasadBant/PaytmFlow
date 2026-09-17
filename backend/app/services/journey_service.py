@@ -245,7 +245,9 @@ def get_resolve_action_id(
     unsatisfied_pre = []
     for p in selected_action.preconditions:
         p_state = derived_states.get(p)
-        status_val = p_state.status if hasattr(p_state, "status") else p_state.get("status")
+        status_val = None
+        if p_state:
+            status_val = p_state.status if hasattr(p_state, "status") else p_state.get("status")
         if status_val not in [CoreFieldStatus.SATISFIED, "SATISFIED"]:
             is_executable = False
             unsatisfied_pre.append(p)
@@ -550,7 +552,9 @@ class JourneyService:
             )
 
         snapshot_repo = SnapshotRepository(db)
-        snapshot = await snapshot_repo.get_by_id(journey.current_snapshot_id)
+        snapshot = None
+        if journey.current_snapshot_id:
+            snapshot = await snapshot_repo.get_by_id(journey.current_snapshot_id)
         if not snapshot:
             snapshot = await snapshot_repo.get_latest_by_journey_id(journey.id)
         if not snapshot:
@@ -563,7 +567,9 @@ class JourneyService:
         }
         current_statuses = {
             k: CoreFieldStatus(
-                v.get("status") if isinstance(v, dict) else getattr(v, "status", "BLOCKED")
+                (v.get("status") or "BLOCKED")
+                if isinstance(v, dict)
+                else getattr(v, "status", "BLOCKED")
             )
             for k, v in snapshot.fields.items()
         }
@@ -671,7 +677,11 @@ class JourneyService:
             if not manifest:
                 continue
 
-            snapshot = await snapshot_repo.get_by_id(j.current_snapshot_id)
+            snapshot = (
+                await snapshot_repo.get_by_id(j.current_snapshot_id)
+                if j.current_snapshot_id
+                else None
+            )
             if not snapshot:
                 snapshot = await snapshot_repo.get_latest_by_journey_id(j.id)
 
@@ -686,7 +696,9 @@ class JourneyService:
                 }
                 current_statuses = {
                     k: CoreFieldStatus(
-                        v.get("status") if isinstance(v, dict) else getattr(v, "status", "BLOCKED")
+                        (v.get("status") or "BLOCKED")
+                        if isinstance(v, dict)
+                        else getattr(v, "status", "BLOCKED")
                     )
                     for k, v in snapshot.fields.items()
                 }
@@ -745,7 +757,9 @@ class JourneyService:
             )
 
         snapshot_repo = SnapshotRepository(db)
-        snapshot = await snapshot_repo.get_by_id(journey.current_snapshot_id)
+        snapshot = None
+        if journey.current_snapshot_id:
+            snapshot = await snapshot_repo.get_by_id(journey.current_snapshot_id)
         if not snapshot:
             snapshot = await snapshot_repo.get_latest_by_journey_id(journey.id)
         if not snapshot:
@@ -794,7 +808,9 @@ class JourneyService:
         }
         current_statuses = {
             k: CoreFieldStatus(
-                v.get("status") if isinstance(v, dict) else getattr(v, "status", "BLOCKED")
+                (v.get("status") or "BLOCKED")
+                if isinstance(v, dict)
+                else getattr(v, "status", "BLOCKED")
             )
             for k, v in snapshot.fields.items()
         }
@@ -963,7 +979,11 @@ class JourneyService:
 
         # 4. Get current snapshot
         snapshot_repo = SnapshotRepository(db)
-        curr_snap = await snapshot_repo.get_by_id(journey.current_snapshot_id)
+        curr_snap = (
+            await snapshot_repo.get_by_id(journey.current_snapshot_id)
+            if journey.current_snapshot_id
+            else None
+        )
         if not curr_snap:
             curr_snap = await snapshot_repo.get_latest_by_journey_id(journey.id)
         if not curr_snap:
@@ -976,7 +996,9 @@ class JourneyService:
         }
         current_statuses = {
             k: CoreFieldStatus(
-                v.get("status") if isinstance(v, dict) else getattr(v, "status", "BLOCKED")
+                (v.get("status") or "BLOCKED")
+                if isinstance(v, dict)
+                else getattr(v, "status", "BLOCKED")
             )
             for k, v in curr_snap.fields.items()
         }
@@ -1119,7 +1141,9 @@ class JourneyService:
                         else str(amb_rule.answer_type)
                     ),
                     choices=(
-                        [asdict(c) for c in (amb_rule.choices or [])] if amb_rule.choices else None
+                        [c.model_dump() for c in (amb_rule.choices or [])]
+                        if amb_rule.choices
+                        else None
                     ),
                 )
 
@@ -1249,8 +1273,12 @@ class JourneyService:
             actions_unlocked=core_diff.actions_unlocked,
             actions_removed=core_diff.actions_removed,
             readiness=ReadinessDiff(
-                from_=Readiness(core_diff.readiness.from_readiness.value),
-                to=Readiness(core_diff.readiness.to_readiness.value),
+                from_=Readiness(core_diff.readiness.from_readiness.value)
+                if core_diff.readiness.from_readiness
+                else None,
+                to=Readiness(core_diff.readiness.to_readiness.value)
+                if core_diff.readiness.to_readiness
+                else None,
             )
             if core_diff.readiness
             else None,
@@ -1260,13 +1288,17 @@ class JourneyService:
                     pending=core_diff.progress.from_progress.pending,
                     blockers=core_diff.progress.from_progress.blockers,
                     total=core_diff.progress.from_progress.total,
-                ),
+                )
+                if core_diff.progress.from_progress
+                else None,
                 to=ProgressCounts(
                     completed=core_diff.progress.to_progress.completed,
                     pending=core_diff.progress.to_progress.pending,
                     blockers=core_diff.progress.to_progress.blockers,
                     total=core_diff.progress.to_progress.total,
-                ),
+                )
+                if core_diff.progress.to_progress
+                else None,
             )
             if core_diff.progress
             else None,
@@ -1367,7 +1399,11 @@ class JourneyService:
 
         # 4. Get current snapshot
         snapshot_repo = SnapshotRepository(db)
-        curr_snap = await snapshot_repo.get_by_id(journey.current_snapshot_id)
+        curr_snap = (
+            await snapshot_repo.get_by_id(journey.current_snapshot_id)
+            if journey.current_snapshot_id
+            else None
+        )
         if not curr_snap:
             curr_snap = await snapshot_repo.get_latest_by_journey_id(journey.id)
         if not curr_snap:
@@ -1455,7 +1491,9 @@ class JourneyService:
         }
         prev_statuses = {
             k: CoreFieldStatus(
-                v.get("status") if isinstance(v, dict) else getattr(v, "status", "BLOCKED")
+                (v.get("status") or "BLOCKED")
+                if isinstance(v, dict)
+                else getattr(v, "status", "BLOCKED")
             )
             for k, v in curr_snap.fields.items()
         }
@@ -1525,7 +1563,7 @@ class JourneyService:
                             else str(other_amb.answer_type)
                         ),
                         choices=(
-                            [asdict(c) for c in (other_amb.choices or [])]
+                            [c.model_dump() for c in (other_amb.choices or [])]
                             if other_amb.choices
                             else None
                         ),
@@ -1697,8 +1735,12 @@ class JourneyService:
             actions_removed=core_diff.actions_removed,
             readiness=(
                 ReadinessDiff(
-                    from_=Readiness(core_diff.readiness.from_readiness.value),
-                    to=Readiness(core_diff.readiness.to_readiness.value),
+                    from_=Readiness(core_diff.readiness.from_readiness.value)
+                    if core_diff.readiness.from_readiness
+                    else None,
+                    to=Readiness(core_diff.readiness.to_readiness.value)
+                    if core_diff.readiness.to_readiness
+                    else None,
                 )
                 if core_diff.readiness
                 else None
@@ -1710,13 +1752,17 @@ class JourneyService:
                         pending=core_diff.progress.from_progress.pending,
                         blockers=core_diff.progress.from_progress.blockers,
                         total=core_diff.progress.from_progress.total,
-                    ),
+                    )
+                    if core_diff.progress.from_progress
+                    else None,
                     to=ProgressCounts(
                         completed=core_diff.progress.to_progress.completed,
                         pending=core_diff.progress.to_progress.pending,
                         blockers=core_diff.progress.to_progress.blockers,
                         total=core_diff.progress.to_progress.total,
-                    ),
+                    )
+                    if core_diff.progress.to_progress
+                    else None,
                 )
                 if core_diff.progress
                 else None
@@ -1775,7 +1821,9 @@ class JourneyService:
             }
             c_statuses = {
                 k: CoreFieldStatus(
-                    v.get("status") if isinstance(v, dict) else getattr(v, "status", "BLOCKED")
+                    (v.get("status") or "BLOCKED")
+                    if isinstance(v, dict)
+                    else getattr(v, "status", "BLOCKED")
                 )
                 for k, v in snap.fields.items()
             }
@@ -1827,8 +1875,12 @@ class JourneyService:
             actions_removed=core_diff.actions_removed,
             readiness=(
                 ReadinessDiff(
-                    from_=Readiness(core_diff.readiness.from_readiness.value),
-                    to=Readiness(core_diff.readiness.to_readiness.value),
+                    from_=Readiness(core_diff.readiness.from_readiness.value)
+                    if core_diff.readiness.from_readiness
+                    else None,
+                    to=Readiness(core_diff.readiness.to_readiness.value)
+                    if core_diff.readiness.to_readiness
+                    else None,
                 )
                 if core_diff.readiness
                 else None
@@ -1840,13 +1892,17 @@ class JourneyService:
                         pending=core_diff.progress.from_progress.pending,
                         blockers=core_diff.progress.from_progress.blockers,
                         total=core_diff.progress.from_progress.total,
-                    ),
+                    )
+                    if core_diff.progress.from_progress
+                    else None,
                     to=ProgressCounts(
                         completed=core_diff.progress.to_progress.completed,
                         pending=core_diff.progress.to_progress.pending,
                         blockers=core_diff.progress.to_progress.blockers,
                         total=core_diff.progress.to_progress.total,
-                    ),
+                    )
+                    if core_diff.progress.to_progress
+                    else None,
                 )
                 if core_diff.progress
                 else None

@@ -282,6 +282,8 @@ async def run_scenario(
                         "question": step.question or "Please confirm field value",
                         "answer_type": step.answer_type or "TEXT",
                     }
+                    if not step.field:
+                        continue
                     existing_f = fields_copy.get(step.field, {})
                     fields_copy[step.field] = {
                         **existing_f,
@@ -533,8 +535,11 @@ def format_matrix_table(results: list[ScenarioResult]) -> str:
     failures = [r for r in results if not r.passed]
     if failures:
         lines.append("\nFAILED SCENARIOS DETAIL:")
-        for f in failures:
-            lines.append(f"  - [{f.pack} - {f.family}] {f.scenario_id}: {f.error_message}")
+        for failure in failures:
+            lines.append(
+                f"  - [{failure.pack} - {failure.family}] "
+                f"{failure.scenario_id}: {failure.error_message}"
+            )
 
     return "\n".join(lines)
 

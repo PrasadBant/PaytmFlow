@@ -119,9 +119,8 @@ def test_ai_cannot_write_state():
                     violations.append(f"{module_name}: imports {forbidden!r}")
                     break
 
-    assert not violations, (
-        "app/core must be pure (no AI, DB, or API imports):\n"
-        + "\n".join(violations)
+    assert not violations, "app/core must be pure (no AI, DB, or API imports):\n" + "\n".join(
+        violations
     )
 
 
@@ -285,9 +284,7 @@ async def test_audit_replay_reconstructs_state(jtype: JourneyType, mem_db: Async
 
     defaults = manifest.simulation_defaults or {}
     initial_values: dict[str, Any] = {
-        f.key: defaults.get(f.key, True)
-        for f in manifest.state_schema
-        if not f.derived
+        f.key: defaults.get(f.key, True) for f in manifest.state_schema if not f.derived
     }
 
     await writer.record_journey_created(
@@ -358,8 +355,7 @@ def test_no_readiness_score_in_any_response():
                     violations.append(f"{module_name}.{name}.{field_name}")
 
     assert not violations, (
-        "Response schemas must not expose numeric score/approval fields:\n"
-        + "\n".join(violations)
+        "Response schemas must not expose numeric score/approval fields:\n" + "\n".join(violations)
     )
 
 
@@ -395,19 +391,16 @@ def test_simulate_purity_100_identical_runs(jtype: JourneyType):
     )
     action_input = {s: defaults.get(s, True) for s in first_action.satisfies}
 
-    results = [
-        simulate(first_action.action_id, action_input, snap, manifest)
-        for _ in range(100)
-    ]
+    results = [simulate(first_action.action_id, action_input, snap, manifest) for _ in range(100)]
 
     first = results[0]
     for i, r in enumerate(results[1:], start=1):
         assert r.predicted_readiness == first.predicted_readiness, (
             f"simulate() impure: run {i} differs in readiness for {jtype}"
         )
-        assert {f.key for f in r.newly_satisfied} == {
-            f.key for f in first.newly_satisfied
-        }, f"simulate() impure: newly_satisfied differs on run {i} for {jtype}"
+        assert {f.key for f in r.newly_satisfied} == {f.key for f in first.newly_satisfied}, (
+            f"simulate() impure: newly_satisfied differs on run {i} for {jtype}"
+        )
         assert r.progress_after.completed == first.progress_after.completed, (
             f"simulate() impure: progress differs on run {i} for {jtype}"
         )

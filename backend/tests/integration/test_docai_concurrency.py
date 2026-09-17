@@ -216,9 +216,6 @@ async def test_small_concurrent_action_execution_workload(
         return resp.json()["version_number"]
 
     versions = await asyncio.gather(
-        *(
-            _check_version(client, {"X-Session-Id": sid}, jid)
-            for jid, sid, _, _ in results
-        )
+        *(_check_version(client, {"X-Session-Id": sid}, jid) for jid, sid, _, _ in results)
     )
     assert all(v == 2 for v in versions)

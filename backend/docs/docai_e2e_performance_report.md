@@ -227,7 +227,9 @@ for s in action_spec.satisfies:
     if s in action_input:
         new_values[s] = action_input[s]
     else:
-        matching_val = next((v for k, v in action_input.items() if k == s or k in s or s in k), None)
+        matching_val = next(
+            (v for k, v in action_input.items() if k == s or k in s or s in k), None
+        )
         if matching_val is not None:
             new_values[s] = matching_val
         elif s in manifest.simulation_defaults:

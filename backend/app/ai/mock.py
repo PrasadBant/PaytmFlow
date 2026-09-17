@@ -159,6 +159,8 @@ class MockAI:
                 continue
 
             # Deterministic values by field key and type
+            val: Any = None
+            disp: str = ""
             if field_spec.type == FieldType.MONEY:
                 val = 85000
                 disp = "₹85,000"

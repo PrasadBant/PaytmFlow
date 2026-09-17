@@ -19,7 +19,7 @@ export const Header: React.FC = () => {
           />
         </div>
         <div
-          className="font-bold text-xl tracking-tight bg-gradient-to-r from-paytm-blue to-paytm-blue-action bg-clip-text text-transparent"
+          className="font-bold text-xl tracking-tight bg-gradient-to-r from-paytm-blue to-paytm-blue-action bg-clip-text text-transparent md:hidden"
           data-testid="header-wordmark"
         >
           <span>Paytm</span>

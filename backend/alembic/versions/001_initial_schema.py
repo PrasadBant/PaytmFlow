@@ -85,13 +85,23 @@ def upgrade() -> None:
     )
 
     # Add foreign key from journeys.current_snapshot_id to journey_snapshots.id
-    op.create_foreign_key(
-        "fk_journey_current_snapshot",
-        "journeys",
-        "journey_snapshots",
-        ["current_snapshot_id"],
-        ["id"],
-    )
+    bind = op.get_bind()
+    if bind.dialect.name == "sqlite":
+        with op.batch_alter_table("journeys") as batch_op:
+            batch_op.create_foreign_key(
+                "fk_journey_current_snapshot",
+                "journey_snapshots",
+                ["current_snapshot_id"],
+                ["id"],
+            )
+    else:
+        op.create_foreign_key(
+            "fk_journey_current_snapshot",
+            "journeys",
+            "journey_snapshots",
+            ["current_snapshot_id"],
+            ["id"],
+        )
 
     # 4. evidence
     op.create_table(

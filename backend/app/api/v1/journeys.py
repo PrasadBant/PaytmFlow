@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import JourneyModel, SessionModel
@@ -56,14 +56,49 @@ async def create_journey(
     body: CreateJourneyRequest,
     session: SessionModel = Depends(get_current_session),
     db: AsyncSession = Depends(get_db),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> JourneyStateResponse:
-    return await JourneyService.create_journey(
+    if idempotency_key:
+        import hashlib
+
+        from app.db.repositories.idempotency import IdempotencyRepository
+
+        idemp_repo = IdempotencyRepository(db)
+        existing = await idemp_repo.get(idempotency_key)
+        if existing and existing.session_id == session.id and existing.action_id == "CREATE":
+            from app.db.repositories.journeys import JourneyRepository
+
+            repo = JourneyRepository(db)
+            journey = await repo.get_by_id(existing.journey_id)
+            if journey:
+                return await JourneyService.get_journey_state(journey=journey, db=db)
+
+    result = await JourneyService.create_journey(
         session=session,
         journey_type=body.journey_type,
         goal=body.goal,
         natural_language=body.natural_language,
         db=db,
     )
+
+    if idempotency_key:
+        import hashlib
+
+        from app.db.repositories.idempotency import IdempotencyRepository
+
+        idemp_repo = IdempotencyRepository(db)
+        request_hash = hashlib.sha256(body.model_dump_json().encode()).hexdigest()
+        await idemp_repo.create(
+            key=idempotency_key,
+            session_id=session.id,
+            journey_id=result.journey_id,
+            action_id="CREATE",
+            request_hash=request_hash,
+            response_body=result.model_dump(mode="json"),
+            status_code=201,
+        )
+
+    return result
 
 
 @router.get(

@@ -285,11 +285,13 @@ class LocalMLProvider:
                     auxiliary_facts[aux_key] = field.value
 
                     existing_aux_value = existing_fields.get(aux_key)
-                    finding = (
-                        check_name_consistency(existing_aux_value, field.value)
-                        if field.key == "name"
-                        else check_identifier_consistency(existing_aux_value, field.value)
-                    )
+                    finding = None
+                    if isinstance(existing_aux_value, str) and isinstance(field.value, str):
+                        finding = (
+                            check_name_consistency(existing_aux_value, field.value)
+                            if field.key == "name"
+                            else check_identifier_consistency(existing_aux_value, field.value)
+                        )
                     if finding:
                         # Attach to whichever ambiguity_rule this
                         # journey's manifest itself declares for the
@@ -371,10 +373,11 @@ class LocalMLProvider:
                         f"{field_spec.label} ({field.value})."
                     )
                     if field.key == "monthly_income":
-                        finding = check_income_consistency(existing_value, field.value)
-                        is_conflict = finding is not None
-                        if finding:
-                            conflict_message = finding.message
+                        if isinstance(existing_value, int) and isinstance(field.value, int):
+                            finding = check_income_consistency(existing_value, field.value)
+                            is_conflict = finding is not None
+                            if finding:
+                                conflict_message = finding.message
 
                     if is_conflict:
                         ambiguity = next(

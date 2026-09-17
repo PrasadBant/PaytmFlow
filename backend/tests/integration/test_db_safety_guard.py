@@ -47,7 +47,9 @@ class TestDeriveTestDatabaseUrl:
         assert derived == "postgresql+psycopg://paytmflow:paytmflow@localhost:5432/paytmflow_test"
 
     def test_normalizes_the_bare_postgresql_scheme(self):
-        derived = derive_test_database_url("postgresql://paytmflow:paytmflow@localhost:5432/paytmflow")
+        derived = derive_test_database_url(
+            "postgresql://paytmflow:paytmflow@localhost:5432/paytmflow"
+        )
         assert derived.startswith("postgresql+psycopg://")
         assert derived.endswith("/paytmflow_test")
 
