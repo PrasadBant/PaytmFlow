@@ -953,4 +953,26 @@ export const handlers = [
     resetMockState();
     return HttpResponse.json({ reset: true, elapsed_ms: 12 });
   }),
+
+  // 14. POST /api/v1/journeys/:journey_id/chat
+  http.post('*/api/v1/journeys/:journey_id/chat', async ({ request }) => {
+    const scenario = getActiveScenario(request.url);
+    if (scenario === 'slow') await delay(1000);
+
+    const body = (await request.json()) as { message?: string };
+    return HttpResponse.json({
+      reply: `(Mock mode) I received: "${body?.message ?? ''}". Switch to live mode for answers grounded in your real journey status.`,
+    });
+  }),
+
+  // 15. POST /api/v1/chat (no journey context)
+  http.post('*/api/v1/chat', async ({ request }) => {
+    const scenario = getActiveScenario(request.url);
+    if (scenario === 'slow') await delay(1000);
+
+    const body = (await request.json()) as { message?: string };
+    return HttpResponse.json({
+      reply: `(Mock mode) I received: "${body?.message ?? ''}". Switch to live mode for a real assistant reply.`,
+    });
+  }),
 ];

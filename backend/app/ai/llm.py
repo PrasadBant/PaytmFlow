@@ -10,6 +10,7 @@ from app.ai.provider import AIProvider
 from app.config import settings
 from app.core.models import CoreSnapshot
 from app.packs.contract import ActionSpec, GoalFieldSpec, JourneyPackManifest
+from app.schemas.journeys import JourneyStateResponse, RecommendationResponse
 
 logger = structlog.get_logger(__name__)
 
@@ -33,8 +34,36 @@ class LLMProvider:
     ) -> None:
         self.api_key = api_key if api_key is not None else settings.AI_API_KEY
         self.model = model if model is not None else (settings.AI_MODEL.strip() or "gpt-4o-mini")
-        self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
+        resolved_base_url = base_url or settings.AI_BASE_URL.strip() or "https://api.openai.com/v1"
+        self.base_url = resolved_base_url.rstrip("/")
         self.fallback_provider = fallback_provider or MockAI()
+
+    async def warmup(self) -> bool:
+        """Best-effort: sends a trivial completion to load the model into memory.
+
+        Local servers like Ollama unload an idle model from RAM after a few
+        minutes, and the very first request after that takes tens of seconds
+        to reload it - long enough to blow past the guardrail timeout and
+        silently fall back to the deterministic reply for a real user's
+        first message. Called from the app startup hook so that cold load
+        happens once, before any user request, not during one. Never raises;
+        returns whether it succeeded, purely for startup logging.
+        """
+        try:
+            await self._call_llm(
+                system_prompt="You are a helpful assistant.",
+                user_prompt="Reply with a single word: ready.",
+                max_tokens=5,
+                # Cold-loading a multi-GB model into RAM can genuinely take
+                # tens of seconds - the request-time guardrail timeout
+                # (AI_TIMEOUT_SECONDS) stays short for real users; this
+                # one-time startup call can afford to wait much longer.
+                timeout_seconds=120.0,
+            )
+            return True
+        except Exception as exc:
+            logger.warning("llm_warmup_failed", error=str(exc), base_url=self.base_url)
+            return False
 
     def _clean_json_text(self, text: str) -> str:
         """Strips markdown code blocks from model response."""
@@ -54,16 +83,22 @@ class LLMProvider:
         user_prompt: str,
         temperature: float = 0.0,
         max_tokens: int = 1000,
+        timeout_seconds: float | None = None,
     ) -> str:
-        """Executes an async HTTP request to the LLM completion endpoint."""
-        if not self.api_key:
+        """Executes an async HTTP request to the LLM completion endpoint.
+
+        A missing `api_key` is only fatal against the default OpenAI host -
+        local OpenAI-compatible servers (Ollama, LM Studio, ...) reached via
+        `AI_BASE_URL` take no credential at all, so the Authorization header
+        is simply omitted for them rather than raising.
+        """
+        if not self.api_key and self.base_url == "https://api.openai.com/v1":
             raise ValueError("AI_API_KEY is not configured for LLMProvider")
 
         url = f"{self.base_url}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         payload = {
             "model": self.model,
             "messages": [
@@ -74,7 +109,10 @@ class LLMProvider:
             "max_tokens": max_tokens,
         }
 
-        async with httpx.AsyncClient(timeout=float(settings.AI_TIMEOUT_SECONDS)) as client:
+        effective_timeout = (
+            timeout_seconds if timeout_seconds is not None else float(settings.AI_TIMEOUT_SECONDS)
+        )
+        async with httpx.AsyncClient(timeout=effective_timeout) as client:
             response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status()
             data = response.json()
@@ -319,3 +357,101 @@ class LLMProvider:
             action_id=action_id,
             manifest=manifest,
         )
+
+    async def chat(
+        self,
+        message: str,
+        manifest: JourneyPackManifest,
+        journey_state: JourneyStateResponse,
+        recommendation: RecommendationResponse | None,
+    ) -> str:
+        """Answers a free-form question about the user's own journey via LLM,
+
+        grounded strictly in the server-computed journey_state/recommendation
+        JSON handed in - the model is instructed to answer only from that data.
+        """
+        try:
+            top_action = recommendation.recommendation if recommendation else None
+            context = {
+                "journey_title": journey_state.display.title,
+                "readiness": journey_state.readiness.value,
+                "progress": journey_state.progress.model_dump(mode="json"),
+                "fields": [
+                    {
+                        "label": f.label,
+                        "status": f.status.value,
+                        "explanation": f.explanation,
+                    }
+                    for f in journey_state.fields
+                ],
+                "pending_clarification_question": (
+                    journey_state.pending_clarification.ambiguity.question
+                    if journey_state.pending_clarification
+                    and journey_state.pending_clarification.ambiguity
+                    else None
+                ),
+                "recommended_action": (
+                    {
+                        "title": top_action.title,
+                        "why": top_action.why,
+                        "kind": top_action.kind.value,
+                        "accepts": top_action.accepts,
+                        "unlocks": top_action.unlocks,
+                    }
+                    if top_action
+                    else None
+                ),
+            }
+
+            system_prompt = (
+                "You are a helpful assistant answering a user's question about their OWN "
+                "financial-journey application. Answer ONLY using the JSON context provided - "
+                "never invent a status, document, or requirement that isn't in it. Keep the "
+                "answer to 1-3 sentences, plain and friendly. "
+                "Do not use banned terms: 'approved', 'approval', 'probability', 'credit score', "
+                "'eligibility score', 'readiness score', 'guaranteed'. "
+                "Never claim to have taken any action - you are advisory only."
+            )
+            user_prompt = (
+                f"Journey Context:\n{json.dumps(context, indent=2)}\n\n"
+                f"User Question: {message}\n"
+            )
+
+            reply = await self._call_llm(
+                system_prompt, user_prompt, temperature=0.2, max_tokens=200
+            )
+            return reply.strip()
+        except Exception as exc:
+            logger.warning("llm_chat_fallback_to_mock", error=str(exc))
+
+        return await self.fallback_provider.chat(
+            message=message,
+            manifest=manifest,
+            journey_state=journey_state,
+            recommendation=recommendation,
+        )
+
+    async def general_chat(self, message: str) -> str:
+        """Answers a free-form question with no journey context via LLM -
+
+        used before any application exists (e.g. the goal-creation form),
+        where there is no journey_state/recommendation to ground against.
+        """
+        try:
+            system_prompt = (
+                "You are PaytmFlow's helpful assistant. The user has not started an "
+                "application yet, so you have no specific data about them - answer "
+                "general questions about filling out financial application forms "
+                "(loans, insurance, KYC, credit cards, accounts, investments) helpfully "
+                "and concisely, in 1-3 sentences. "
+                "Do not use banned terms: 'approved', 'approval', 'probability', "
+                "'credit score', 'eligibility score', 'readiness score', 'guaranteed'. "
+                "Never claim to know specifics about a user's own application - "
+                "they have none yet."
+            )
+            reply = await self._call_llm(system_prompt, message, temperature=0.3, max_tokens=200)
+            return reply.strip()
+        except Exception as exc:
+            logger.warning("llm_general_chat_fallback_to_mock", error=str(exc))
+
+        return await self.fallback_provider.general_chat(message)

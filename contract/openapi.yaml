@@ -303,6 +303,48 @@ paths:
               schema: { $ref: "#/components/schemas/JourneyDiff" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/chat:
+    post:
+      tags: [journeys]
+      operationId: generalChat
+      description: >
+        Advisory-only Q&A with NO journey context - used before any application
+        exists (e.g. the goal-creation form). Never claims to know specifics about
+        the caller's own application, since there isn't one yet.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatRequest" }
+      responses:
+        "200":
+          description: Assistant reply
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatResponse" }
+
+  /api/v1/journeys/{journey_id}/chat:
+    post:
+      tags: [journeys]
+      operationId: chatWithAssistant
+      description: >
+        Advisory-only Q&A about the caller's own journey. Grounded in the same
+        server-computed journey_state/recommendation data the status/recommendation
+        screens already render. Never writes state.
+      parameters: [{ $ref: "#/components/parameters/JourneyIdPath" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatRequest" }
+      responses:
+        "200":
+          description: Assistant reply
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/demo/reset:
     post:
       tags: [demo]
@@ -716,6 +758,18 @@ components:
           type: string
           enum: [STATUS, RECOMMENDATION, NEEDS_REVIEW, COMPLETE]
           description: Where Dev1 should route on resume. Server decides, client obeys.
+
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, minLength: 1, maxLength: 500 }
+
+    ChatResponse:
+      type: object
+      required: [reply]
+      properties:
+        reply: { type: string }
 
 security:
   - sessionCookie: []

@@ -1,3 +1,8 @@
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+import structlog
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -5,6 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.actions import router as actions_router
+from app.api.v1.chat import router as chat_router
 from app.api.v1.clarifications import router as clarifications_router
 from app.api.v1.demo import router as demo_router
 from app.api.v1.diff import router as diff_router
@@ -19,6 +25,32 @@ from app.schemas.enums import ErrorCode
 from app.schemas.errors import ErrorEnvelope, ErrorObject
 
 setup_logging()
+logger = structlog.get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Fire-and-forget: preloads the local LLM (e.g. Ollama) into memory.
+
+    Only runs when AI_BASE_URL points somewhere other than the default
+    OpenAI host - i.e. a local server the chat feature actually depends on
+    (see app/ai/local_ml.py's chat()). Scheduled as a background task, never
+    awaited here: a real user's FIRST chat message should not be the thing
+    that pays a ~50s cold-load cost, but a slow/unavailable local server
+    must never block the API from starting or serving every other endpoint
+    normally.
+    """
+    if settings.AI_BASE_URL.strip():
+        from app.ai.llm import LLMProvider
+
+        async def _warm() -> None:
+            ok = await LLMProvider().warmup()
+            logger.info("local_llm_warmup", ready=ok, base_url=settings.AI_BASE_URL)
+
+        asyncio.create_task(_warm())
+
+    yield
+
 
 app = FastAPI(
     title="PaytmFlow API",
@@ -27,6 +59,7 @@ app = FastAPI(
     openapi_url="/api/v1/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS setup
@@ -86,3 +119,4 @@ app.include_router(actions_router, prefix="/api/v1")
 app.include_router(clarifications_router, prefix="/api/v1")
 app.include_router(diff_router, prefix="/api/v1")
 app.include_router(demo_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")

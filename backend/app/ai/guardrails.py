@@ -10,6 +10,7 @@ from app.ai.provider import AIProvider
 from app.config import settings
 from app.core.models import CoreSnapshot
 from app.packs.contract import ActionSpec, GoalFieldSpec, JourneyPackManifest
+from app.schemas.journeys import JourneyStateResponse, RecommendationResponse
 
 logger = structlog.get_logger(__name__)
 
@@ -322,3 +323,66 @@ class GuardrailedAIProvider:
                 error=str(exc),
             )
             return fallback_explanation
+
+    async def chat(
+        self,
+        message: str,
+        manifest: JourneyPackManifest,
+        journey_state: JourneyStateResponse,
+        recommendation: RecommendationResponse | None,
+    ) -> str:
+        """Answers a free-form question with timeout, length bounding, and
+
+        prohibited-claims scanning. Falls back to the deterministic,
+        grounded MockAI response on any provider failure or violation.
+        """
+        from app.ai.mock import MockAI
+
+        bounded_message = (message or "").strip()[:500]
+        fallback_reply = await MockAI().chat(
+            message=bounded_message,
+            manifest=manifest,
+            journey_state=journey_state,
+            recommendation=recommendation,
+        )
+
+        if not bounded_message:
+            return fallback_reply
+
+        try:
+            reply = await asyncio.wait_for(
+                self.inner.chat(
+                    message=bounded_message,
+                    manifest=manifest,
+                    journey_state=journey_state,
+                    recommendation=recommendation,
+                ),
+                timeout=self.timeout_seconds,
+            )
+            return sanitize_text(text=reply, fallback_copy=fallback_reply, manifest=manifest)
+        except (TimeoutError, Exception) as exc:
+            logger.warning("ai_chat_fallback", error=str(exc))
+            return fallback_reply
+
+    async def general_chat(self, message: str) -> str:
+        """Answers a free-form question with no journey context, with the
+
+        same timeout/length-bounding/prohibited-claims safety net as chat().
+        """
+        from app.ai.mock import MockAI
+
+        bounded_message = (message or "").strip()[:500]
+        fallback_reply = await MockAI().general_chat(bounded_message)
+
+        if not bounded_message:
+            return fallback_reply
+
+        try:
+            reply = await asyncio.wait_for(
+                self.inner.general_chat(bounded_message),
+                timeout=self.timeout_seconds,
+            )
+            return sanitize_text(text=reply, fallback_copy=fallback_reply, manifest=None)
+        except (TimeoutError, Exception) as exc:
+            logger.warning("ai_general_chat_fallback", error=str(exc))
+            return fallback_reply

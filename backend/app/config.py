@@ -35,10 +35,16 @@ class Settings(BaseSettings):
     SESSION_SECRET: str = "change-me-32-bytes-minimum-session-secret-key"
     SESSION_TTL_DAYS: int = 30
     CORS_ORIGINS: str = "http://localhost:5173"
-    AI_PROVIDER: str = "mock"  # mock | llm
+    AI_PROVIDER: str = "mock"  # mock | llm | local_ml
     AI_TIMEOUT_SECONDS: int = 4
     AI_API_KEY: str = ""
     AI_MODEL: str = ""
+    # Empty -> LLMProvider's own default (https://api.openai.com/v1). Set this
+    # to a local inference server's OpenAI-compatible base (e.g. Ollama's
+    # "http://localhost:11434/v1") to run an open-source model with no API
+    # key at all - LLMProvider only sends an Authorization header when
+    # AI_API_KEY is non-empty, which real local servers like Ollama ignore.
+    AI_BASE_URL: str = ""
     EVIDENCE_STORAGE_DIR: str = "./storage/evidence"
     EVIDENCE_MAX_BYTES: int = 10485760  # 10 MB
     DEMO_RESET_SECRET: str = "change-me-demo-reset-secret"

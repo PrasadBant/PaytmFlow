@@ -4,6 +4,7 @@ from app.ai.models import ActionRankingResult, AIInterpretationResult
 from app.config import settings
 from app.core.models import CoreSnapshot
 from app.packs.contract import ActionSpec, GoalFieldSpec, JourneyPackManifest
+from app.schemas.journeys import JourneyStateResponse, RecommendationResponse
 
 
 class AIProvider(Protocol):
@@ -61,6 +62,31 @@ class AIProvider(Protocol):
         manifest: JourneyPackManifest,
     ) -> str:
         """Generates friendly, human-readable explanation of state changes or blockers."""
+        ...
+
+    async def chat(
+        self,
+        message: str,
+        manifest: JourneyPackManifest,
+        journey_state: JourneyStateResponse,
+        recommendation: RecommendationResponse | None,
+    ) -> str:
+        """Answers a free-form question about the user's OWN journey.
+
+        Grounded strictly in the already-computed journey_state/recommendation
+        data supplied by the caller - advisory only, never writes state, and
+        must never invent facts about the user's application.
+        """
+        ...
+
+    async def general_chat(self, message: str) -> str:
+        """Answers a free-form question with NO journey context at all.
+
+        Used before any journey exists yet (e.g. while filling out the goal
+        form) - same advisory-only invariant, but with no application data
+        to ground against, so it must never claim to know specifics about a
+        user's own (nonexistent) application.
+        """
         ...
 
 

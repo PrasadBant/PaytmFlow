@@ -190,6 +190,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Advisory-only Q&A with NO journey context - used before any application exists (e.g. the goal-creation form). Never claims to know specifics about the caller's own application, since there isn't one yet. */
+        post: operations["generalChat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journeys/{journey_id}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Advisory-only Q&A about the caller's own journey. Grounded in the same server-computed journey_state/recommendation data the status/recommendation screens already render. Never writes state. */
+        post: operations["chatWithAssistant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/demo/reset": {
         parameters: {
             query?: never;
@@ -463,6 +497,12 @@ export interface components {
              */
             resume_screen?: "STATUS" | "RECOMMENDATION" | "NEEDS_REVIEW" | "COMPLETE";
         };
+        ChatRequest: {
+            message: string;
+        };
+        ChatResponse: {
+            reply: string;
+        };
     };
     responses: {
         /** @description Not found, or not owned by this session (deliberately indistinguishable) */
@@ -534,7 +574,7 @@ export interface operations {
                         packs_loaded: number;
                         packs_supported?: number;
                         /** @enum {string} */
-                        ai_provider: "mock" | "llm";
+                        ai_provider: "mock" | "llm" | "local_ml";
                         git_sha?: string;
                     };
                 };
@@ -863,6 +903,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JourneyDiff"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    generalChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Assistant reply */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatResponse"];
+                };
+            };
+        };
+    };
+    chatWithAssistant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: components["parameters"]["JourneyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Assistant reply */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatResponse"];
                 };
             };
             404: components["responses"]["NotFound"];

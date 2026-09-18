@@ -66,6 +66,7 @@ from app.docai.extraction import (
 from app.docai.ocr import OcrLine
 from app.packs.contract import ActionSpec, GoalFieldSpec, JourneyPackManifest
 from app.schemas.enums import FieldType
+from app.schemas.journeys import JourneyStateResponse, RecommendationResponse
 
 logger = structlog.get_logger(__name__)
 
@@ -565,3 +566,39 @@ class LocalMLProvider:
         return await self._mock_fallback.explain(
             field_key, from_status, to_status, action_id, manifest
         )
+
+    async def chat(
+        self,
+        message: str,
+        manifest: JourneyPackManifest,
+        journey_state: JourneyStateResponse,
+        recommendation: RecommendationResponse | None,
+    ) -> str:
+        """Conversational Q&A is out of this mission's document-intelligence scope,
+
+        so it is delegated - but to the real LLM adapter (`LLMProvider`,
+        pointed at AI_BASE_URL when set, e.g. a local Ollama server) rather
+        than straight to MockAI. `LLMProvider.chat` already tries the real
+        model first and falls back to its own internal MockAI on any
+        failure, so this gets a genuine free-form assistant when one is
+        configured and the exact same deterministic behavior as before when
+        it isn't - with zero change to the trained classifier/extraction
+        path above.
+        """
+        from app.ai.llm import LLMProvider
+
+        return await LLMProvider(fallback_provider=self._mock_fallback).chat(
+            message=message,
+            manifest=manifest,
+            journey_state=journey_state,
+            recommendation=recommendation,
+        )
+
+    async def general_chat(self, message: str) -> str:
+        """Out of scope for this mission - routed to the real LLM adapter
+
+        (same rationale as chat() above), falling back to MockAI.
+        """
+        from app.ai.llm import LLMProvider
+
+        return await LLMProvider(fallback_provider=self._mock_fallback).general_chat(message)
