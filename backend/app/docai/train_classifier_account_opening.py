@@ -9,7 +9,7 @@ Run: `uv run python -m app.docai.train_classifier_account_opening`
 from __future__ import annotations
 
 from app.docai.dataset.generate_account_opening import DATASET_ROOT, SEED
-from app.docai.train_classifier import train_and_evaluate
+from app.docai.train_classifier import other_pack_roots, train_and_evaluate
 
 JOURNEY_TYPE = "ACCOUNT_OPENING"
 MODEL_VERSION = "account-opening-classifier-v1"
@@ -21,6 +21,7 @@ if __name__ == "__main__":
         model_version=MODEL_VERSION,
         seed=SEED,
         representative_expected_doc_type="SIGNATURE_SPECIMEN",
+        cross_journey_other_roots=other_pack_roots(JOURNEY_TYPE),
     )
     for split, res in report["results"].items():
         if res.get("n"):

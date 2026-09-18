@@ -5,7 +5,7 @@
     "field_metrics": {
       "monthly_income": {
         "n": 18,
-        "exact_match_accuracy": 0.9444,
+        "exact_match_accuracy": 1.0,
         "extraction_coverage": 1.0
       },
       "employer_name": {
@@ -15,18 +15,6 @@
       }
     },
     "errors": [
-      {
-        "split": "val",
-        "sample_id": "SALARY_SLIP_salary_two_col_0036",
-        "doc_type": "SALARY_SLIP",
-        "template_id": "salary_two_col",
-        "field": "monthly_income",
-        "expected": 154000,
-        "predicted": 1154000,
-        "raw_value": " l1,54,000",
-        "validated": true,
-        "note": null
-      },
       {
         "split": "val",
         "sample_id": "OFFICE_ID_CARD_id_vertical_0146",
@@ -65,7 +53,7 @@
         "field": "monthly_income",
         "expected": 191000,
         "predicted": 1191000,
-        "raw_value": " 11,91,000",
+        "raw_value": "11,91,000",
         "validated": true,
         "note": null
       }
@@ -77,8 +65,8 @@
     "field_metrics": {
       "monthly_income": {
         "n": 24,
-        "exact_match_accuracy": 0.875,
-        "extraction_coverage": 0.9167
+        "exact_match_accuracy": 0.9167,
+        "extraction_coverage": 0.9583
       },
       "employer_name": {
         "n": 24,
@@ -87,18 +75,6 @@
       }
     },
     "errors": [
-      {
-        "split": "unseen_template",
-        "sample_id": "BANK_STATEMENT_bank_axis_unseen_0109",
-        "doc_type": "BANK_STATEMENT",
-        "template_id": "bank_axis_unseen",
-        "field": "monthly_income",
-        "expected": 134000,
-        "predicted": null,
-        "raw_value": null,
-        "validated": false,
-        "note": "No recognized income label found for BANK_STATEMENT."
-      },
       {
         "split": "unseen_template",
         "sample_id": "BANK_STATEMENT_bank_axis_unseen_0117",
@@ -119,7 +95,7 @@
         "field": "monthly_income",
         "expected": 255000,
         "predicted": 8255000,
-        "raw_value": " 82,55,000",
+        "raw_value": "82,55,000",
         "validated": true,
         "note": null
       }

@@ -41,7 +41,7 @@
       "document_date": {
         "n": 18,
         "exact_match_accuracy": 0.9444,
-        "extraction_coverage": 1.0
+        "extraction_coverage": 0.9444
       }
     },
     "errors": [
@@ -52,7 +52,7 @@
         "template_id": "checkup_table",
         "field": "document_date",
         "expected": "1975-11-21",
-        "predicted": "2tt11975",
+        "predicted": null,
         "raw_value": "2tt11975",
         "validated": false,
         "note": "Could not normalize date '2tt11975'."
@@ -71,7 +71,7 @@
       "document_date": {
         "n": 36,
         "exact_match_accuracy": 0.9722,
-        "extraction_coverage": 1.0
+        "extraction_coverage": 0.9722
       }
     },
     "errors": [
@@ -106,7 +106,7 @@
         "template_id": "policy_letterhead_unseen",
         "field": "document_date",
         "expected": "1991-08-11",
-        "predicted": "41/08/1991",
+        "predicted": null,
         "raw_value": "41/08/1991",
         "validated": false,
         "note": "Could not normalize date '41/08/1991'."

@@ -8,9 +8,10 @@
       "PASSPORT_SCAN",
       "VOTER_ID_CARD"
     ],
-    "trained_at": "2026-09-14T20:36:55.168735+00:00",
+    "trained_at": "2026-09-18T18:57:47.421904+00:00",
     "dataset_seed": 20260916,
-    "train_n": 75,
+    "train_n": 90,
+    "cross_journey_other_n": 15,
     "sklearn_version": "1.9.1",
     "python_version": "3.13.12 (tags/v3.13.12:1cbe481, Feb  3 2026, 18:22:25) [MSC v.1944 64 bit (AMD64)]",
     "platform": "Windows-11-10.0.26200-SP0",
@@ -183,8 +184,8 @@
       "split": "unseen_template",
       "n": 39,
       "accuracy": 0.9744,
-      "macro_f1": 0.9791,
-      "macro_precision": 0.9808,
+      "macro_f1": 0.9534,
+      "macro_precision": 0.9375,
       "macro_recall": 0.9792,
       "per_class_report": {
         "DRIVING_LICENCE": {
@@ -194,15 +195,15 @@
           "support": 12.0
         },
         "OTHER": {
-          "precision": 1.0,
+          "precision": 0.75,
           "recall": 1.0,
-          "f1-score": 1.0,
+          "f1-score": 0.8571428571428571,
           "support": 3.0
         },
         "PASSPORT_SCAN": {
-          "precision": 0.9230769230769231,
+          "precision": 1.0,
           "recall": 1.0,
-          "f1-score": 0.96,
+          "f1-score": 1.0,
           "support": 12.0
         },
         "VOTER_ID_CARD": {
@@ -213,15 +214,15 @@
         },
         "accuracy": 0.9743589743589743,
         "macro avg": {
-          "precision": 0.9807692307692308,
+          "precision": 0.9375,
           "recall": 0.9791666666666666,
-          "f1-score": 0.9791304347826086,
+          "f1-score": 0.9534161490683231,
           "support": 39.0
         },
         "weighted avg": {
-          "precision": 0.9763313609467457,
+          "precision": 0.9807692307692307,
           "recall": 0.9743589743589743,
-          "f1-score": 0.974314381270903,
+          "f1-score": 0.9756330625895843,
           "support": 39.0
         }
       },
@@ -253,8 +254,8 @@
           ],
           [
             0,
-            0,
             1,
+            0,
             11
           ]
         ]
@@ -267,7 +268,7 @@
       "sample_id": "VOTER_ID_CARD_voter_letterhead_unseen_0084",
       "template_id": "voter_letterhead_unseen",
       "expected": "VOTER_ID_CARD",
-      "predicted": "PASSPORT_SCAN",
+      "predicted": "OTHER",
       "ocr_confidence": 0.8766,
       "word_count": 29,
       "degradation": {

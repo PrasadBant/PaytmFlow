@@ -97,6 +97,27 @@ class TestExtractMonthlyIncomeBankStatement:
         field = extract_monthly_income(text, "BANK_STATEMENT")
         assert field.value is None
 
+    def test_gross_in_narration_text_does_not_exclude_the_only_amount(self):
+        # Regression (traced on a real frozen eval sample,
+        # BANK_STATEMENT_bank_icici_0095): a genuine, common Indian NEFT
+        # narration convention states the credit as
+        # "NEFT-SALARY-GROSS-<company>". The word "GROSS" appearing here
+        # is just descriptive narration text, not a competing "Gross Pay"
+        # breakdown row (that concept only exists on a SALARY_SLIP, which
+        # has separate Gross/Deductions/Net lines - a bank statement
+        # narration has exactly one amount per transaction). Before this
+        # fix, the Gross/Deductions exclusion (built to protect salary-slip
+        # extraction, see TestMonthlyNetIncomeExtractionRegression below)
+        # wrongly fired here too, excluding the correct 91,000 salary
+        # credit and silently returning an unrelated nearby transaction's
+        # amount (a utility bill payment of 1,700) instead.
+        text = (
+            "Nov 1980 NEFT-SALARY-GROSS INC TECHNOLOGIES 91,000\n"
+            "Nov 1980 UTILITY BILL PAYMENT 1,700"
+        )
+        field = extract_monthly_income(text, "BANK_STATEMENT")
+        assert field.value == 91000
+
 
 class TestExtractEmployerName:
     def test_pvt_ltd_suffix(self):
@@ -215,6 +236,30 @@ class TestExtractDocumentDate:
         field = extract_document_date(text, doc_type="SOME_UNKNOWN_TYPE")
         assert field.value == "2022-02-10"
 
+    def test_unnormalizable_date_returns_none_not_the_raw_string(self):
+        # Regression (traced on a real frozen eval sample,
+        # DRIVING_LICENCE_dl_standard_0111): OCR misread "18/04/2019" as
+        # "48/04/2019" (an impossible day-of-month), which correctly fails
+        # normalize_date and is correctly flagged `validated=False` - but
+        # `value` used to still hold the raw, un-normalized garbage string
+        # instead of None. Every other field in this file (money,
+        # identifier, name) returns None on failure; this one silently
+        # didn't - an inconsistency with the "never fabricate" principle,
+        # not a deliberate design.
+        text = "Valid Till: 48/04/2019"
+        field = extract_document_date(text, doc_type="DRIVING_LICENCE")
+        assert field.value is None
+        assert not field.validated
+
+    def test_dob_label_tolerates_d_to_o_ocr_misread(self):
+        # "DOB" -> "OOB" (D->O) is the same traced artifact as "DL No" ->
+        # "OL No" below - confirmed recurring across PAN_CARD_IMAGE,
+        # VOTER_ID_CARD, and AADHAAR_FRONT_BACK, all of which share the
+        # literal "DOB" label wording.
+        text = "PAN: PXURC9253N\nOOB: 21/10/1972"
+        field = extract_document_date(text, doc_type="PAN_CARD_IMAGE")
+        assert field.value == "1972-10-21"
+
 
 class TestExtractIdentifier:
     def test_passport_number_extracted_and_validated(self):
@@ -329,6 +374,58 @@ class TestExtractIdentifier:
         # eligible for the fixer, and it's already all-digit so the
         # fixer is a no-op on it too.
         assert field.value == "QRSTU5678V"
+
+    def test_card_no_label_tolerates_c_to_g_ocr_misread(self):
+        # "Card No" -> "Gard No" (C->G), traced 100%-reproducible across
+        # both real voter_compact failures in the frozen val/test splits.
+        text = "Voter ID Card\nGard No: DTE6381941\nName: Test User"
+        field = extract_identifier(text, "VOTER_ID_CARD")
+        assert field.value == "DTE6381941"
+        assert field.validated
+
+    def test_dl_no_label_tolerates_d_to_o_ocr_misread(self):
+        # "DL No" -> "OL No" (D->O), traced 100%-reproducible across both
+        # real dl_standard failures in the frozen val/test splits.
+        text = "DRIVING LICENCE\nOL No: RJO119974599993\nName: Test User"
+        field = extract_identifier(text, "DRIVING_LICENCE")
+        assert field.value == "RJ0119974599993"
+        assert field.validated
+
+    def test_pan_trailing_letter_digit_lookalike_is_canonicalized(self):
+        # Regression (traced: PAN_CARD_IMAGE_pan_standard_0067): the
+        # trailing letter "I" OCR'd as digit "1" ("IWCKS6883I" ->
+        # "IWCKS68831") fails PAN_VALUE's strict [A-Z] trailing-letter
+        # requirement entirely without this fix - the SAME digit
+        # lookalikes normalize.py's `_OCR_DIGIT_CONFUSIONS` already
+        # trusts, just applied in the reverse direction to a
+        # known-to-be-a-letter position.
+        text = "PAN: IWCKS68831\nName: Test User"
+        field = extract_identifier(text, "PAN_CARD_IMAGE")
+        assert field.value == "IWCKS6883I"
+        assert field.validated
+
+    def test_pan_prefix_letter_digit_lookalike_is_canonicalized(self):
+        # Regression (traced: PAN_CARD_IMAGE_pan_standard_0073): a letter
+        # "O" within the 5-letter prefix OCR'd as digit "0"
+        # ("YMVZO4898T" -> "YMVZ04898T") breaks the required 5-consecutive-
+        # real-letters run entirely without this fix.
+        text = "PAN: YMVZ04898T\nName: Test User"
+        field = extract_identifier(text, "PAN_CARD_IMAGE")
+        assert field.value == "YMVZO4898T"
+        assert field.validated
+
+    def test_identifier_digit_group_tolerates_s_and_b_lookalikes(self):
+        # Regression (traced: CANCELLED_CHEQUE IFSC branch code "0504862"
+        # with an embedded digit OCR'd as its letter lookalike, e.g. "5"
+        # -> "S"): the digit-middle capture class only included O/o/I/l,
+        # never S/B, even though `try_fix_ocr_digit_confusion` already
+        # corrects S->5 and B->8 for money - the regex simply couldn't
+        # CAPTURE those characters in the first place, so the fixer never
+        # got a chance to run.
+        text = "IFSC MTBL0S04862\nName: Test User"
+        field = extract_identifier(text, "CANCELLED_CHEQUE")
+        assert field.value == "MTBL0504862"
+        assert field.validated
 
     def test_same_identifier_shape_isolated_per_doc_type(self):
         # Cross-journey stability: PAN's exact same value pattern is

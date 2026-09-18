@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import platform
+import random
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,6 +34,33 @@ from sklearn.pipeline import Pipeline
 from app.docai.classifier import MODELS_DIR, DocumentClassifier
 from app.docai.dataset.generate import DATASET_ROOT as LENDING_DATASET_ROOT
 from app.docai.dataset.generate import SEED as LENDING_SEED
+from app.docai.dataset.generate_account_opening import DATASET_ROOT as ACCOUNT_OPENING_ROOT
+from app.docai.dataset.generate_credit_card import DATASET_ROOT as CREDIT_CARD_ROOT
+from app.docai.dataset.generate_insurance import DATASET_ROOT as INSURANCE_ROOT
+from app.docai.dataset.generate_investment import DATASET_ROOT as INVESTMENT_ROOT
+from app.docai.dataset.generate_kyc import DATASET_ROOT as KYC_ROOT
+
+# Every other pack's own dataset root, for the cross-journey "OTHER"
+# augmentation described on `_load_cross_journey_other_samples` below -
+# one place listing all six packs so a new pack only needs to add itself
+# here to both send and receive real cross-journey negative examples.
+ALL_PACK_DATASET_ROOTS: dict[str, Path] = {
+    "LENDING": LENDING_DATASET_ROOT,
+    "INSURANCE": INSURANCE_ROOT,
+    "KYC": KYC_ROOT,
+    "CREDIT_CARD": CREDIT_CARD_ROOT,
+    "ACCOUNT_OPENING": ACCOUNT_OPENING_ROOT,
+    "INVESTMENT": INVESTMENT_ROOT,
+}
+
+
+def other_pack_roots(journey_type: str) -> list[Path]:
+    """Every pack's dataset root except `journey_type`'s own - the source
+
+    pool for that journey's cross-journey "OTHER" training augmentation.
+    """
+    return [root for name, root in ALL_PACK_DATASET_ROOTS.items() if name != journey_type]
+
 
 # Defaults preserve the exact original LENDING CLI behavior
 # (`python -m app.docai.train_classifier`, no args) - the function itself
@@ -76,17 +104,70 @@ def _load_split(split: str, dataset_root: Path) -> tuple[list[str], list[str], l
     return texts, doc_types, raw
 
 
+def _load_cross_journey_other_samples(
+    source_dataset_roots: list[Path],
+    per_root: int,
+    seed: int,
+) -> tuple[list[str], list[str]]:
+    """Draws a small, deterministic sample of REAL documents from other
+
+    journeys' own TRAIN splits (never val/test/unseen_template - the
+    honest held-out evaluation must never be touched), relabeled "OTHER"
+    for the classifier being trained here.
+
+    Why: a closed-set softmax classifier trained only on its own journey's
+    doc types plus a synthetic junk class (a fabricated "grocery receipt")
+    has no real signal for the single most likely real-world OOD case -
+    a user uploading a legitimate document that just belongs to a
+    DIFFERENT journey (e.g. a salary slip submitted for an insurance PED
+    claim). Traced live: an Insurance journey accepted a genuine Lending
+    salary slip as a "Previous Policy Copy" with 0.456 probability -
+    barely above the 0.45 ambiguity floor, and confidently wrong rather
+    than a safe non-answer, because Insurance's classifier had never once
+    seen anything salary-slip-shaped during training. Enriching "OTHER"
+    with real cross-journey documents (not more synthetic junk) is the
+    generalizable fix: it teaches "this isn't my domain" as a genuine
+    category, not a fix tuned to one specific test document.
+    """
+    texts: list[str] = []
+    labels: list[str] = []
+    for root in source_dataset_roots:
+        split_dir = root / "train"
+        if not split_dir.exists():
+            continue
+        source_texts, source_doc_types, _ = _load_split("train", root)
+        real_texts = [
+            t for t, dt in zip(source_texts, source_doc_types, strict=True) if dt != "OTHER"
+        ]
+        rng = random.Random(f"{seed}:{root.name}")
+        chosen = rng.sample(real_texts, k=min(per_root, len(real_texts)))
+        texts.extend(chosen)
+        labels.extend(["OTHER"] * len(chosen))
+    return texts, labels
+
+
 def train_and_evaluate(
     journey_type: str = JOURNEY_TYPE,
     dataset_root: Path = LENDING_DATASET_ROOT,
     model_version: str = MODEL_VERSION,
     seed: int = LENDING_SEED,
     representative_expected_doc_type: str | None = None,
+    cross_journey_other_roots: list[Path] | None = None,
+    cross_journey_samples_per_root: int = 3,
 ) -> dict:
     train_texts, train_labels, _ = _load_split("train", dataset_root)
     val_texts, val_labels, val_raw = _load_split("val", dataset_root)
     test_texts, test_labels, test_raw = _load_split("test", dataset_root)
     unseen_texts, unseen_labels, unseen_raw = _load_split("unseen_template", dataset_root)
+
+    n_cross_journey_other = 0
+    if cross_journey_other_roots:
+        cross_texts, cross_labels = _load_cross_journey_other_samples(
+            cross_journey_other_roots, cross_journey_samples_per_root, seed
+        )
+        train_texts = train_texts + cross_texts
+        train_labels = train_labels + cross_labels
+        n_cross_journey_other = len(cross_texts)
 
     pipeline = Pipeline(
         [
@@ -267,6 +348,7 @@ def train_and_evaluate(
         "trained_at": datetime.now(UTC).isoformat(),
         "dataset_seed": seed,
         "train_n": len(train_texts),
+        "cross_journey_other_n": n_cross_journey_other,
         "sklearn_version": sklearn.__version__,
         "python_version": sys.version,
         "platform": platform.platform(),
@@ -282,7 +364,7 @@ def train_and_evaluate(
 
 
 if __name__ == "__main__":
-    report = train_and_evaluate()
+    report = train_and_evaluate(cross_journey_other_roots=other_pack_roots(JOURNEY_TYPE))
     for split, res in report["results"].items():
         if res.get("n"):
             print(

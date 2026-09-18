@@ -7,9 +7,10 @@
     "OTHER",
     "PREVIOUS_POLICY_COPY"
   ],
-  "trained_at": "2026-09-14T20:36:55.070286+00:00",
+  "trained_at": "2026-09-18T18:57:45.248137+00:00",
   "dataset_seed": 20260915,
-  "train_n": 75,
+  "train_n": 90,
+  "cross_journey_other_n": 15,
   "sklearn_version": "1.9.1",
   "python_version": "3.13.12 (tags/v3.13.12:1cbe481, Feb  3 2026, 18:22:25) [MSC v.1944 64 bit (AMD64)]",
   "platform": "Windows-11-10.0.26200-SP0",

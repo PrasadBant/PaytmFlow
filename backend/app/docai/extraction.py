@@ -201,6 +201,7 @@ def _find_amount_near_label(
     text: str,
     label_patterns: list[str],
     lines: list | None = None,
+    apply_breakdown_exclusion: bool = True,
 ) -> tuple[str | None, str | None]:
     """Returns (raw_amount_string, evidence_span) for an amount token
     associated with any of the given label patterns.
@@ -211,6 +212,14 @@ def _find_amount_near_label(
          pixel positions, are supplied): associates table row labels with their corresponding
          row amounts using vertical row-band proximity and row ranking, excluding candidate
          amounts explicitly associated with opposing breakdown categories (e.g. Gross/Deductions).
+
+    `apply_breakdown_exclusion` scopes that Gross/Deductions exclusion to documents
+    where a competing breakdown row genuinely CAN exist (salary slips). A bank
+    statement transaction line has exactly one amount per narration - there is no
+    separate "Gross" row to compete with - so a real narration convention like
+    "NEFT-SALARY-GROSS-<company>" must not have its own, only amount excluded just
+    because the word "GROSS" appears in the narration text describing it (traced:
+    this silently returned an unrelated nearby transaction's amount instead).
     """
     tolerance = _row_band_tolerance(lines) if lines else 0.0
 
@@ -224,15 +233,16 @@ def _find_amount_near_label(
             if lbl_m:
                 lbl_start, lbl_end = lbl_m.span()
                 for m in _amounts_in_line(line):
-                    prefix_to_amt = line[: m.start()]
-                    last_excluded = list(_EXCLUDED_INCOME_LABELS.finditer(prefix_to_amt))
-                    if last_excluded:
-                        last_ex_end = last_excluded[-1].end()
-                        is_excluded = m.start() >= last_ex_end and (
-                            last_ex_end > lbl_end or m.start() < lbl_start
-                        )
-                        if is_excluded:
-                            continue
+                    if apply_breakdown_exclusion:
+                        prefix_to_amt = line[: m.start()]
+                        last_excluded = list(_EXCLUDED_INCOME_LABELS.finditer(prefix_to_amt))
+                        if last_excluded:
+                            last_ex_end = last_excluded[-1].end()
+                            is_excluded = m.start() >= last_ex_end and (
+                                last_ex_end > lbl_end or m.start() < lbl_start
+                            )
+                            if is_excluded:
+                                continue
 
                     if m.start() >= lbl_end:
                         char_dist = float(m.start() - lbl_end)
@@ -279,8 +289,10 @@ def _find_amount_near_label(
                         continue
 
                     # Exclude candidate lines explicitly labeled with other breakdown categories
-                    if _EXCLUDED_INCOME_LABELS.search(candidate_line.text) and not label_re.search(
-                        candidate_line.text
+                    if (
+                        apply_breakdown_exclusion
+                        and _EXCLUDED_INCOME_LABELS.search(candidate_line.text)
+                        and not label_re.search(candidate_line.text)
                     ):
                         continue
 
@@ -312,7 +324,16 @@ def extract_monthly_income(text: str, doc_type: str, lines: list | None = None) 
     label_patterns = (
         INCOME_LABELS_SALARY_SLIP if doc_type == "SALARY_SLIP" else INCOME_LABELS_BANK_STATEMENT
     )
-    raw_amount, evidence = _find_amount_near_label(text, label_patterns, lines=lines)
+    # Only a salary slip can genuinely have a competing Gross/Deductions row
+    # near the target label - a bank statement's narration line has exactly
+    # one amount, so the exclusion must not apply there (see
+    # _find_amount_near_label's docstring for the traced failure this fixes).
+    raw_amount, evidence = _find_amount_near_label(
+        text,
+        label_patterns,
+        lines=lines,
+        apply_breakdown_exclusion=(doc_type == "SALARY_SLIP"),
+    )
     if raw_amount is None:
         return ExtractedField(
             key="monthly_income",
@@ -555,14 +576,18 @@ _GENERIC_DATE_LABELS = (
 # -> valid-till date, not birth date.
 _DATE_LABELS_BY_DOC_TYPE: dict[str, str] = {
     "PASSPORT_SCAN": r"Date\s*of\s*Issue|Date\s*Issued|Issued",
-    "VOTER_ID_CARD": r"Date\s*of\s*Birth|DOB",
+    # "[DO]OB" tolerates "DOB" -> "OOB" (D->O), the SAME traced OCR
+    # artifact fixed for "DL No" -> "OL No" below - now confirmed
+    # recurring across two unrelated doc types/templates, not one-off
+    # noise.
+    "VOTER_ID_CARD": r"Date\s*of\s*Birth|[DO]OB",
     "DRIVING_LICENCE": r"Valid\s*Till|Valid",
     # Credit Card salary slips express the pay period as prose ("Payslip
     # for Mar 1997", "for the period Jul 1971.") rather than a colon-style
     # label - a real, common payslip wording, not tuned to one template.
     "SALARY_SLIP": r"Payslip\s*for|Pay\s*Period|for\s*the\s*period",
-    "PAN_CARD_IMAGE": r"Date\s*of\s*Birth|DOB",
-    "AADHAAR_FRONT_BACK": r"Date\s*of\s*Birth|DOB",
+    "PAN_CARD_IMAGE": r"Date\s*of\s*Birth|[DO]OB",
+    "AADHAAR_FRONT_BACK": r"Date\s*of\s*Birth|[DO]OB",
     "BANK_STATEMENT_SUMMARY": r"Statement\s*Period|Statement\s*Date|Period",
     # "[I{]ssue" tolerates the same leading-"I" OCR misread documented
     # above for IFSC ("Issue" -> "{ssue", traced on a real sample).
@@ -613,10 +638,21 @@ def extract_document_date(text: str, doc_type: str | None = None) -> ExtractedFi
         if match:
             raw = match.group(1).strip()
             normalized = normalize_date(raw)
+            # Never fall back to the raw, un-normalized string as `value`
+            # (traced: a genuinely impossible calendar date - OCR misread
+            # "18/04/2019" as "48/04/2019", day 48 - correctly failed
+            # normalization and was correctly flagged `validated=False`,
+            # but `value` still held the garbage raw string instead of
+            # None. Every other field in this file (money, identifier,
+            # name) returns None rather than an unnormalized/unvalidated
+            # value on failure; this one silently didn't, an inconsistency
+            # with the "never fabricate" principle, not a deliberate
+            # design - nothing in this codebase's test suite exercises or
+            # depends on the raw fallback.
             return ExtractedField(
                 key="document_date",
                 raw_value=raw,
-                value=normalized or raw,
+                value=normalized,
                 evidence_span=match.group(0),
                 method="label_anchored_regex",
                 validated=normalized is not None,
@@ -643,8 +679,15 @@ def extract_document_date(text: str, doc_type: str | None = None) -> ExtractedFi
 # (Phase 12's "AI extracts, deterministic validation verifies").
 _IDENTIFIER_LABELS_BY_DOC_TYPE: dict[str, str] = {
     "PASSPORT_SCAN": r"Passport\s*No\.?|Passport\s*Number|No\.",
-    "VOTER_ID_CARD": r"EPIC\s*No\.?|Voter\s*ID\s*No\.?|Card\s*No\.?",
-    "DRIVING_LICENCE": r"DL\s*No\.?|Licen[cs]e\s*No\.?|Licen[cs]e\s*Number",
+    # "Card No" -> "Gard No" (C->G) is a traced, 100%-reproducible OCR
+    # misread on this dataset's voter_compact template (2 of 2 real
+    # failures), the same class of single-letter-lookalike artifact as
+    # CANCELLED_CHEQUE's "IFSC" tolerance below - not a guess.
+    "VOTER_ID_CARD": r"EPIC\s*No\.?|Voter\s*ID\s*No\.?|[CG]ard\s*No\.?",
+    # "DL No" -> "OL No" (D->O) is the same class of traced artifact,
+    # 100%-reproducible on this dataset's dl_standard template (2 of 2
+    # real failures).
+    "DRIVING_LICENCE": r"[DO]L\s*No\.?|Licen[cs]e\s*No\.?|Licen[cs]e\s*Number",
     "ITR_V_ACKNOWLEDGEMENT": r"PAN|Permanent\s*Account\s*Number",
     "PAN_CARD_IMAGE": r"PAN|Permanent\s*Account\s*Number",
     "AADHAAR_FRONT_BACK": r"Aadhaar\s*(?:No\.?|Number)?|UIDAI|UID\s*No\.?",
@@ -688,6 +731,15 @@ _IDENTIFIER_DIGIT_LEN: dict[str, int] = {
     "BANK_STATEMENT_SUMMARY": 12,  # this dataset's bank account number length
     "KRA_KYC_LETTER": 4,  # same PAN format, different doc_type/journey
 }
+# Every digit-middle group below is scoped to `[0-9OoIlSB ]` - the SAME
+# confusable set `normalize.py`'s `try_fix_ocr_digit_confusion` already
+# corrects (O/o->0, I/l->1, S->5, B->8), applied to this group a few lines
+# below. Before this fix the capture classes only included O/o/I/l, never
+# S/B, so a genuinely correct identifier whose digit run happened to
+# contain an OCR-misread S or B (traced: IFSC "0504862" -> "O5S04862")
+# could not even be CAPTURED by the regex at all, let alone corrected -
+# the fixer never got a chance to run. Widening the capture class to match
+# the already-vetted correction table is not a new guess.
 # Each pattern has THREE groups (letter-prefix, digit-middle,
 # trailing-letter) so a format with a trailing letter (PAN: 5 letters + 4
 # digits + 1 letter) can be handled by the same mechanism as the
@@ -709,37 +761,54 @@ _IDENTIFIER_DIGIT_LEN: dict[str, int] = {
 #
 # Indian passport: 1 letter (real series letters exclude a few easily
 # OCR-confused ones) + 7 digits.
-_PASSPORT_NO_VALUE = re.compile(r"([A-PR-Z])[ \t]?([0-9OoIl ]{7,10})()", re.IGNORECASE)
+_PASSPORT_NO_VALUE = re.compile(r"([A-PR-Z])[ \t]?([0-9OoIlSB ]{7,10})()", re.IGNORECASE)
 # EPIC (voter ID) number: 3 letters + 7 digits.
-_EPIC_NO_VALUE = re.compile(r"([A-Z]{3})[ \t]?([0-9OoIl ]{7,10})()", re.IGNORECASE)
+_EPIC_NO_VALUE = re.compile(r"([A-Z]{3})[ \t]?([0-9OoIlSB ]{7,10})()", re.IGNORECASE)
 # Driving licence: 2-letter state code + 2-digit RTO + 4-digit year +
 # 7-digit serial (a commonly used real DL numbering convention).
-_DL_NO_VALUE = re.compile(r"([A-Z]{2})[ \t]?([0-9OoIl ]{13,17})()", re.IGNORECASE)
+_DL_NO_VALUE = re.compile(r"([A-Z]{2})[ \t]?([0-9OoIlSB ]{13,17})()", re.IGNORECASE)
 # Indian PAN: 5 letters + 4 digits + 1 letter (a real, fixed, well-known
 # government format, distinct in shape from the 3 above). Reused as-is for
 # Account Opening's PAN_CARD_IMAGE - the same government format, just a
 # different journey/doc_type, not a copy of Credit Card business logic.
-_PAN_VALUE = re.compile(r"([A-Z]{5})[ \t]?([0-9OoIl ]{4,6})[ \t]?([A-Z])", re.IGNORECASE)
+#
+# The letter groups tolerate the SAME digit lookalikes normalize.py's
+# `_OCR_DIGIT_CONFUSIONS` already trusts (O/o->0, I/l->1, S->5, B->8) -
+# traced on two real samples: a trailing letter "I" read as digit "1"
+# ("IWCKS6883I" -> "IWCKS68831"), and a prefix letter "O" read as digit
+# "0" ("YMVZO4898T" -> "YMVZ04898T"). Without this, the letter group's
+# strict `[A-Z]` requirement fails to match at all, and the whole
+# identifier is lost - `_canonicalize_pan_letter_group` below converts
+# these back using the same mapping, applied ONLY to the two letter
+# groups, never to the digit-middle group.
+_PAN_VALUE = re.compile(
+    r"([A-Z0oO1lI5S8B]{5})[ \t]?([0-9OoIlSB ]{4,6})[ \t]?([A-Z0oO1lI5S8B])", re.IGNORECASE
+)
+_DIGIT_TO_ALPHA_CONFUSIONS = {"0": "O", "1": "I", "5": "S", "8": "B"}
+
+
+def _canonicalize_pan_letter_group(group: str) -> str:
+    return "".join(_DIGIT_TO_ALPHA_CONFUSIONS.get(ch, ch) for ch in group)
 # Aadhaar number: 12 digits, no letters at all (unlike every format above)
 # - both letter groups are the always-empty `()` capture, and the middle
 # digit group tolerates the real printed space-grouping ("1234 5678 9012")
 # PLUS the same embedded-OCR-space tolerance as every other identifier
 # above; the expected-length check after stripping ALL spaces is what
 # actually distinguishes a genuine 12-digit Aadhaar number from noise.
-_AADHAAR_VALUE = re.compile(r"()([0-9OoIl ]{12,18})()", re.IGNORECASE)
+_AADHAAR_VALUE = re.compile(r"()([0-9OoIlSB ]{12,18})()", re.IGNORECASE)
 # IFSC (Indian Financial System Code): 4-letter bank code + a fixed "0" +
 # 6-digit branch code (11 chars total) - a real, well-known government/RBI
 # format, genuinely new SHAPE from every identifier above (the branch
 # portion is bank-assigned digits, not a checksum letter), reused via the
 # same letter-prefix/digit-middle split so the digit-confusion fixer only
 # ever touches the numeric branch portion, never the bank-code letters.
-_IFSC_VALUE = re.compile(r"([A-Z]{4})[ \t]?([0-9OoIl ]{7,10})()", re.IGNORECASE)
+_IFSC_VALUE = re.compile(r"([A-Z]{4})[ \t]?([0-9OoIlSB ]{7,10})()", re.IGNORECASE)
 # Bank account number: pure digits, no letters at all (same empty-letter-
 # group shape as Aadhaar above) - length varies by bank in the real world,
 # but this dataset generates a fixed, disclosed length (see
 # _IDENTIFIER_DIGIT_LEN) since there is no single universal Indian
 # standard length to validate against.
-_ACCOUNT_NUMBER_VALUE = re.compile(r"()([0-9OoIl ]{12,16})()", re.IGNORECASE)
+_ACCOUNT_NUMBER_VALUE = re.compile(r"()([0-9OoIlSB ]{12,16})()", re.IGNORECASE)
 
 _IDENTIFIER_VALUE_PATTERN: dict[str, re.Pattern] = {
     "PASSPORT_SCAN": _PASSPORT_NO_VALUE,
@@ -803,6 +872,9 @@ def extract_identifier(text: str, doc_type: str) -> ExtractedField:
     letter_prefix = value_match.group(1)
     digit_suffix_raw = value_match.group(2)
     trailing_letter = value_match.group(3) or ""  # empty for non-PAN formats
+    if value_pattern is _PAN_VALUE:
+        letter_prefix = _canonicalize_pan_letter_group(letter_prefix)
+        trailing_letter = _canonicalize_pan_letter_group(trailing_letter)
     raw = letter_prefix + digit_suffix_raw + trailing_letter
     # Strip any embedded space(s) BEFORE validating length - this is what
     # actually recovers the "digit run split by a false OCR space" case

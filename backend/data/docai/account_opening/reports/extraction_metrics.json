@@ -10,8 +10,8 @@
       },
       "identifier": {
         "n": 12,
-        "exact_match_accuracy": 0.8333,
-        "extraction_coverage": 0.9167
+        "exact_match_accuracy": 0.9167,
+        "extraction_coverage": 1.0
       },
       "document_date": {
         "n": 12,
@@ -20,18 +20,6 @@
       }
     },
     "errors": [
-      {
-        "split": "val",
-        "sample_id": "PAN_CARD_IMAGE_pan_standard_0067",
-        "doc_type": "PAN_CARD_IMAGE",
-        "template_id": "pan_standard",
-        "field": "identifier",
-        "expected": "IWCKS6883I",
-        "predicted": null,
-        "raw_value": null,
-        "validated": false,
-        "note": "Identifier label found but no value matched the expected format."
-      },
       {
         "split": "val",
         "sample_id": "AADHAAR_FRONT_BACK_aadhaar_compact_0114",
@@ -57,40 +45,16 @@
       },
       "identifier": {
         "n": 12,
-        "exact_match_accuracy": 0.9167,
-        "extraction_coverage": 0.9167
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
       },
       "document_date": {
         "n": 12,
-        "exact_match_accuracy": 0.9167,
-        "extraction_coverage": 0.9167
+        "exact_match_accuracy": 1.0,
+        "extraction_coverage": 1.0
       }
     },
     "errors": [
-      {
-        "split": "test",
-        "sample_id": "PAN_CARD_IMAGE_pan_standard_0073",
-        "doc_type": "PAN_CARD_IMAGE",
-        "template_id": "pan_standard",
-        "field": "identifier",
-        "expected": "YMVZO4898T",
-        "predicted": null,
-        "raw_value": null,
-        "validated": false,
-        "note": "Identifier label found but no value matched the expected format."
-      },
-      {
-        "split": "test",
-        "sample_id": "PAN_CARD_IMAGE_pan_compact_0074",
-        "doc_type": "PAN_CARD_IMAGE",
-        "template_id": "pan_compact",
-        "field": "document_date",
-        "expected": "1972-10-21",
-        "predicted": null,
-        "raw_value": null,
-        "validated": false,
-        "note": "No labeled document date found."
-      },
       {
         "split": "test",
         "sample_id": "PAN_CARD_IMAGE_pan_compact_0076",
@@ -128,8 +92,8 @@
       },
       "identifier": {
         "n": 24,
-        "exact_match_accuracy": 0.9167,
-        "extraction_coverage": 0.9167
+        "exact_match_accuracy": 0.9583,
+        "extraction_coverage": 0.9583
       },
       "document_date": {
         "n": 24,
@@ -281,18 +245,6 @@
         "raw_value": null,
         "validated": false,
         "note": "No labeled name found."
-      },
-      {
-        "split": "unseen_template",
-        "sample_id": "PAN_CARD_IMAGE_pan_letterhead_unseen_0085",
-        "doc_type": "PAN_CARD_IMAGE",
-        "template_id": "pan_letterhead_unseen",
-        "field": "identifier",
-        "expected": "HUWVL8965O",
-        "predicted": null,
-        "raw_value": null,
-        "validated": false,
-        "note": "Identifier label found but no value matched the expected format."
       },
       {
         "split": "unseen_template",

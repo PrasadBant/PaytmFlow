@@ -21,7 +21,7 @@
       "identifier": {
         "n": 6,
         "exact_match_accuracy": 0.8333,
-        "extraction_coverage": 0.8333
+        "extraction_coverage": 1.0
       }
     },
     "errors": [
@@ -56,10 +56,10 @@
         "template_id": "itr_formal",
         "field": "identifier",
         "expected": "BMJNG0120J",
-        "predicted": null,
-        "raw_value": null,
-        "validated": false,
-        "note": "Identifier label found but no value matched the expected format."
+        "predicted": "BMJNG0120S",
+        "raw_value": "BMJNGO120S",
+        "validated": true,
+        "note": null
       }
     ]
   },
@@ -111,8 +111,8 @@
       },
       "identifier": {
         "n": 12,
-        "exact_match_accuracy": 0.75,
-        "extraction_coverage": 0.8333
+        "exact_match_accuracy": 0.8333,
+        "extraction_coverage": 0.9167
       }
     },
     "errors": [
@@ -127,18 +127,6 @@
         "raw_value": null,
         "validated": false,
         "note": "No labeled name found."
-      },
-      {
-        "split": "unseen_template",
-        "sample_id": "ITR_V_ACKNOWLEDGEMENT_itr_letterhead_unseen_0080",
-        "doc_type": "ITR_V_ACKNOWLEDGEMENT",
-        "template_id": "itr_letterhead_unseen",
-        "field": "identifier",
-        "expected": "VAVJZ6976O",
-        "predicted": null,
-        "raw_value": null,
-        "validated": false,
-        "note": "Identifier label found but no value matched the expected format."
       },
       {
         "split": "unseen_template",

@@ -162,3 +162,49 @@ def test_real_generated_document_through_real_ocr_classifies_correctly():
         word_count=ocr_result.word_count,
     )
     assert classification.outcome == "CORRECT_DOCUMENT"
+
+
+_insurance_classifier = get_classifier("INSURANCE")
+
+
+@pytest.mark.skipif(
+    _insurance_classifier is None,
+    reason="No trained INSURANCE classifier artifact present - run "
+    "app.docai.train_classifier_insurance first.",
+)
+def test_cross_journey_document_is_not_confidently_misclassified():
+    """Real-browser QA regression: a genuine LENDING salary slip, uploaded
+
+    by mistake for Insurance's Pre-existing Disease Clearance (which
+    accepts MEDICAL_DISCHARGE_SUMMARY, HEALTH_CHECKUP_REPORT, or
+    PREVIOUS_POLICY_COPY - all mapped to the same target field), was
+    "Verified" as a "Previous Policy Copy" at 0.456 probability - just
+    over the 0.45 ambiguity floor, and confidently WRONG rather than a
+    safe non-answer. Root cause: Insurance's classifier had never once
+    seen a salary-slip-shaped document during training, only its own
+    doc types plus a synthetic junk class - so it had no real signal
+    that this specific kind of OOD content isn't its domain. Fixed by
+    training every pack's "OTHER" class on a sample of REAL documents
+    from every OTHER pack (see train_classifier.py's
+    `_load_cross_journey_other_samples`), not more synthetic junk.
+    """
+    text = (
+        "DEMO FINANCIAL SERVICES\nSALARY SLIP OCTOBER 2026\n"
+        "Employee Name\nPriya Nair\nEmployer\nExample Technologies Pvt. Ltd.\n"
+        "EARNINGS\nBasic Pay 48,000.00\nHouse Rent Allowance 16,000.00\n"
+        "Gross Earnings 75,000.00\nDEDUCTIONS\nProvident Fund 6,000.00\n"
+        "Total Deductions 11,000.00\nNET PAY 64,000.00\n"
+        "Net Pay / Take Home Salary: 64000 INR"
+    )
+    result = _insurance_classifier.classify(
+        text,
+        expected_doc_type="MEDICAL_DISCHARGE_SUMMARY",
+        ocr_confidence=0.95,
+        word_count=len(text.split()),
+        accepted_doc_types={
+            "MEDICAL_DISCHARGE_SUMMARY",
+            "HEALTH_CHECKUP_REPORT",
+            "PREVIOUS_POLICY_COPY",
+        },
+    )
+    assert result.outcome != "CORRECT_DOCUMENT"

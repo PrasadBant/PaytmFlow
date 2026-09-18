@@ -1,6 +1,6 @@
 {
   "meta": {
-    "version": "credit_card-classifier-v1",
+    "version": "credit-card-classifier-v1",
     "journey_type": "CREDIT_CARD",
     "label_names": [
       "ITR_V_ACKNOWLEDGEMENT",
@@ -8,9 +8,10 @@
       "SALARY_SLIP",
       "UTILITY_BILL_ELECTRICITY"
     ],
-    "trained_at": "2026-09-14T20:36:55.268099+00:00",
+    "trained_at": "2026-09-18T18:57:49.611273+00:00",
     "dataset_seed": 20260917,
-    "train_n": 75,
+    "train_n": 90,
+    "cross_journey_other_n": 15,
     "sklearn_version": "1.9.1",
     "python_version": "3.13.12 (tags/v3.13.12:1cbe481, Feb  3 2026, 18:22:25) [MSC v.1944 64 bit (AMD64)]",
     "platform": "Windows-11-10.0.26200-SP0",
@@ -182,10 +183,10 @@
     "unseen_template": {
       "split": "unseen_template",
       "n": 39,
-      "accuracy": 1.0,
-      "macro_f1": 1.0,
-      "macro_precision": 1.0,
-      "macro_recall": 1.0,
+      "accuracy": 0.9744,
+      "macro_f1": 0.9534,
+      "macro_precision": 0.9375,
+      "macro_recall": 0.9792,
       "per_class_report": {
         "ITR_V_ACKNOWLEDGEMENT": {
           "precision": 1.0,
@@ -194,9 +195,9 @@
           "support": 12.0
         },
         "OTHER": {
-          "precision": 1.0,
+          "precision": 0.75,
           "recall": 1.0,
-          "f1-score": 1.0,
+          "f1-score": 0.8571428571428571,
           "support": 3.0
         },
         "SALARY_SLIP": {
@@ -207,21 +208,21 @@
         },
         "UTILITY_BILL_ELECTRICITY": {
           "precision": 1.0,
-          "recall": 1.0,
-          "f1-score": 1.0,
+          "recall": 0.9166666666666666,
+          "f1-score": 0.9565217391304348,
           "support": 12.0
         },
-        "accuracy": 1.0,
+        "accuracy": 0.9743589743589743,
         "macro avg": {
-          "precision": 1.0,
-          "recall": 1.0,
-          "f1-score": 1.0,
+          "precision": 0.9375,
+          "recall": 0.9791666666666666,
+          "f1-score": 0.9534161490683231,
           "support": 39.0
         },
         "weighted avg": {
-          "precision": 1.0,
-          "recall": 1.0,
-          "f1-score": 1.0,
+          "precision": 0.9807692307692307,
+          "recall": 0.9743589743589743,
+          "f1-score": 0.9756330625895843,
           "support": 39.0
         }
       },
@@ -253,15 +254,31 @@
           ],
           [
             0,
+            1,
             0,
-            0,
-            12
+            11
           ]
         ]
       }
     }
   },
-  "errors": [],
+  "errors": [
+    {
+      "split": "unseen_template",
+      "sample_id": "UTILITY_BILL_ELECTRICITY_utility_letterhead_unseen_0127",
+      "template_id": "utility_letterhead_unseen",
+      "expected": "UTILITY_BILL_ELECTRICITY",
+      "predicted": "OTHER",
+      "ocr_confidence": 0.9179,
+      "word_count": 24,
+      "degradation": {
+        "rotation_deg": -3.13,
+        "blur_radius": 0.8,
+        "noise_sigma": 3,
+        "jpeg_quality": 70
+      }
+    }
+  ],
   "runtime_safety": {
     "val": {
       "split": "val",
@@ -299,15 +316,15 @@
       "split": "unseen_template",
       "n": 39,
       "outcomes": {
-        "CORRECT_DOCUMENT": 36,
+        "CORRECT_DOCUMENT": 25,
         "WRONG_DOCUMENT": 3,
-        "AMBIGUOUS_DOCUMENT": 0,
+        "AMBIGUOUS_DOCUMENT": 11,
         "UNREADABLE_DOCUMENT": 0
       },
-      "correct_rate": 0.9231,
+      "correct_rate": 0.641,
       "false_rejection_rate": 0.0,
       "false_acceptance_rate": 0.0,
-      "safe_non_answer_rate": 0.0,
+      "safe_non_answer_rate": 0.2821,
       "false_rejections": [],
       "false_acceptances": []
     }

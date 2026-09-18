@@ -69,13 +69,13 @@
       },
       "identifier": {
         "n": 18,
-        "exact_match_accuracy": 0.8889,
-        "extraction_coverage": 0.8889
+        "exact_match_accuracy": 0.9444,
+        "extraction_coverage": 0.9444
       },
       "document_date": {
         "n": 12,
         "exact_match_accuracy": 0.8333,
-        "extraction_coverage": 1.0
+        "extraction_coverage": 0.8333
       }
     },
     "errors": [
@@ -87,21 +87,9 @@
         "field": "identifier",
         "expected": "MTBL0504862",
         "predicted": null,
-        "raw_value": null,
+        "raw_value": "MTBLO5S04862",
         "validated": false,
-        "note": "Identifier label found but no value matched the expected format."
-      },
-      {
-        "split": "test",
-        "sample_id": "KRA_KYC_LETTER_kra_standard_0116",
-        "doc_type": "KRA_KYC_LETTER",
-        "template_id": "kra_standard",
-        "field": "identifier",
-        "expected": "YWMZL9153O",
-        "predicted": null,
-        "raw_value": null,
-        "validated": false,
-        "note": "Identifier label found but no value matched the expected format."
+        "note": "Matched label but digit portion 'O5S04862' is 8 chars, expected 7."
       },
       {
         "split": "test",
@@ -110,7 +98,7 @@
         "template_id": "kra_standard",
         "field": "document_date",
         "expected": "2004-08-10",
-        "predicted": "40/08/2004",
+        "predicted": null,
         "raw_value": "40/08/2004",
         "validated": false,
         "note": "Could not normalize date '40/08/2004'."
@@ -122,7 +110,7 @@
         "template_id": "kra_compact",
         "field": "document_date",
         "expected": "1993-09-21",
-        "predicted": "24 99/1993",
+        "predicted": null,
         "raw_value": "24 99/1993",
         "validated": false,
         "note": "Could not normalize date '24 99/1993'."
@@ -140,8 +128,8 @@
       },
       "identifier": {
         "n": 36,
-        "exact_match_accuracy": 0.8889,
-        "extraction_coverage": 0.9167
+        "exact_match_accuracy": 0.9167,
+        "extraction_coverage": 0.9722
       },
       "document_date": {
         "n": 24,
@@ -181,22 +169,10 @@
         "template_id": "kra_letterhead_unseen",
         "field": "identifier",
         "expected": "GHOYI3437J",
-        "predicted": null,
-        "raw_value": null,
-        "validated": false,
-        "note": "Identifier label found but no value matched the expected format."
-      },
-      {
-        "split": "unseen_template",
-        "sample_id": "KRA_KYC_LETTER_kra_letterhead_unseen_0125",
-        "doc_type": "KRA_KYC_LETTER",
-        "template_id": "kra_letterhead_unseen",
-        "field": "identifier",
-        "expected": "UCAJS5939I",
-        "predicted": null,
-        "raw_value": null,
-        "validated": false,
-        "note": "Identifier label found but no value matched the expected format."
+        "predicted": "GHOYI3437U",
+        "raw_value": "GHOYI3437u",
+        "validated": true,
+        "note": null
       },
       {
         "split": "unseen_template",
