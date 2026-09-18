@@ -60,7 +60,7 @@ def try_fix_ocr_digit_confusion(raw: str) -> str:
     raw_str = raw.strip()
     prefix_match = _CURRENCY_PREFIX.match(raw_str)
     prefix = prefix_match.group(0) if prefix_match else ""
-    numeric_part = raw_str[len(prefix):]
+    numeric_part = raw_str[len(prefix) :]
 
     def _fix_token(match: re.Match) -> str:
         token = match.group(0)

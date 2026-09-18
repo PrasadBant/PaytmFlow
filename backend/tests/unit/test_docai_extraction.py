@@ -595,6 +595,7 @@ class TestMonthlyNetIncomeExtractionRegression:
         demo_pdf_path = Path(r"C:\Users\vishu\Downloads\paytmflow_correct_salary_slip_demo.pdf")
         if demo_pdf_path.exists():
             from app.docai.ocr import extract_text
+
             pdf_bytes = demo_pdf_path.read_bytes()
             ocr_res = extract_text(pdf_bytes, "application/pdf")
             demo_field = extract_monthly_income(ocr_res.text, "SALARY_SLIP", lines=ocr_res.lines)
@@ -625,14 +626,7 @@ class TestMonthlyNetIncomeExtractionRegression:
             "Monthly Net Income",
         ]
         for label in labels:
-            text = (
-                f"Gross Earnings: ₹1,00,000\n"
-                f"Total Deductions: ₹15,000\n"
-                f"{label}: ₹85,000\n"
-            )
+            text = f"Gross Earnings: ₹1,00,000\nTotal Deductions: ₹15,000\n{label}: ₹85,000\n"
             field = extract_monthly_income(text, "SALARY_SLIP")
             assert field.value == 85000, f"Failed for label {label}: got {field.value}"
             assert field.validated
-
-
-

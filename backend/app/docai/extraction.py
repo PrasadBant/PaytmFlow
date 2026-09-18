@@ -224,13 +224,12 @@ def _find_amount_near_label(
             if lbl_m:
                 lbl_start, lbl_end = lbl_m.span()
                 for m in _amounts_in_line(line):
-                    prefix_to_amt = line[:m.start()]
+                    prefix_to_amt = line[: m.start()]
                     last_excluded = list(_EXCLUDED_INCOME_LABELS.finditer(prefix_to_amt))
                     if last_excluded:
                         last_ex_end = last_excluded[-1].end()
-                        is_excluded = (
-                            m.start() >= last_ex_end
-                            and (last_ex_end > lbl_end or m.start() < lbl_start)
+                        is_excluded = m.start() >= last_ex_end and (
+                            last_ex_end > lbl_end or m.start() < lbl_start
                         )
                         if is_excluded:
                             continue
@@ -240,13 +239,15 @@ def _find_amount_near_label(
                     else:
                         char_dist = float(1000 + abs(lbl_start - m.end()))
 
-                    candidates.append((
-                        _is_marked_amount(m.group(0)),
-                        0,
-                        char_dist,
-                        m,
-                        line.strip(),
-                    ))
+                    candidates.append(
+                        (
+                            _is_marked_amount(m.group(0)),
+                            0,
+                            char_dist,
+                            m,
+                            line.strip(),
+                        )
+                    )
 
         if lines:
             label_line = next((ln for ln in lines if label_re.search(ln.text)), None)
@@ -254,16 +255,14 @@ def _find_amount_near_label(
                 label_top = label_line.top
 
                 amount_lines = [
-                    ln for ln in lines
-                    if _amounts_in_line(ln.text) and ln is not label_line
+                    ln for ln in lines if _amounts_in_line(ln.text) and ln is not label_line
                 ]
 
                 # Identify labeled rows in the table section to determine relative row ranking
                 if amount_lines:
                     min_amt_top = min(a.top for a in amount_lines) - tolerance
                     table_label_lines = [
-                        ln for ln in lines
-                        if ln not in amount_lines and ln.top >= min_amt_top
+                        ln for ln in lines if ln not in amount_lines and ln.top >= min_amt_top
                     ]
                     label_rank = (
                         table_label_lines.index(label_line)

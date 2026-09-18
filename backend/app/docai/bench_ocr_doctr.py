@@ -50,8 +50,8 @@ def run_doctr_ocr(model, image_path: Path) -> tuple[str, list[OcrLine], float, i
     page_h, page_w = page.dimensions
 
     lines: list[OcrLine] = []
-    words_all = []
-    confidences = []
+    words_all: list[str] = []
+    confidences: list[float] = []
     for block in page.blocks:
         for line in block.lines:
             words = [w.value for w in line.words]

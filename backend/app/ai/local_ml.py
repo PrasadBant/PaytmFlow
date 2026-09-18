@@ -133,8 +133,8 @@ class LocalMLProvider:
             try:
                 parsed_manual = json.loads(text)
                 if isinstance(parsed_manual, dict) and parsed_manual:
-                    detected_fields: list[AIDetectedField] = []
-                    raw_values: dict[str, Any] = {}
+                    manual_detected_fields: list[AIDetectedField] = []
+                    manual_raw_values: dict[str, Any] = {}
                     for k, v in parsed_manual.items():
                         state_spec = next((f for f in manifest.state_schema if f.key == k), None)
                         if state_spec:
@@ -144,7 +144,7 @@ class LocalMLProvider:
                                 if is_money and isinstance(v, (int, float))
                                 else str(v)
                             )
-                            detected_fields.append(
+                            manual_detected_fields.append(
                                 AIDetectedField(
                                     key=k,
                                     label=state_spec.label,
@@ -152,16 +152,16 @@ class LocalMLProvider:
                                     value=v,
                                 )
                             )
-                            raw_values[k] = v
-                    if detected_fields:
-                        n_fields = len(detected_fields)
+                            manual_raw_values[k] = v
+                    if manual_detected_fields:
+                        n_fields = len(manual_detected_fields)
                         return AIInterpretationResult(
                             verified=True,
                             confidence=0.95,
-                            detected=detected_fields,
+                            detected=manual_detected_fields,
                             summary=f"Verified {n_fields} field(s) from manual submission.",
                             conflicts=[],
-                            raw_values=raw_values,
+                            raw_values=manual_raw_values,
                             resolved_doc_type=doc_type.upper(),
                         )
             except Exception as exc:
@@ -454,7 +454,7 @@ class LocalMLProvider:
             and len(conflicts) == 0
             and ocr_confidence >= 0.70
             and word_count >= 15
-            and classification_confidence >= 0.50
+            and classification_confidence >= 0.40
         ):
             confidence = round(min(0.96, max(confidence, 0.88 + 0.08 * (ocr_confidence - 0.70))), 4)
 

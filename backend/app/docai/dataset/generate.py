@@ -73,7 +73,7 @@ def _fmt_indian_amount(amount: int, style: str) -> str:
     s = str(amount)
     if len(s) > 3:
         head, tail = s[:-3], s[-3:]
-        groups = []
+        groups: list[str] = []
         while len(head) > 2:
             groups.insert(0, head[-2:])
             head = head[:-2]

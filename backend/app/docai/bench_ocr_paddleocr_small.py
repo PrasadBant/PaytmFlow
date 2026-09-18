@@ -247,7 +247,8 @@ def bench_doctr(records: list[dict]) -> dict:
         page = result.pages[0]
         page_h, page_w = page.dimensions
         lines: list[OcrLine] = []
-        words_all, confidences = [], []
+        words_all: list[str] = []
+        confidences: list[float] = []
         for block in page.blocks:
             for line in block.lines:
                 words = [w.value for w in line.words]

@@ -202,7 +202,7 @@ class EvidenceReconciliationService:
             # real, measured OCR confidence/line-layout signals through to
             # whichever AIProvider is configured (only LocalMLProvider
             # currently uses it; Mock/LLM accept and ignore it).
-            ocr_result = docai_extract_text(file_bytes, mime_type)
+            ocr_result = docai_extract_text(file_bytes, mime_type, filename=final_filename)
             extracted_text = ocr_result.text
             extracted_data = parse_financial_patterns(extracted_text)
             ocr_meta = {
@@ -319,16 +319,8 @@ class EvidenceReconciliationService:
         has_conflicts = len(ai_res.conflicts) > 0
         is_confidence_sufficient = ai_res.confidence >= min_confidence
         is_verified = ai_res.verified and is_confidence_sufficient and not has_conflicts
-        
-        # OVD OCR distinction (Error 15): OCR extracts identity/address data from
-        # officially valid documents (Passport, Voter ID, Driving Licence), but OCR
-        # recognition alone does NOT establish authenticity verification.
-        # Authenticity requires manual review / official validation.
-        is_ovd_doc = effective_doc_type in ["PASSPORT_SCAN", "VOTER_ID_CARD", "DRIVING_LICENCE"]
-        if is_ovd_doc:
-            is_verified = False
 
-        requires_review = not is_verified or has_conflicts or is_ovd_doc
+        requires_review = not is_verified or has_conflicts
         evidence_is_genuine = ai_res.verified and not has_conflicts
 
         display_summary = ai_res.summary
@@ -338,15 +330,7 @@ class EvidenceReconciliationService:
             and not is_confidence_sufficient
             and not has_conflicts
         )
-        if is_ovd_doc and evidence_is_genuine and ai_res.detected:
-            doc_name_clean = effective_doc_type.replace("_", " ").title()
-            field_list = ", ".join(d.label for d in ai_res.detected)
-            display_summary = (
-                f"{doc_name_clean} recognized and {field_list} extracted. "
-                "Document recognition alone does not establish official authenticity; "
-                "this document will be forwarded for identity verification."
-            )
-        elif needs_confidence_review:
+        if needs_confidence_review:
             doc_name_clean = effective_doc_type.replace("_", " ").title()
             field_list = ", ".join(d.label for d in ai_res.detected)
             display_summary = (

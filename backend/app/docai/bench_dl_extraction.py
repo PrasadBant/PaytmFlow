@@ -87,6 +87,7 @@ def _load_all_records() -> list[dict]:
 
 
 def _score(doc_type: str, field_key: str, gt_value, predicted_raw: str | None) -> dict:
+    predicted: int | str | None = None
     if field_key == "monthly_income":
         predicted = normalize_indian_amount(predicted_raw) if predicted_raw else None
         is_match = predicted == gt_value

@@ -172,8 +172,10 @@ async def run_scenario(
                                 for field_spec in action.input_schema:
                                     if field_spec.required and field_spec.key not in step_input:
                                         has_val = hasattr(field_spec.type, "value")
-                                        f_type = field_spec.type.value if has_val else str(
-                                            field_spec.type
+                                        f_type = (
+                                            field_spec.type.value
+                                            if has_val
+                                            else str(field_spec.type)
                                         )
                                         if f_type == "boolean":
                                             step_input[field_spec.key] = True

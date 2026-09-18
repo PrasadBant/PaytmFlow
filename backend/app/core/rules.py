@@ -161,11 +161,7 @@ def derive_field_states(
     completed = sum(1 for f in applicable_fields if f.status == CoreFieldStatus.SATISFIED)
     total = len(applicable_fields)
     pending = total - completed
-    blockers = sum(
-        1
-        for f in applicable_fields
-        if f.status == CoreFieldStatus.BLOCKED
-    )
+    blockers = sum(1 for f in applicable_fields if f.status == CoreFieldStatus.BLOCKED)
 
     progress = CoreProgressCounts(
         completed=completed,

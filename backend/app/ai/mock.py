@@ -45,7 +45,19 @@ class MockAI:
             k = spec.key
             if spec.type == FieldType.MONEY or (
                 spec.type == FieldType.NUMBER
-                and any(w in k for w in ["amount", "limit", "deposit", "sum", "insured", "sip", "balance", "target"])
+                and any(
+                    w in k
+                    for w in [
+                        "amount",
+                        "limit",
+                        "deposit",
+                        "sum",
+                        "insured",
+                        "sip",
+                        "balance",
+                        "target",
+                    ]
+                )
             ):
                 if parsed_amount is not None:
                     val = parsed_amount
@@ -56,9 +68,8 @@ class MockAI:
                     extracted[k] = val
                 elif spec.min is not None:
                     extracted[k] = int(spec.min)
-            elif (
-                spec.type == FieldType.NUMBER
-                and any(w in k for w in ["tenure", "duration", "term", "month", "year"])
+            elif spec.type == FieldType.NUMBER and any(
+                w in k for w in ["tenure", "duration", "term", "month", "year"]
             ):
                 year_matches = re.findall(r"(\d+)\s*(?:years?|yrs?)", text)
                 month_matches = re.findall(r"(\d+)\s*(?:months?|mos?|m)\b", text)
@@ -79,13 +90,29 @@ class MockAI:
                 elif "sip" in text or "monthly sip" in text or "per month" in text:
                     chosen_opt = next((o.value for o in spec.options if "SIP" in o.value), None)
                 elif "medic" in text or "health" in text or "hospital" in text:
-                    chosen_opt = next((o.value for o in spec.options if "MEDIC" in o.value or "HEALTH" in o.value), None)
+                    chosen_opt = next(
+                        (
+                            o.value
+                            for o in spec.options
+                            if "MEDIC" in o.value or "HEALTH" in o.value
+                        ),
+                        None,
+                    )
                 elif "renovat" in text or "home" in text or "house" in text:
-                    chosen_opt = next((o.value for o in spec.options if "HOME" in o.value or "RENOVAT" in o.value), None)
+                    chosen_opt = next(
+                        (
+                            o.value
+                            for o in spec.options
+                            if "HOME" in o.value or "RENOVAT" in o.value
+                        ),
+                        None,
+                    )
                 elif "educat" in text or "study" in text or "college" in text:
                     chosen_opt = next((o.value for o in spec.options if "EDUCAT" in o.value), None)
                 elif "cashback" in text:
-                    chosen_opt = next((o.value for o in spec.options if "CASHBACK" in o.value), None)
+                    chosen_opt = next(
+                        (o.value for o in spec.options if "CASHBACK" in o.value), None
+                    )
                 elif "reward" in text:
                     chosen_opt = next((o.value for o in spec.options if "REWARD" in o.value), None)
                 elif "travel" in text or "flight" in text:
@@ -93,20 +120,42 @@ class MockAI:
                 elif "family" in text or "floater" in text:
                     chosen_opt = next((o.value for o in spec.options if "FAMILY" in o.value), None)
                 elif "individual" in text or "self" in text:
-                    chosen_opt = next((o.value for o in spec.options if "INDIVIDUAL" in o.value), None)
+                    chosen_opt = next(
+                        (o.value for o in spec.options if "INDIVIDUAL" in o.value), None
+                    )
                 elif "salary" in text or "corporate" in text:
                     chosen_opt = next((o.value for o in spec.options if "SALARY" in o.value), None)
                 elif "saving" in text or "digital" in text:
                     chosen_opt = next((o.value for o in spec.options if "SAVING" in o.value), None)
                 elif "upgrade" in text or "limit" in text:
-                    chosen_opt = next((o.value for o in spec.options if "UPGRADE" in o.value or "LIMIT" in o.value), None)
+                    chosen_opt = next(
+                        (
+                            o.value
+                            for o in spec.options
+                            if "UPGRADE" in o.value or "LIMIT" in o.value
+                        ),
+                        None,
+                    )
                 elif "address" in text:
                     chosen_opt = next((o.value for o in spec.options if "ADDRESS" in o.value), None)
                 elif "periodic" in text or "rekyc" in text:
-                    chosen_opt = next((o.value for o in spec.options if "PERIODIC" in o.value), None)
+                    chosen_opt = next(
+                        (o.value for o in spec.options if "PERIODIC" in o.value), None
+                    )
 
                 if not chosen_opt:
-                    stop_words = {"loan", "card", "policy", "cover", "account", "investment", "update", "plan", "option", "paytm"}
+                    stop_words = {
+                        "loan",
+                        "card",
+                        "policy",
+                        "cover",
+                        "account",
+                        "investment",
+                        "update",
+                        "plan",
+                        "option",
+                        "paytm",
+                    }
                     for opt in spec.options:
                         opt_val = opt.value.lower().replace("_", " ")
                         opt_label = opt.label.lower()
@@ -114,7 +163,11 @@ class MockAI:
                             opt.value.lower() in text
                             or opt_val in text
                             or opt_label in text
-                            or any(word in text for word in opt_label.split() if len(word) > 3 and word not in stop_words)
+                            or any(
+                                word in text
+                                for word in opt_label.split()
+                                if len(word) > 3 and word not in stop_words
+                            )
                         ):
                             chosen_opt = opt.value
                             break
