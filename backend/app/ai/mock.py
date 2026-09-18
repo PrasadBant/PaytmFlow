@@ -20,51 +20,105 @@ class MockAI:
         goal_schema: list[GoalFieldSpec],
     ) -> dict[str, Any]:
         """Extracts goal fields from natural language prompt deterministically."""
-        text = natural_language.lower()
+        raw_text = natural_language.lower().strip()
+        # Normalize commas in formatted numbers e.g. "2,50,000" -> "250000"
+        text = re.sub(r"(\d),(\d)", r"\1\2", raw_text)
         extracted: dict[str, Any] = {}
 
         # 1. Extract money / numbers
         numbers = [int(n) for n in re.findall(r"\b\d+\b", text)]
+        crore_matches = re.findall(r"(\d+(?:\.\d+)?)\s*(?:crore|cr)\b", text)
         lakh_matches = re.findall(r"(\d+(?:\.\d+)?)\s*(?:lakh|lac|l)\b", text)
         k_matches = re.findall(r"(\d+(?:\.\d+)?)\s*k\b", text)
 
         parsed_amount = None
-        if lakh_matches:
+        if crore_matches:
+            parsed_amount = int(float(crore_matches[0]) * 10000000)
+        elif lakh_matches:
             parsed_amount = int(float(lakh_matches[0]) * 100000)
         elif k_matches:
             parsed_amount = int(float(k_matches[0]) * 1000)
         elif numbers:
-            parsed_amount = next((n for n in numbers if n >= 1000), numbers[0])
+            parsed_amount = next((n for n in numbers if n >= 500), numbers[0])
 
         for spec in goal_schema:
             k = spec.key
-            if spec.type in [FieldType.MONEY, FieldType.NUMBER]:
-                if k in ["loan_amount", "sum_insured", "target_amount", "credit_limit"]:
-                    if parsed_amount is not None:
-                        val = parsed_amount
-                        if spec.min is not None:
-                            val = max(val, int(spec.min))
-                        if spec.max is not None:
-                            val = min(val, int(spec.max))
-                        extracted[k] = val
-                    elif spec.min is not None:
-                        extracted[k] = int(spec.min)
-                elif k == "tenure_months":
-                    tenure = next((n for n in numbers if 6 <= n <= 84), 24)
+            if spec.type == FieldType.MONEY or (
+                spec.type == FieldType.NUMBER
+                and any(w in k for w in ["amount", "limit", "deposit", "sum", "insured", "sip", "balance", "target"])
+            ):
+                if parsed_amount is not None:
+                    val = parsed_amount
+                    if spec.min is not None:
+                        val = max(val, int(spec.min))
+                    if spec.max is not None:
+                        val = min(val, int(spec.max))
+                    extracted[k] = val
+                elif spec.min is not None:
+                    extracted[k] = int(spec.min)
+            elif (
+                spec.type == FieldType.NUMBER
+                and any(w in k for w in ["tenure", "duration", "term", "month", "year"])
+            ):
+                year_matches = re.findall(r"(\d+)\s*(?:years?|yrs?)", text)
+                month_matches = re.findall(r"(\d+)\s*(?:months?|mos?|m)\b", text)
+                if "year" in k and year_matches:
+                    extracted[k] = int(year_matches[0])
+                elif "month" in k and month_matches:
+                    extracted[k] = int(month_matches[0])
+                elif "tenure" in k and year_matches:
+                    extracted[k] = int(year_matches[0]) * 12
+                else:
+                    tenure = next((n for n in numbers if 6 <= n <= 84 and n != parsed_amount), 24)
                     extracted[k] = tenure
             elif spec.type == FieldType.ENUM and spec.options:
                 chosen_opt = None
-                for opt in spec.options:
-                    opt_val = opt.value.lower().replace("_", " ")
-                    opt_label = opt.label.lower()
-                    if (
-                        opt.value.lower() in text
-                        or opt_val in text
-                        or opt_label in text
-                        or any(word in text for word in opt_label.split() if len(word) > 3)
-                    ):
-                        chosen_opt = opt.value
-                        break
+                # Check specialized domain aliases first
+                if "lump" in text or "lumpsum" in text or "one time" in text or "one-time" in text:
+                    chosen_opt = next((o.value for o in spec.options if "LUMP" in o.value), None)
+                elif "sip" in text or "monthly sip" in text or "per month" in text:
+                    chosen_opt = next((o.value for o in spec.options if "SIP" in o.value), None)
+                elif "medic" in text or "health" in text or "hospital" in text:
+                    chosen_opt = next((o.value for o in spec.options if "MEDIC" in o.value or "HEALTH" in o.value), None)
+                elif "renovat" in text or "home" in text or "house" in text:
+                    chosen_opt = next((o.value for o in spec.options if "HOME" in o.value or "RENOVAT" in o.value), None)
+                elif "educat" in text or "study" in text or "college" in text:
+                    chosen_opt = next((o.value for o in spec.options if "EDUCAT" in o.value), None)
+                elif "cashback" in text:
+                    chosen_opt = next((o.value for o in spec.options if "CASHBACK" in o.value), None)
+                elif "reward" in text:
+                    chosen_opt = next((o.value for o in spec.options if "REWARD" in o.value), None)
+                elif "travel" in text or "flight" in text:
+                    chosen_opt = next((o.value for o in spec.options if "TRAVEL" in o.value), None)
+                elif "family" in text or "floater" in text:
+                    chosen_opt = next((o.value for o in spec.options if "FAMILY" in o.value), None)
+                elif "individual" in text or "self" in text:
+                    chosen_opt = next((o.value for o in spec.options if "INDIVIDUAL" in o.value), None)
+                elif "salary" in text or "corporate" in text:
+                    chosen_opt = next((o.value for o in spec.options if "SALARY" in o.value), None)
+                elif "saving" in text or "digital" in text:
+                    chosen_opt = next((o.value for o in spec.options if "SAVING" in o.value), None)
+                elif "upgrade" in text or "limit" in text:
+                    chosen_opt = next((o.value for o in spec.options if "UPGRADE" in o.value or "LIMIT" in o.value), None)
+                elif "address" in text:
+                    chosen_opt = next((o.value for o in spec.options if "ADDRESS" in o.value), None)
+                elif "periodic" in text or "rekyc" in text:
+                    chosen_opt = next((o.value for o in spec.options if "PERIODIC" in o.value), None)
+
+                if not chosen_opt:
+                    stop_words = {"loan", "card", "policy", "cover", "account", "investment", "update", "plan", "option", "paytm"}
+                    for opt in spec.options:
+                        opt_val = opt.value.lower().replace("_", " ")
+                        opt_label = opt.label.lower()
+                        if (
+                            opt.value.lower() in text
+                            or opt_val in text
+                            or opt_label in text
+                            or any(word in text for word in opt_label.split() if len(word) > 3 and word not in stop_words)
+                        ):
+                            chosen_opt = opt.value
+                            break
+
                 extracted[k] = chosen_opt or spec.options[0].value
             elif spec.type == FieldType.BOOLEAN:
                 if "yes" in text or "true" in text or "with" in text or "co-applicant" in text:

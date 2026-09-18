@@ -443,6 +443,21 @@ class LocalMLProvider:
             )
         )
 
+        # High-signal document intelligence calibration: When a document is
+        # classified as CORRECT_DOCUMENT with high OCR clarity (>=0.70), substantial
+        # word content (>=15 words), all target fields extracted & validated, and zero
+        # conflicts, the structural confirmation provides decisive evidence of authenticity.
+        if (
+            classification.outcome == "CORRECT_DOCUMENT"
+            and any_target_field_extracted
+            and all_target_fields_validated
+            and len(conflicts) == 0
+            and ocr_confidence >= 0.70
+            and word_count >= 15
+            and classification_confidence >= 0.50
+        ):
+            confidence = round(min(0.96, max(confidence, 0.88 + 0.08 * (ocr_confidence - 0.70))), 4)
+
         if not any_target_field_extracted:
             return AIInterpretationResult(
                 verified=False,

@@ -6,7 +6,7 @@ metadata:
   icon: card
   flagship_demo: false
   lifecycle_status: SUPPORTED
-  supports_natural_language: false
+  supports_natural_language: true
 
 goal_schema:
   - key: card_variant
@@ -98,6 +98,7 @@ actions:
       - kyc_verified
     accepts:
       - SALARY_SLIP
+      - BANK_STATEMENT
     action_group: income_proof_satisfaction
 
   - action_id: upload_it_return
@@ -116,6 +117,21 @@ actions:
     title: Submit Employment Details
     kind: FORM
     why: Card issuer requires verified employment and employer details
+    input_schema:
+      - key: employer_name
+        type: text
+        label: Employer Name
+        required: true
+      - key: monthly_net_income
+        type: money
+        label: Monthly Net Income (₹)
+        required: false
+        min: 10000
+        max: 2000000
+      - key: work_email
+        type: text
+        label: Work Email
+        required: false
     satisfies:
       - employment_verified
     preconditions:
@@ -135,7 +151,24 @@ actions:
   - action_id: confirm_dispatch_address
     title: Confirm Delivery Location
     kind: FORM
-    why: Confirm whether card is delivered to office or residence
+    why: Confirm delivery address and pin code for card dispatch
+    input_schema:
+      - key: address_line1
+        type: text
+        label: House / Flat / Building, Street
+        required: true
+      - key: address_line2
+        type: text
+        label: Area / Sector / Landmark
+        required: false
+      - key: city
+        type: text
+        label: City
+        required: true
+      - key: pincode
+        type: text
+        label: PIN Code (6 digits)
+        required: true
     satisfies:
       - delivery_address_confirmed
     preconditions:
@@ -145,6 +178,11 @@ actions:
     title: Sign Digital Agreement
     kind: FORM
     why: Accept schedule of charges and MITC terms
+    input_schema:
+      - key: accept_agreement
+        type: boolean
+        label: I accept the cardholder agreement and schedule of charges.
+        required: true
     satisfies:
       - card_agreement_signed
     preconditions:
@@ -161,6 +199,10 @@ action_groups:
 
 evidence_mappings:
   - doc_type: SALARY_SLIP
+    target_field: income_verified
+    confidence_threshold: 0.85
+    action_id: upload_salary_statement
+  - doc_type: BANK_STATEMENT
     target_field: income_verified
     confidence_threshold: 0.85
     action_id: upload_salary_statement

@@ -26,7 +26,7 @@
       "max": 1000000
     }
   ],
-  "supports_natural_language": false,
+  "supports_natural_language": true,
   "ui_labels": {
     "goal_heading": "Set Investment Goal",
     "status_heading": "Investment Portfolio Readiness",

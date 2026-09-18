@@ -75,7 +75,7 @@
   "progress": {
     "completed": 3,
     "pending": 4,
-    "blockers": 3,
+    "blockers": 4,
     "total": 7
   },
   "pending_clarification": null,

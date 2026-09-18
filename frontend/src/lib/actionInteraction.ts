@@ -36,8 +36,9 @@ export function classifyInteraction(action: ActionOption | undefined): Interacti
   if (action.kind === 'CLARIFICATION') return 'CLARIFICATION';
 
   const id = action.action_id || '';
-  if (VIDEO_PATTERN.test(id)) return 'VIDEO_VERIFICATION';
-  if (SCHEDULING_PATTERN.test(id)) return 'SCHEDULING';
+  const title = action.title || '';
+  if (VIDEO_PATTERN.test(id) || VIDEO_PATTERN.test(title)) return 'VIDEO_VERIFICATION';
+  if (SCHEDULING_PATTERN.test(id) || SCHEDULING_PATTERN.test(title)) return 'SCHEDULING';
 
   // If an action has text, number, money, or enum fields (e.g. setup_insurance_mandate
   // or register_enach_mandate which collect bank account & IFSC), it must render
@@ -48,6 +49,6 @@ export function classifyInteraction(action: ActionOption | undefined): Interacti
     return 'FORM';
   }
 
-  if (CONSENT_PATTERN.test(id)) return 'CONSENT';
+  if (CONSENT_PATTERN.test(id) || CONSENT_PATTERN.test(title)) return 'CONSENT';
   return 'FORM';
 }

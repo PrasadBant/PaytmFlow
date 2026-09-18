@@ -27,7 +27,7 @@
       ]
     }
   ],
-  "supports_natural_language": false,
+  "supports_natural_language": true,
   "ui_labels": {
     "goal_heading": "Select Health Cover Options",
     "status_heading": "Health Policy Underwriting Checklist",

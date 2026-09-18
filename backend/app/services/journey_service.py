@@ -672,6 +672,7 @@ class JourneyService:
             ),
             pending_clarification=pending_clarification_state,
             display=display_info,
+            natural_language=journey.natural_language,
             updated_at=journey.updated_at,
         )
 

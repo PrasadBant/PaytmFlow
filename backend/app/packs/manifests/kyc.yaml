@@ -6,7 +6,7 @@ metadata:
   icon: id
   flagship_demo: false
   lifecycle_status: SUPPORTED
-  supports_natural_language: false
+  supports_natural_language: true
 
 goal_schema:
   - key: kyc_purpose
@@ -86,6 +86,11 @@ actions:
     title: Validate PAN Number
     kind: FORM
     why: Verification against NSDL / Income Tax database
+    input_schema:
+      - key: pan_number
+        type: text
+        label: Permanent Account Number (PAN)
+        required: true
     satisfies:
       - pan_linked
     preconditions:
@@ -129,6 +134,11 @@ actions:
     title: Validate Geo-Location
     kind: FORM
     why: RBI guidelines mandate verification within national borders
+    input_schema:
+      - key: location_confirmed
+        type: boolean
+        label: Share current device location
+        required: true
     satisfies:
       - geo_tag_validated
     preconditions:
@@ -138,6 +148,11 @@ actions:
     title: Sign KYC Consent Undertaking
     kind: FORM
     why: Submit digital declaration of accuracy for customer records
+    input_schema:
+      - key: accept_undertaking
+        type: boolean
+        label: I declare that the details provided are true and accurate.
+        required: true
     satisfies:
       - rekyc_declaration_signed
     preconditions:

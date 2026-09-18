@@ -171,6 +171,7 @@ class JourneyStateResponse(BaseModel):
     progress: ProgressCounts
     pending_clarification: FieldState | None = None
     display: DisplayInfo
+    natural_language: str | None = None
     updated_at: datetime | None = None
 
 

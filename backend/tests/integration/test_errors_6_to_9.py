@@ -42,10 +42,7 @@ async def test_error_6_health_insurance_prerequisite_and_action_resolution(clien
             "expected_snapshot_id": snap_id,
             "idempotency_key": str(uuid4()),
             "input": {
-                "has_hypertension": False,
-                "has_diabetes": False,
-                "has_critical_illness": False,
-                "has_surgeries": False,
+                "has_medical_history": "NO",
             },
         },
     )

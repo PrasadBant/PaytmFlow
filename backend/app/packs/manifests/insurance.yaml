@@ -6,7 +6,7 @@ metadata:
   icon: shield
   flagship_demo: false
   lifecycle_status: SUPPORTED
-  supports_natural_language: false
+  supports_natural_language: true
 
 goal_schema:
   - key: sum_insured
@@ -90,6 +90,20 @@ actions:
     title: Declare Medical History
     kind: FORM
     why: Insurer requires self-declaration of past health conditions
+    input_schema:
+      - key: has_medical_history
+        type: enum
+        label: Have you ever been diagnosed with any pre-existing medical condition?
+        required: true
+        options:
+          - value: "NO"
+            label: "No"
+          - value: "YES"
+            label: "Yes"
+      - key: medical_condition_details
+        type: text
+        label: Pre-existing Medical Condition Details
+        required: false
     satisfies:
       - medical_history_declared
     preconditions:
@@ -113,6 +127,11 @@ actions:
     title: No Pre-Existing Conditions Declaration
     kind: FORM
     why: Sign zero pre-existing condition confirmation
+    input_schema:
+      - key: no_pre_existing_conditions
+        type: boolean
+        label: I confirm that I do not have any pre-existing diseases.
+        required: true
     satisfies:
       - ped_declaration_submitted
     preconditions:
@@ -123,6 +142,12 @@ actions:
     title: Schedule Doctor Underwriting Call
     kind: FORM
     why: Select time slot for tele-medical consultation
+    input_schema:
+      - key: preferred_time
+        type: text
+        label: Preferred Time Slot
+        required: true
+        placeholder: e.g. 10:00 AM - 12:00 PM
     satisfies:
       - tele_underwriting_scheduled
     preconditions:
@@ -132,6 +157,15 @@ actions:
     title: Set Up Auto-Debit Mandate
     kind: FORM
     why: Automatic annual renewal premium payment setup
+    input_schema:
+      - key: bank_account_number
+        type: text
+        label: Bank Account Number
+        required: true
+      - key: ifsc_code
+        type: text
+        label: IFSC Code
+        required: true
     satisfies:
       - bank_mandate_registered
     preconditions:
@@ -141,6 +175,11 @@ actions:
     title: Confirm Policy & Issue
     kind: FORM
     why: Final agreement to policy terms and premium schedule
+    input_schema:
+      - key: accept_policy
+        type: boolean
+        label: I agree to the policy terms and conditions.
+        required: true
     satisfies:
       - policy_terms_accepted
     preconditions:

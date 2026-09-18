@@ -19,7 +19,7 @@
       ]
     }
   ],
-  "supports_natural_language": false,
+  "supports_natural_language": true,
   "ui_labels": {
     "goal_heading": "Start KYC Verification",
     "status_heading": "Identity Verification Status",

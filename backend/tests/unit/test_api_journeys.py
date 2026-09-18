@@ -68,10 +68,10 @@ async def test_create_lending_journey_matches_fixture(client_with_db: AsyncClien
     assert state.readiness == Readiness.NOT_READY
     assert state.status == JourneyStatus.IN_PROGRESS
 
-    # 2. Progress counts: 3 completed, 4 pending, 3 blockers, 7 total
+    # 2. Progress counts: 3 completed, 4 pending, 4 blockers, 7 total
     assert state.progress.completed == 3
     assert state.progress.pending == 4
-    assert state.progress.blockers == 3
+    assert state.progress.blockers == 4
     assert state.progress.total == 7
 
     # 3. Display info

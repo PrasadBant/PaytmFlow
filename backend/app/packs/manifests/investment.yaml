@@ -6,7 +6,7 @@ metadata:
   icon: chart
   flagship_demo: false
   lifecycle_status: SUPPORTED
-  supports_natural_language: false
+  supports_natural_language: true
 
 goal_schema:
   - key: investment_mode
@@ -88,6 +88,11 @@ actions:
     title: Validate Mutual Fund KYC
     kind: FORM
     why: Verification against CVL / NDML KRA database
+    input_schema:
+      - key: pan_number
+        type: text
+        label: Permanent Account Number (PAN)
+        required: true
     satisfies:
       - kra_kyc_validated
     preconditions:
@@ -97,6 +102,18 @@ actions:
     title: Complete Risk Questionnaire
     kind: FORM
     why: Assess investment horizon and risk tolerance profile
+    input_schema:
+      - key: risk_tolerance
+        type: enum
+        label: Risk Tolerance
+        required: true
+        options:
+          - value: LOW
+            label: Low
+          - value: MEDIUM
+            label: Medium
+          - value: HIGH
+            label: High
     satisfies:
       - risk_assessment_completed
     preconditions:
@@ -119,6 +136,15 @@ actions:
     title: Verify Bank via Penny Drop
     kind: FORM
     why: Instant automated ₹1 test credit verification
+    input_schema:
+      - key: bank_account_number
+        type: text
+        label: Bank Account Number
+        required: true
+      - key: ifsc_code
+        type: text
+        label: IFSC Code
+        required: true
     satisfies:
       - bank_account_verified
     preconditions:
@@ -129,6 +155,13 @@ actions:
     title: Set Up Recurring SIP Mandate
     kind: FORM
     why: NPCI eNACH digital mandate for automatic monthly debits
+    input_schema:
+      - key: mandate_amount
+        type: money
+        label: Monthly Debit Amount
+        required: true
+        min: 500
+        max: 1000000
     satisfies:
       - sip_mandate_approved
     preconditions:
@@ -138,6 +171,11 @@ actions:
     title: Sign Regulatory Declarations
     kind: FORM
     why: Accept SEBI investment terms and confirm FATCA/CRS status
+    input_schema:
+      - key: accept_declaration
+        type: boolean
+        label: I accept the SEBI investment terms and confirm FATCA/CRS status.
+        required: true
     satisfies:
       - nomination_and_fatca_signed
     preconditions:

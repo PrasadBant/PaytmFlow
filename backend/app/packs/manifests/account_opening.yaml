@@ -6,7 +6,7 @@ metadata:
   icon: bank
   flagship_demo: false
   lifecycle_status: SUPPORTED
-  supports_natural_language: false
+  supports_natural_language: true
 
 goal_schema:
   - key: account_type
@@ -88,6 +88,12 @@ actions:
     title: Link PAN Card
     kind: FORM
     why: Mandatory for opening Indian savings bank account
+    input_schema:
+      - key: pan_number
+        type: text
+        label: Permanent Account Number (PAN)
+        required: true
+        placeholder: e.g. ABCDE1234F
     satisfies:
       - pan_authenticated
     preconditions:
@@ -97,6 +103,27 @@ actions:
     title: Add Account Nominee
     kind: FORM
     why: Nominee designation for bank account operations
+    input_schema:
+      - key: nominee_name
+        type: text
+        label: Nominee Full Name
+        required: true
+      - key: nominee_relation
+        type: enum
+        label: Relationship to you
+        required: true
+        options:
+          - value: SPOUSE
+            label: Spouse
+          - value: PARENT
+            label: Parent
+          - value: CHILD
+            label: Child
+      - key: nominee_dob
+        type: text
+        label: Nominee Date of Birth
+        required: true
+        placeholder: YYYY-MM-DD
     satisfies:
       - nominee_declared
     preconditions:
@@ -107,6 +134,11 @@ actions:
     title: Opt-Out of Nominee
     kind: FORM
     why: Explicitly opt out of appointing a nominee at account opening
+    input_schema:
+      - key: opt_out_confirm
+        type: boolean
+        label: I confirm that I do not wish to appoint a nominee.
+        required: true
     satisfies:
       - nominee_declared
     preconditions:
@@ -151,6 +183,11 @@ actions:
     title: Accept Account Terms & Open
     kind: FORM
     why: Consent to schedule of banking charges and debit card issuance
+    input_schema:
+      - key: accept_terms
+        type: boolean
+        label: I agree to the account terms and conditions.
+        required: true
     satisfies:
       - account_agreement_accepted
     preconditions:

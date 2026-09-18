@@ -163,11 +163,47 @@ async def run_scenario(
                 snap_to_send = (
                     initial_snapshot_id if step.use_stale_snapshot else current_snapshot_id
                 )
+                step_input = dict(step.input) if step.input is not None else {}
+                if step.input is None and step.action_id:
+                    manifest = pack_registry.get_pack(scenario.pack)
+                    if manifest:
+                        for action in manifest.actions:
+                            if action.action_id == step.action_id and action.input_schema:
+                                for field_spec in action.input_schema:
+                                    if field_spec.required and field_spec.key not in step_input:
+                                        has_val = hasattr(field_spec.type, "value")
+                                        f_type = field_spec.type.value if has_val else str(
+                                            field_spec.type
+                                        )
+                                        if f_type == "boolean":
+                                            step_input[field_spec.key] = True
+                                        elif f_type in ("integer", "number", "money"):
+                                            step_input[field_spec.key] = (
+                                                field_spec.min
+                                                if field_spec.min is not None
+                                                else 10000
+                                            )
+                                        elif f_type == "enum":
+                                            if field_spec.options:
+                                                opt = field_spec.options[0]
+                                                step_input[field_spec.key] = (
+                                                    opt.value if hasattr(opt, "value") else opt
+                                                )
+                                            else:
+                                                step_input[field_spec.key] = "NO"
+                                        elif "pan" in field_spec.key.lower():
+                                            step_input[field_spec.key] = "ABCDE1234F"
+                                        elif "pin" in field_spec.key.lower():
+                                            step_input[field_spec.key] = "560001"
+                                        else:
+                                            step_input[field_spec.key] = "Test Value"
+                                break
+
                 action_payload = {
                     "action_id": step.action_id,
                     "expected_snapshot_id": snap_to_send,
                     "idempotency_key": str(uuid4()),
-                    "input": step.input or {},
+                    "input": step_input,
                 }
                 act_res = await client.post(
                     f"/api/v1/journeys/{journey_id}/actions",

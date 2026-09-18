@@ -113,8 +113,10 @@ export async function apiFetch<T>(endpoint: string, options: RequestOptions = {}
   }
 
   // Set credentials to 'include' by default for session cookie management (Contract §4)
+  // Disable HTTP cache so back navigation (Screen 6 -> 4) always fetches fresh data (Error #5)
   const fetchConfig: RequestInit = {
     credentials: 'include',
+    cache: 'no-store',
     ...restOptions,
     headers: mergedHeaders,
   };

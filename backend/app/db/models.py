@@ -50,6 +50,7 @@ class JourneyModel(Base):
         nullable=True,
     )
     goal: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    natural_language: Mapped[str | None] = mapped_column(Text, nullable=True)
     display_title: Mapped[str] = mapped_column(String(200), default="")
     display_summary: Mapped[str] = mapped_column(String(500), default="")
     created_at: Mapped[datetime] = mapped_column(

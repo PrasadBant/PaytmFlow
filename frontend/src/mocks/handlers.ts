@@ -376,35 +376,50 @@ function applyGenericAction(
 async function parseMultipartFields(
   request: Request
 ): Promise<{ fields: Record<string, string>; filename: string | null }> {
-  const contentType = request.headers.get('content-type') || '';
-  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/);
-  const boundary = boundaryMatch ? boundaryMatch[1] || boundaryMatch[2] : null;
-  if (!boundary) {
+  try {
+    const contentType = request.headers.get('content-type') || '';
+    const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/);
+    const boundary = boundaryMatch ? boundaryMatch[1] || boundaryMatch[2] : null;
+
+    let body = '';
+    try {
+      body = await request.clone().text();
+    } catch {
+      try {
+        body = await request.text();
+      } catch {
+        return { fields: {}, filename: null };
+      }
+    }
+
+    if (!boundary || !body) {
+      return { fields: {}, filename: null };
+    }
+
+    const parts = body.split(`--${boundary}`);
+    const fields: Record<string, string> = {};
+    let filename: string | null = null;
+
+    for (const part of parts) {
+      const nameMatch = part.match(/name="([^"]+)"/);
+      if (!nameMatch) continue;
+
+      const filenameMatch = part.match(/filename="([^"]*)"/);
+      if (filenameMatch) {
+        filename = filenameMatch[1] || null;
+        continue;
+      }
+
+      const valueSection = part.split(/\r?\n\r?\n/)[1];
+      if (valueSection !== undefined) {
+        fields[nameMatch[1]] = valueSection.replace(/\r?\n--\s*$/, '').trim();
+      }
+    }
+
+    return { fields, filename };
+  } catch {
     return { fields: {}, filename: null };
   }
-
-  const body = await request.text();
-  const parts = body.split(`--${boundary}`);
-  const fields: Record<string, string> = {};
-  let filename: string | null = null;
-
-  for (const part of parts) {
-    const nameMatch = part.match(/name="([^"]+)"/);
-    if (!nameMatch) continue;
-
-    const filenameMatch = part.match(/filename="([^"]*)"/);
-    if (filenameMatch) {
-      filename = filenameMatch[1] || null;
-      continue;
-    }
-
-    const valueSection = part.split(/\r?\n\r?\n/)[1];
-    if (valueSection !== undefined) {
-      fields[nameMatch[1]] = valueSection.replace(/\r?\n--\s*$/, '').trim();
-    }
-  }
-
-  return { fields, filename };
 }
 
 export const handlers = [
@@ -648,8 +663,20 @@ export const handlers = [
       return HttpResponse.json(lendingEvidenceBankStatement);
     }
 
-    const { fields, filename: uploadedFilename } = await parseMultipartFields(request);
-    const docType = (fields.doc_type || '').toUpperCase();
+    let docType = '';
+    let uploadedFilename: string | null = null;
+    let parsedFields: Record<string, string> = {};
+    try {
+      const parsed = await parseMultipartFields(request);
+      parsedFields = parsed.fields;
+      docType = (parsed.fields.doc_type || '').toUpperCase();
+      uploadedFilename = parsed.filename;
+    } catch {
+      docType = 'SALARY_SLIP';
+    }
+    if (!docType) {
+      docType = 'SALARY_SLIP';
+    }
 
     if (journeyId !== LENDING_JOURNEY_ID) {
       // Generic evidence preview for non-flagship journeys: find the field
@@ -705,9 +732,9 @@ export const handlers = [
     // manual_fields) with no invented numbers, and is clearly a generic/unverified
     // result rather than a fabricated specific one.
     let manualFields: Record<string, unknown> = {};
-    if (fields.manual_fields) {
+    if (parsedFields.manual_fields) {
       try {
-        manualFields = JSON.parse(fields.manual_fields) as Record<string, unknown>;
+        manualFields = JSON.parse(parsedFields.manual_fields) as Record<string, unknown>;
       } catch {
         manualFields = {};
       }

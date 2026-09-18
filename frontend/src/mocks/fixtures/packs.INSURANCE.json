@@ -4,7 +4,7 @@
   "description": "Resume or complete your insurance application",
   "icon": "shield",
   "flagship_demo": false,
-  "supports_natural_language": false,
+  "supports_natural_language": true,
   "lifecycle_status": "SUPPORTED",
   "goal_schema": [
     {

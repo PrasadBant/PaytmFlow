@@ -26,12 +26,27 @@ export function formatIndianCurrency(value: number | string | undefined | null):
  */
 export function formatRelativeTime(dateInput: string | Date | undefined | null): string {
   if (!dateInput) return '';
-  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  
+  let date: Date;
+  if (typeof dateInput === 'string') {
+    // Error #9: SQLite/FastAPI sometimes returns naive datetime strings for UTC times
+    // (e.g., "2026-09-18T09:00:00" instead of "2026-09-18T09:00:00Z").
+    // If it lacks a timezone indicator (Z or +/- offset), assume it's UTC.
+    let dateStr = dateInput;
+    if (dateStr.includes('T') && !/(Z|[+-]\d{2}:\d{2})$/.test(dateStr)) {
+      dateStr += 'Z';
+    }
+    date = new Date(dateStr);
+  } else {
+    date = dateInput;
+  }
+  
   if (isNaN(date.getTime())) return '';
 
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
+  // If the date is in the future (negative diff), or less than 60s ago
   if (diffInSeconds < 60) {
     return 'Just now';
   }

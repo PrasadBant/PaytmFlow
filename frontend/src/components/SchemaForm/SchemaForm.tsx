@@ -12,6 +12,7 @@ type GoalFieldSpec = components['schemas']['GoalFieldSpec'];
 export interface SchemaFormProps {
   schema: GoalFieldSpec[];
   defaultValues?: Record<string, unknown>;
+  values?: Record<string, unknown>;
   submitLabel: string;
   onSubmit: (values: Record<string, unknown>) => void | Promise<void>;
   isSubmitting?: boolean;
@@ -23,6 +24,7 @@ export interface SchemaFormProps {
 export function SchemaForm({
   schema,
   defaultValues,
+  values,
   submitLabel,
   onSubmit,
   isSubmitting = false,
@@ -35,12 +37,32 @@ export function SchemaForm({
   const {
     control,
     handleSubmit,
+    setValue,
     setError,
     formState: { errors },
   } = useForm<Record<string, unknown>>({
     resolver: zodResolver(zodSchema),
     defaultValues: defaultValues ?? {},
+    values: values,
+    resetOptions: {
+      keepDirtyValues: false,
+    },
   });
+
+  // Imperatively synchronize form inputs when values prop changes (e.g. from natural language parsing)
+  useEffect(() => {
+    if (values && Object.keys(values).length > 0) {
+      Object.entries(values).forEach(([key, val]) => {
+        if (val !== undefined && val !== null) {
+          setValue(key, val, {
+            shouldValidate: true,
+            shouldDirty: true,
+            shouldTouch: true,
+          });
+        }
+      });
+    }
+  }, [values, setValue]);
 
   // Inject server-side validation errors when passed
   useEffect(() => {

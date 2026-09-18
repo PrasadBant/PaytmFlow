@@ -445,7 +445,7 @@ class EvidenceReconciliationService:
         consequence_preview: SimulationPreview | None = None
         diff_preview: JourneyDiff | None = None
 
-        if proposed_action and evidence_is_genuine:
+        if proposed_action and is_verified:
             action_input: dict[str, Any] = {
                 "evidence_id": str(evidence_record.id),
             }

@@ -57,9 +57,32 @@ export function Screen04CurrentStatus(): ReactElement {
   // This is also the screen `resume_screen: NEEDS_REVIEW` sends the applicant back
   // to, so it must work standalone, not only right after the action that caused it.
   const ambiguousFields = journey.fields.filter((f) => f.status === 'AMBIGUOUS');
-  const blockedFields = journey.fields.filter(
+  
+  const rawBlockedFields = journey.fields.filter(
     (f) => f.status !== 'SATISFIED' && f.status !== 'AMBIGUOUS'
   );
+
+  // Error #6: Overlapping/incorrect blockers
+  // Group fields by resolve_action_id so we don't render duplicate blocker panels
+  // for multiple fields that are resolved by the exact same action.
+  const blockedFieldsMap = new Map<string, typeof rawBlockedFields[0]>();
+  const blockedFields: typeof rawBlockedFields = [];
+  
+  for (const field of rawBlockedFields) {
+    if (field.resolve_action_id) {
+      if (!blockedFieldsMap.has(field.resolve_action_id)) {
+        blockedFieldsMap.set(field.resolve_action_id, field);
+        blockedFields.push(field);
+      } else {
+        // If we already have a blocker for this action, optionally we could
+        // merge the labels/explanations, but usually the primary field is sufficient.
+        // We'll just skip adding a duplicate panel.
+      }
+    } else {
+      blockedFields.push(field); // Fields without a resolve_action_id aren't grouped
+    }
+  }
+
   const satisfiedFields = journey.fields.filter((f) => f.status === 'SATISFIED');
 
   const { completed, pending, blockers, total } = journey.progress;

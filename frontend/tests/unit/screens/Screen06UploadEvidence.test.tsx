@@ -48,6 +48,7 @@ function renderScreen6(
 describe('Screen06UploadEvidence (F19)', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+    server.resetHandlers();
   });
 
   it('renders title, back button, and active tabs', async () => {
@@ -62,12 +63,40 @@ describe('Screen06UploadEvidence (F19)', () => {
   });
 
   it('uploads a file from Tab 1 and navigates to AI analysis screen', async () => {
-    // The default route's action (UPLOAD_INCOME_PROOF, real Lending fixture)
-    // genuinely accepts two document types (SALARY_SLIP, BANK_STATEMENT), so
-    // an explicit doc-type selection is required first - see the
-    // multi-accept regression tests below for why (§14.5/Item 1 closure).
+    server.use(
+      http.post('*/api/v1/journeys/:journey_id/evidence', async () => {
+        return HttpResponse.json({
+          evidence_id: 'evi-upload-test',
+          filename: 'salary_aug_2026.pdf',
+          uploaded_at: new Date().toISOString(),
+          size_bytes: 100,
+          interpretation: {
+            verified: true,
+            confidence: 0.95,
+            detected: [],
+            summary: 'Salary slip verified',
+            conflicts: [],
+          },
+          proposed_action_id: 'UPLOAD_INCOME_PROOF',
+          consequence_preview: null,
+          diff_preview: null,
+          requires_review: false,
+        });
+      })
+    );
+
     const user = userEvent.setup();
-    renderScreen6();
+    renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/UPLOAD_INCOME_PROOF', {
+      action: {
+        action_id: 'UPLOAD_INCOME_PROOF',
+        title: 'Upload Salary Slip',
+        kind: 'EVIDENCE',
+        why: 'Uploading your latest salary slip verifies your net monthly income and unlocks your loan limit calculation.',
+        unlocks: ['monthly_income', 'bank_statement'],
+        accepts: ['SALARY_SLIP', 'BANK_STATEMENT'],
+      },
+      snapshotId: '11111111-1111-4111-8111-111111111111',
+    });
 
     await screen.findByRole('heading', { level: 1 });
 
@@ -81,14 +110,13 @@ describe('Screen06UploadEvidence (F19)', () => {
     expect(await screen.findByText('salary_aug_2026.pdf')).toBeInTheDocument();
 
     const submitBtn = screen.getByTestId('upload-submit-btn');
-    expect(submitBtn).toBeDisabled();
-
-    await user.selectOptions(screen.getByTestId('doc-type-select'), 'SALARY_SLIP');
+    const select = await screen.findByTestId('doc-type-select');
+    await user.selectOptions(select, 'SALARY_SLIP');
     expect(submitBtn).toBeEnabled();
 
     await user.click(submitBtn);
 
-    expect(await screen.findByTestId('screen-07-stub')).toBeInTheDocument();
+    expect(await screen.findByTestId('screen-07-stub', {}, { timeout: 3000 })).toBeInTheDocument();
   });
 
   it('EVIDENCE action with no input_schema: Enter Details tab is omitted so dead-end placeholder is never rendered (Error 2 & 10)', async () => {

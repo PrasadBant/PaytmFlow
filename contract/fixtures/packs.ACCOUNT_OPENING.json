@@ -26,7 +26,7 @@
       "max": 100000
     }
   ],
-  "supports_natural_language": false,
+  "supports_natural_language": true,
   "ui_labels": {
     "goal_heading": "Open Savings Account",
     "status_heading": "Account Opening Checklist",

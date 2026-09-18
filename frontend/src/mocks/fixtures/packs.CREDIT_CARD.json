@@ -4,7 +4,7 @@
   "description": "Finish your credit card application",
   "icon": "card",
   "flagship_demo": false,
-  "supports_natural_language": false,
+  "supports_natural_language": true,
   "lifecycle_status": "SUPPORTED",
   "goal_schema": [
     {

@@ -27,7 +27,7 @@
       "max": 1000000
     }
   ],
-  "supports_natural_language": false,
+  "supports_natural_language": true,
   "ui_labels": {
     "goal_heading": "Choose Your Credit Card",
     "status_heading": "Card Issuance Status",

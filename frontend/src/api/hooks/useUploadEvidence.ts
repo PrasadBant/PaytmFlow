@@ -30,5 +30,10 @@ export const useUploadEvidence = () => {
 
       return apiClient.postForm<EvidenceResponse>(`/journeys/${journeyId}/evidence`, formData);
     },
+    onSuccess: () => {
+      // Intentionally do nothing with cache here. 
+      // /evidence is a preview-only endpoint that does NOT mutate the backend journey.
+      // Cache invalidation/updates only happen in useApplyAction.ts.
+    },
   });
 };

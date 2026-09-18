@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Sparkles, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Sparkles, ChevronDown, ChevronUp, AlertCircle, Check } from 'lucide-react';
 import { usePack } from '@/api/hooks/usePack';
 import { useCreateJourney } from '@/api/hooks/useCreateJourney';
 import { SchemaForm } from '@/components/SchemaForm';
@@ -8,9 +8,26 @@ import { Card } from '@/components/primitives/Card';
 import { Spinner } from '@/components/primitives/Spinner';
 import { Button } from '@/components/primitives/Button';
 import { ApiError } from '@/api/errors';
+import { parseGoalFromNaturalLanguage } from '@/lib/goalParser';
 import type { components } from '@/api/types.gen';
 
 type JourneyType = components['schemas']['JourneyType'];
+
+const EXAMPLE_PROMPTS: Record<string, string> = {
+  LENDING: 'Need a 5 lakh loan for home renovation, tenure 24 months',
+  INSURANCE: 'Looking for 5 lakh individual health cover',
+  CREDIT_CARD: 'Want a cashback credit card with 2 lakh limit',
+  KYC: 'Periodic re-kyc update for account',
+  ACCOUNT_OPENING: 'Digital savings account with 10000 initial deposit',
+  INVESTMENT: 'Monthly SIP investment of 25000',
+};
+
+const getPlaceholder = (jType: string): string => {
+  return (
+    EXAMPLE_PROMPTS[jType] ||
+    'e.g. Describe your requirement in natural language...'
+  );
+};
 
 export function Screen03GoalBasicInfo(): ReactElement {
   const { type } = useParams<{ type: string }>();
@@ -22,6 +39,8 @@ export function Screen03GoalBasicInfo(): ReactElement {
 
   const [naturalLanguage, setNaturalLanguage] = useState('');
   const [isNlOpen, setIsNlOpen] = useState(false);
+  const [parsedValues, setParsedValues] = useState<Record<string, unknown> | undefined>(undefined);
+  const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string> | undefined>(undefined);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -66,6 +85,47 @@ export function Screen03GoalBasicInfo(): ReactElement {
   const heading = 'Tell us about your goal';
   const subtext = 'This helps us personalize your recovery journey.';
 
+  // Provide initial reference values if lending pack
+  const defaultGoalValues =
+    pack.journey_type === 'LENDING'
+      ? {
+          loan_amount: 500000,
+          loan_purpose: 'HOME_RENOVATION',
+          tenure_months: 36,
+        }
+      : undefined;
+
+  const applyNlText = (text: string): void => {
+    setNaturalLanguage(text);
+    if (pack?.goal_schema && text.trim().length >= 2) {
+      const extracted = parseGoalFromNaturalLanguage(text, pack.goal_schema);
+      if (Object.keys(extracted).length > 0) {
+        setParsedValues((prev) => ({
+          ...(defaultGoalValues || {}),
+          ...(prev || {}),
+          ...extracted,
+        }));
+        setIsAutoFilled(true);
+      }
+    }
+  };
+
+  const handleAutoFillClick = (): void => {
+    const textToUse = naturalLanguage.trim() || EXAMPLE_PROMPTS[pack.journey_type] || '';
+    if (textToUse && pack?.goal_schema) {
+      setNaturalLanguage(textToUse);
+      const extracted = parseGoalFromNaturalLanguage(textToUse, pack.goal_schema);
+      if (Object.keys(extracted).length > 0) {
+        setParsedValues((prev) => ({
+          ...(defaultGoalValues || {}),
+          ...(prev || {}),
+          ...extracted,
+        }));
+        setIsAutoFilled(true);
+      }
+    }
+  };
+
   const handleFormSubmit = async (values: Record<string, unknown>): Promise<void> => {
     setFormError(null);
     setServerErrors(undefined);
@@ -95,15 +155,7 @@ export function Screen03GoalBasicInfo(): ReactElement {
     }
   };
 
-  // Provide initial reference values if lending pack
-  const defaultGoalValues =
-    pack.journey_type === 'LENDING'
-      ? {
-          loan_amount: 500000,
-          loan_purpose: 'HOME_RENOVATION',
-          tenure_months: 36,
-        }
-      : undefined;
+  const exampleText = EXAMPLE_PROMPTS[pack.journey_type] || '';
 
   return (
     <div data-testid="screen-03-goal-basic-info" className="max-w-xl mx-auto px-4 py-8 md:py-10 space-y-6">
@@ -154,7 +206,7 @@ export function Screen03GoalBasicInfo(): ReactElement {
           )}
         </div>
 
-        {/* Optional Natural Language Progressive Disclosure (only when supported by the pack) */}
+        {/* Optional Natural Language Progressive Disclosure (supported across all 6 journeys) */}
         {pack.supports_natural_language && (
           <div className="mb-6 border-b border-surface-border pb-6">
             <button
@@ -176,7 +228,7 @@ export function Screen03GoalBasicInfo(): ReactElement {
             </button>
 
             {isNlOpen && (
-              <div id="nl-input-section" className="mt-3 space-y-2">
+              <div id="nl-input-section" className="mt-3 space-y-2.5">
                 <label htmlFor="natural-language-input" className="block text-xs text-content-secondary">
                   Add any additional context or describe your goal in natural language.
                 </label>
@@ -184,10 +236,38 @@ export function Screen03GoalBasicInfo(): ReactElement {
                   id="natural-language-input"
                   rows={3}
                   value={naturalLanguage}
-                  onChange={(e) => setNaturalLanguage(e.target.value)}
-                  placeholder="e.g. Need a 5 lakh loan for home renovation, monthly salary is 85000..."
+                  onChange={(e) => applyNlText(e.target.value)}
+                  placeholder={`e.g. ${getPlaceholder(pack.journey_type)}`}
                   className="w-full rounded-button bg-surface border border-surface-border p-3 text-sm text-content-primary placeholder:text-content-tertiary focus-visible:ring-2 focus-visible:ring-paytm-cyan focus-visible:border-paytm-cyan focus-visible:outline-none transition-colors duration-150 resize-none"
                 />
+                {exampleText && (
+                  <div className="flex items-center gap-1.5 text-xs text-content-tertiary">
+                    <span>Try example:</span>
+                    <button
+                      type="button"
+                      onClick={() => applyNlText(exampleText)}
+                      className="text-paytm-blue hover:underline font-medium text-left truncate"
+                    >
+                      &quot;{exampleText}&quot;
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={handleAutoFillClick}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-paytm-blue hover:text-paytm-blue-action transition-colors cursor-pointer"
+                    data-testid="nl-autofill-btn"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-paytm-blue" />
+                    <span>Auto-fill Form from Description</span>
+                  </button>
+                  {isAutoFilled && (
+                    <span className="text-[11px] text-paytm-green font-medium flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> Auto-filled from description
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -197,6 +277,7 @@ export function Screen03GoalBasicInfo(): ReactElement {
         <SchemaForm
           schema={pack.goal_schema}
           defaultValues={defaultGoalValues}
+          values={parsedValues ?? defaultGoalValues}
           submitLabel="Continue →"
           onSubmit={handleFormSubmit}
           isSubmitting={createJourney.isPending}
