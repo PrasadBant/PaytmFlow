@@ -29,9 +29,11 @@ describe('Phase F28: Responsive Design & Layout Verification (375px / 768px / 14
   describe('1. Navigation, Sidebar & Mobile Drawer Behavior', () => {
     it('AppShell & Header render hamburger trigger on mobile and open/close drawer via state', () => {
       render(
-        <MemoryRouter initialEntries={['/']}>
-          <AppShell />
-        </MemoryRouter>
+        <QueryClientProvider client={createTestQueryClient()}>
+          <MemoryRouter initialEntries={['/']}>
+            <AppShell />
+          </MemoryRouter>
+        </QueryClientProvider>
       );
 
       const sidebarContainer = screen.getByTestId('sidebar-container');
@@ -59,9 +61,11 @@ describe('Phase F28: Responsive Design & Layout Verification (375px / 768px / 14
     it('Mobile drawer close button dismisses sidebar navigation', () => {
       useUiStore.setState({ isSidebarOpen: true });
       render(
-        <MemoryRouter initialEntries={['/']}>
-          <AppShell />
-        </MemoryRouter>
+        <QueryClientProvider client={createTestQueryClient()}>
+          <MemoryRouter initialEntries={['/']}>
+            <AppShell />
+          </MemoryRouter>
+        </QueryClientProvider>
       );
 
       const closeBtn = screen.getByRole('button', { name: /Close menu/i });

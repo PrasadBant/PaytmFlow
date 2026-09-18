@@ -66,7 +66,7 @@ export function AssistantModal(): ReactElement | null {
   const chatMutation = useChat();
   const generalChatMutation = useGeneralChat();
 
-  const welcomeText = welcomeMessageFor(journeyData?.display.title, journeyContext);
+  const welcomeText = welcomeMessageFor(journeyData?.display?.title, journeyContext);
 
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
@@ -182,7 +182,7 @@ export function AssistantModal(): ReactElement | null {
       onClose={closeAssistant}
       title="PaytmFlow Assistant"
       description={
-        journeyData
+        journeyData?.display?.title
           ? `Guiding your "${journeyData.display.title}" application`
           : journeyContext
             ? `Guiding your ${journeyContext} journey`

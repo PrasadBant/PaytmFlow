@@ -2,10 +2,20 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppShell } from './AppShell';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { useUiStore } from '../state/ui';
+
+function createTestQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+}
 
 describe('Application Shell Components Suite (F06)', () => {
   beforeEach(() => {
@@ -18,13 +28,15 @@ describe('Application Shell Components Suite (F06)', () => {
   describe('AppShell', () => {
     it('renders Header, Sidebar, and the main Outlet content area', () => {
       render(
-        <MemoryRouter initialEntries={['/']}>
-          <Routes>
-            <Route element={<AppShell />}>
-              <Route path="/" element={<div data-testid="test-child-page">Child Page Content</div>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
+        <QueryClientProvider client={createTestQueryClient()}>
+          <MemoryRouter initialEntries={['/']}>
+            <Routes>
+              <Route element={<AppShell />}>
+                <Route path="/" element={<div data-testid="test-child-page">Child Page Content</div>} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
       );
 
       expect(screen.getByTestId('app-shell')).toBeInTheDocument();
