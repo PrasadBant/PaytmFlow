@@ -50,6 +50,9 @@ describe('Phase F30: Utility Functions (Formatting & Numbering)', () => {
       const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
       expect(formatRelativeTime(twoHoursAgo.toISOString())).toBe('2h ago');
 
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      expect(formatRelativeTime(oneDayAgo.toISOString())).toBe('Yesterday');
+
       const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
       expect(formatRelativeTime(fiveDaysAgo.toISOString())).toBe('5d ago');
     });

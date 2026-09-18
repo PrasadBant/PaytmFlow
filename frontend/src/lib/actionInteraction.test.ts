@@ -85,7 +85,7 @@ describe('classifyInteraction', () => {
       ['submit_medical_declaration', 'FORM'],
       ['submit_ped_exemption', 'FORM'],
       ['schedule_tele_mer', 'SCHEDULING'],
-      ['setup_insurance_mandate', 'CONSENT'],
+      ['setup_insurance_mandate', 'CONSENT'], // when no data fields in action object
       ['accept_insurance_policy', 'CONSENT'],
       // kyc.yaml
       ['link_pan_record', 'FORM'],
@@ -106,7 +106,7 @@ describe('classifyInteraction', () => {
       ['check_kra_status', 'FORM'],
       ['complete_risk_questionnaire', 'FORM'],
       ['link_upi_penny_drop', 'FORM'],
-      ['register_enach_mandate', 'CONSENT'],
+      ['register_enach_mandate', 'CONSENT'], // when no data fields in action object
       ['sign_investment_declaration', 'CONSENT'],
     ];
 
@@ -115,6 +115,17 @@ describe('classifyInteraction', () => {
       const result = classifyInteraction(makeAction({ action_id: actionId, kind }));
       expect(result, `${actionId} expected ${expected}, got ${result}`).toBe(expected);
     }
+  });
+
+  it('routes mandate actions with non-boolean data fields to FORM so SchemaForm renders', () => {
+    const mandateWithFields = makeAction({
+      action_id: 'setup_insurance_mandate',
+      input_schema: [
+        { key: 'bank_account_number', type: 'text', label: 'Bank Account Number', required: true },
+        { key: 'ifsc_code', type: 'text', label: 'IFSC Code', required: true },
+      ],
+    });
+    expect(classifyInteraction(mandateWithFields)).toBe('FORM');
   });
 
   it('defaults to FORM when no action is resolved yet', () => {

@@ -3,6 +3,7 @@ import pytest
 from app.ai import MockAI, get_ai_provider
 from app.ai.guardrails import GuardrailedAIProvider
 from app.ai.models import ActionRankingResult, AIInterpretationResult
+from app.config import settings
 from app.core.models import CoreFieldState, CoreFieldStatus, CoreReadiness, CoreSnapshot
 from app.packs.registry import pack_registry
 from app.schemas.enums import JourneyType
@@ -19,7 +20,8 @@ BANNED_WORDS = [
 
 
 @pytest.fixture(autouse=True)
-def load_manifests():
+def load_manifests(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "AI_PROVIDER", "mock")
     pack_registry.load_all()
 
 

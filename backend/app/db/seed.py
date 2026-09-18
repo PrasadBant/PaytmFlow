@@ -49,6 +49,7 @@ async def clear_database_tables(session: AsyncSession) -> None:
         await create_immutability_triggers(session)
 
     await session.commit()
+    session.expire_all()
 
 
 def clear_evidence_storage() -> None:
@@ -71,14 +72,16 @@ async def seed_demo_data(session: AsyncSession) -> None:
     pack_registry.load_all()
 
     # 1. Create default demo session
-    demo_session = SessionModel(
-        id=DEMO_SESSION_ID,
-        created_at=datetime.now(UTC),
-        expires_at=datetime.now(UTC) + timedelta(days=settings.SESSION_TTL_DAYS),
-        meta={"source": "demo_seed", "role": "demo_user"},
-    )
-    session.add(demo_session)
-    await session.commit()
+    demo_session = await session.get(SessionModel, DEMO_SESSION_ID)
+    if not demo_session:
+        demo_session = SessionModel(
+            id=DEMO_SESSION_ID,
+            created_at=datetime.now(UTC),
+            expires_at=datetime.now(UTC) + timedelta(days=settings.SESSION_TTL_DAYS),
+            meta={"source": "demo_seed", "role": "demo_user"},
+        )
+        session.add(demo_session)
+        await session.commit()
 
     # 2. Seed showcase journeys across all 6 packs
     await JourneyService.create_journey(

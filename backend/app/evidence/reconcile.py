@@ -292,6 +292,19 @@ class EvidenceReconciliationService:
         # `doc_type` for MockAI/LLM (which never set it) - unchanged
         # behavior for both.
         effective_doc_type = ai_res.resolved_doc_type or doc_type
+        # 6. Find proposed action matching this evidence doc_type
+        proposed_action = next(
+            (
+                a
+                for a in manifest.actions
+                if a.accepts
+                and any(acc.upper() == doc_type.upper() or acc == doc_type for acc in a.accepts)
+            ),
+            None,
+        )
+        proposed_action_id = proposed_action.action_id if proposed_action else None
+
+        # 6b. Verification & confidence threshold check against manifest mapping
         mapping = next(
             (
                 m
@@ -306,42 +319,18 @@ class EvidenceReconciliationService:
         has_conflicts = len(ai_res.conflicts) > 0
         is_confidence_sufficient = ai_res.confidence >= min_confidence
         is_verified = ai_res.verified and is_confidence_sufficient and not has_conflicts
-        requires_review = not is_verified or has_conflicts
+        
+        # OVD OCR distinction (Error 15): OCR extracts identity/address data from
+        # officially valid documents (Passport, Voter ID, Driving Licence), but OCR
+        # recognition alone does NOT establish authenticity verification.
+        # Authenticity requires manual review / official validation.
+        is_ovd_doc = effective_doc_type in ["PASSPORT_SCAN", "VOTER_ID_CARD", "DRIVING_LICENCE"]
+        if is_ovd_doc:
+            is_verified = False
 
-        # Document AI integration integrity fix: what gets PERSISTED as
-        # `evidence.verified` (consumed later by action execution, see
-        # app/core/deterministic_check.py) is deliberately NOT the same
-        # as `is_verified` above. `is_verified` additionally requires
-        # confidence >= the manifest's threshold, which the confidence-
-        # audit phase measured is systematically NOT cleared even by
-        # genuinely correct documents in 5 of 6 journeys (a separate,
-        # already-flagged, deliberately-deferred calibration problem -
-        # DO NOT touch it here). Gating action execution on that SAME
-        # uncalibrated number would make real evidence actions unable to
-        # ever succeed for most journeys - a regression this fix must not
-        # introduce. `evidence_is_genuine` instead answers only the
-        # question THIS fix is actually about: was this genuinely the
-        # expected, correctly-classified document with no detected
-        # conflict (i.e., not a wrong document, not fabricated) -
-        # confidence-threshold-based review routing stays exactly as
-        # before, informing `EvidenceInterpretation`/`consequence_preview`
-        # only, never gating whether the action can be attempted.
+        requires_review = not is_verified or has_conflicts or is_ovd_doc
         evidence_is_genuine = ai_res.verified and not has_conflicts
 
-        # Real-browser QA finding: a genuinely correct, correctly-classified
-        # document whose only shortfall is confidence below the manifest's
-        # auto-verification threshold (this exact case, live: SALARY_SLIP
-        # recognized correctly, income extracted and validated, no
-        # conflicts, composed confidence ~0.74 vs. a 0.85 threshold) was
-        # given the SAME generic AI-authored summary text as any other
-        # verified extraction. Screen 7 then paired that text with its
-        # "needs a closer look" / Review Needed presentation, which reads
-        # as if something might be WRONG with the extracted value - it
-        # isn't; the value is real and will be applied as shown in
-        # `consequence_preview` once a human confirms it. This is a
-        # deterministic, server-authored explanation (not the AI's own
-        # text) precisely because it depends on the manifest's own
-        # threshold, which the AI provider never sees.
         display_summary = ai_res.summary
         needs_confidence_review = (
             evidence_is_genuine
@@ -349,7 +338,15 @@ class EvidenceReconciliationService:
             and not is_confidence_sufficient
             and not has_conflicts
         )
-        if needs_confidence_review:
+        if is_ovd_doc and evidence_is_genuine and ai_res.detected:
+            doc_name_clean = effective_doc_type.replace("_", " ").title()
+            field_list = ", ".join(d.label for d in ai_res.detected)
+            display_summary = (
+                f"{doc_name_clean} recognized and {field_list} extracted. "
+                "Document recognition alone does not establish official authenticity; "
+                "this document will be forwarded for identity verification."
+            )
+        elif needs_confidence_review:
             doc_name_clean = effective_doc_type.replace("_", " ").title()
             field_list = ", ".join(d.label for d in ai_res.detected)
             display_summary = (
@@ -358,14 +355,43 @@ class EvidenceReconciliationService:
                 "verification, so it will be sent for manual review instead of applied "
                 "immediately - the extracted value itself is not in question."
             )
+        elif not evidence_is_genuine or not ai_res.detected:
+            # Recovery messaging (Error 3): truthful guidance based on actual action capabilities
+            has_manual_schema = bool(
+                proposed_action
+                and proposed_action.input_schema
+                and len(proposed_action.input_schema) > 0
+            )
+            other_accepted = (
+                [
+                    acc.replace("_", " ").title()
+                    for acc in (proposed_action.accepts or [])
+                    if acc.upper() != doc_type.upper()
+                ]
+                if proposed_action
+                else []
+            )
+
+            if has_manual_schema:
+                recovery_hint = (
+                    "Please upload a clearer copy or use the Enter Details tab "
+                    "to enter the information directly."
+                )
+            elif other_accepted:
+                alt_docs = " or ".join(other_accepted)
+                recovery_hint = (
+                    f"Please upload a clearer copy, or provide an alternative "
+                    f"accepted document such as {alt_docs}."
+                )
+            else:
+                recovery_hint = (
+                    "Please ensure the document is clear, uncropped, "
+                    "and matches the requested document type."
+                )
+
+            display_summary = f"{ai_res.summary} {recovery_hint}".strip()
 
         # 7. Persist evidence record in database
-        # Auxiliary facts (name / doc_type-scoped identifier) merged in
-        # alongside the existing legacy `parse_financial_patterns` output
-        # - both share this same append-only, internal-only JSON column;
-        # neither is ever exposed on the wire (see
-        # app/schemas/evidence.py's `EvidenceResponse`, which has no
-        # `extracted_data` field at all).
         if ai_res.auxiliary_facts:
             extracted_data = {**extracted_data, **ai_res.auxiliary_facts}
 
@@ -380,12 +406,6 @@ class EvidenceReconciliationService:
             extracted_text=extracted_text[:4000] if extracted_text else None,
             extracted_data=extracted_data,
             confidence=ai_res.confidence,
-            # Document AI integration integrity fix: persist the SAME
-            # verification decision (`is_verified`, computed just above)
-            # and the AI's real `raw_values` so a later action-execution
-            # request can consume the actual, server-validated result
-            # (app/core/deterministic_check.py) instead of ever falling
-            # back to a simulated/default value.
             verified=evidence_is_genuine,
             raw_values=ai_res.raw_values,
         )
@@ -402,18 +422,6 @@ class EvidenceReconciliationService:
             extracted_data=extracted_data,
         )
         await self.session.commit()
-
-        # 9. Find proposed action matching this evidence doc_type
-        proposed_action = next(
-            (
-                a
-                for a in manifest.actions
-                if a.accepts
-                and any(acc.upper() == doc_type.upper() or acc == doc_type for acc in a.accepts)
-            ),
-            None,
-        )
-        proposed_action_id = proposed_action.action_id if proposed_action else None
 
         # 10. Compute deterministic simulation preview and diff preview
         #

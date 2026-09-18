@@ -4,6 +4,7 @@
   "description": "Complete your loan application",
   "icon": "rupee",
   "flagship_demo": true,
+  "supports_natural_language": true,
   "lifecycle_status": "SUPPORTED",
   "goal_schema": [
     {

@@ -159,27 +159,24 @@ describe('Screen03GoalBasicInfo', () => {
     });
   });
 
-  it('renders the real pack description as the "I want to" context line, not fabricated per-pack copy', async () => {
-    // The reference mockup shows an "I want to: Apply for a new personal loan"
-    // dropdown here. No goal_schema field or option list backs that exact control
-    // for any pack (verified against contract/openapi.yaml), so fabricating a fake
-    // dropdown would violate the no-invented-data rule. Instead this renders the
-    // pack's own real, already-fetched, contract-required `description` field -
-    // proven here by checking it differs correctly across two different packs.
+  it('renders the real pack display_name and description as static context without editable selector', async () => {
     renderWithProviders('/start/lending');
     await waitFor(() => {
-      expect(screen.getByText('I want to')).toBeInTheDocument();
+      expect(screen.getByTestId('selected-journey-context')).toBeInTheDocument();
     });
-    expect(
-      screen.getByText('Complete your loan application')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Loan / Lending')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/I want to/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('goal-selector')).not.toBeInTheDocument();
+  });
 
+  it('renders insurance pack static context correctly', async () => {
     renderWithProviders('/start/insurance');
     await waitFor(() => {
-      expect(
-        screen.getByText('Resume or complete your insurance application')
-      ).toBeInTheDocument();
+      expect(screen.getByTestId('selected-journey-context')).toBeInTheDocument();
     });
+    expect(screen.getByText('Insurance')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/I want to/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('goal-selector')).not.toBeInTheDocument();
   });
 
   it('contains no prohibited words or claims', async () => {

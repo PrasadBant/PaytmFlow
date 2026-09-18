@@ -145,7 +145,7 @@ export function VideoVerificationFlow({
         disabled={stage !== 'complete' || isSubmitting}
         isLoading={isSubmitting}
         onClick={() =>
-          void onSubmit({ [fieldKey || 'video_verification_status']: 'completed_simulated' })
+          void onSubmit({ [fieldKey || 'liveness_confirmed']: true })
         }
         data-testid="video-continue-btn"
       >

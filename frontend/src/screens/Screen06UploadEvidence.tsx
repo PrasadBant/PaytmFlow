@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, UploadCloud, FileEdit, HelpCircle, ShieldCheck, CheckCircle2, AlertCircle, FileWarning } from 'lucide-react';
 import { useJourney } from '@/api/hooks/useJourney';
@@ -11,6 +11,7 @@ import { SchedulingPicker } from '@/components/interactions/SchedulingPicker';
 import { ConsentPanel } from '@/components/interactions/ConsentPanel';
 import { VideoVerificationFlow } from '@/components/interactions/VideoVerificationFlow';
 import { classifyInteraction } from '@/lib/actionInteraction';
+import { getActionDefinition } from '@/lib/actionCatalog';
 import { Tabs, type TabItem } from '@/components/primitives/Tabs';
 import { Button } from '@/components/primitives/Button';
 import { Card } from '@/components/primitives/Card';
@@ -96,12 +97,13 @@ export const Screen06UploadEvidence: React.FC = () => {
   const uploadEvidence = useUploadEvidence();
   const applyAction = useApplyAction();
 
-  // Find action from location state or recommendation response
+  // Find action from location state, recommendation response, or action catalog
   const action: ActionOption | undefined =
     locationState.action ||
     (recommendationData?.recommendation && recommendationData.recommendation.action_id === actionId
       ? recommendationData.recommendation
-      : recommendationData?.alternatives?.find((a) => a.action_id === actionId));
+      : recommendationData?.alternatives?.find((a) => a.action_id === actionId) ||
+        getActionDefinition(actionId));
 
   const currentSnapshotId = locationState.snapshotId || journey?.snapshot_id || '';
   const acceptedDocTypes = action?.accepts || [];
@@ -147,6 +149,10 @@ export const Screen06UploadEvidence: React.FC = () => {
   // here - not per-journey, per-action-id, or hardcoded - fixes every
   // current and future CONSENT/SCHEDULING/VIDEO_VERIFICATION action that
   // declares a real input_schema, not just Lending's.
+  const manualSchema = action?.input_schema && action.input_schema.length > 0
+    ? action.input_schema
+    : null;
+
   const interactionFieldKey = action?.input_schema?.[0]?.key || action?.unlocks?.[0];
   const tabLabel =
     interactionType === 'SCHEDULING'
@@ -156,6 +162,9 @@ export const Screen06UploadEvidence: React.FC = () => {
         : interactionType === 'VIDEO_VERIFICATION'
           ? 'Verify'
           : 'Enter Details';
+
+  // Error 2 & 10: Only render manual tab if action has usable manual-entry schema or is a FORM action
+  const hasManualEntry = isFormAction || !!manualSchema;
 
   const tabs: TabItem[] = isFormAction
     ? [
@@ -171,11 +180,15 @@ export const Screen06UploadEvidence: React.FC = () => {
           label: 'Upload File',
           icon: <UploadCloud className="w-4 h-4" aria-hidden="true" />,
         },
-        {
-          id: 'manual',
-          label: 'Enter Details',
-          icon: <FileEdit className="w-4 h-4" aria-hidden="true" />,
-        },
+        ...(hasManualEntry
+          ? [
+              {
+                id: 'manual' as const,
+                label: 'Enter Details',
+                icon: <FileEdit className="w-4 h-4" aria-hidden="true" />,
+              },
+            ]
+          : []),
         {
           id: 'help',
           label: 'How it helps',
@@ -186,7 +199,7 @@ export const Screen06UploadEvidence: React.FC = () => {
   // activeTab's own default ('upload') predates knowing the action's kind (it's set
   // before the journey/recommendation queries resolve); clamp it to the one tab a
   // FORM action actually offers so the tab bar and the panel shown never disagree.
-  const effectiveTab = isFormAction ? 'manual' : activeTab;
+  const effectiveTab = isFormAction ? 'manual' : (!hasManualEntry && activeTab === 'manual' ? 'upload' : activeTab);
 
   // Defensive guard: this route has no UI for a CLARIFICATION-kind action (per contract,
   // that kind maps to NeedsReviewCard, not Screen 6's upload/form flow). Screen 5 already
@@ -199,8 +212,14 @@ export const Screen06UploadEvidence: React.FC = () => {
     }
   }, [journeyId, action?.kind, navigate]);
 
+  // Error 4: In-flight upload double-click guard
+  const isUploadingRef = useRef(false);
+
   const handleFileUpload = async (): Promise<void> => {
     if (!selectedFile || !journeyId || !currentSnapshotId || !docType) return;
+    if (isUploadingRef.current || uploadEvidence.isPending) return;
+
+    isUploadingRef.current = true;
     setSubmitError(null);
 
     try {
@@ -221,6 +240,8 @@ export const Screen06UploadEvidence: React.FC = () => {
       });
     } catch (err) {
       setSubmitError(mapErrorToUxAction(err).message);
+    } finally {
+      isUploadingRef.current = false;
     }
   };
 
@@ -330,9 +351,7 @@ export const Screen06UploadEvidence: React.FC = () => {
     );
   }
 
-  const manualSchema = action?.input_schema && action.input_schema.length > 0
-    ? action.input_schema
-    : null;
+
 
   return (
     <div data-testid="screen-06-upload-evidence" className="max-w-3xl mx-auto px-4 py-8 md:py-10 space-y-6">

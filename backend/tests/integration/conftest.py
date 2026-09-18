@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import StaticPool
 
 from app.config import settings
 from app.db.models import Base
@@ -59,7 +60,7 @@ async def _ensure_database_exists(url: str) -> None:
         await maintenance_engine.dispose()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def db_engine() -> AsyncGenerator[AsyncEngine, None]:
     """Provide async database engine.
 
@@ -123,7 +124,12 @@ async def db_engine() -> AsyncGenerator[AsyncEngine, None]:
         )
         print(f"\n\033[93mWARNING: {message}\033[0m", file=sys.stderr)
         warnings.warn(message, stacklevel=2)
-        test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+        test_engine = create_async_engine(
+            "sqlite+aiosqlite:///:memory:",
+            echo=False,
+            poolclass=StaticPool,
+            connect_args={"check_same_thread": False},
+        )
 
     async with test_engine.begin() as conn:
         if use_postgres:

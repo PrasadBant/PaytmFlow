@@ -176,7 +176,16 @@ async def test_insurance_e2e_real_evidence_advances_state(
     # must be satisfied first - a real manifest fact, not a test
     # artifact.
     med_act = await _execute_action(
-        client, session_headers, journey_id, snap, "submit_medical_declaration", {}
+        client,
+        session_headers,
+        journey_id,
+        snap,
+        "submit_medical_declaration",
+        {
+            "has_existing_conditions": False,
+            "tobacco_consumer": False,
+            "previous_hospitalization": False,
+        },
     )
     assert med_act.status_code == 200, med_act.text
     snap = med_act.json()["journey"]["snapshot_id"]
@@ -298,7 +307,12 @@ async def test_account_opening_e2e_real_evidence_advances_state(
     # SATISFIED by default, but pan_authenticated is not), not an
     # artifact of this test.
     pan_act = await _execute_action(
-        client, session_headers, journey_id, snap, "verify_pan_for_banking", {}
+        client,
+        session_headers,
+        journey_id,
+        snap,
+        "verify_pan_for_banking",
+        {"pan_number": "ABCDE1234F"},
     )
     assert pan_act.status_code == 200, pan_act.text
     snap = pan_act.json()["journey"]["snapshot_id"]

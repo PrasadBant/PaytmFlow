@@ -41,6 +41,7 @@ manifest (Lending never exercised this path).
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -64,7 +65,7 @@ from app.schemas.enums import FieldType
 logger = structlog.get_logger(__name__)
 
 _UNTRUSTED_WRAPPER_RE = re.compile(
-    r"^<untrusted_document>\n\[SYSTEM INSTRUCTION:.*?\]\n(.*)\n</untrusted_document>$",
+    r"^<untrusted_document>\r?\n\[SYSTEM INSTRUCTION:.*?\]\r?\n(.*)\r?\n</untrusted_document>$",
     re.DOTALL,
 )
 
@@ -82,8 +83,9 @@ def _strip_untrusted_wrapper(text: str) -> str:
     the wrapper's own boilerplate in would be a real train/serve
     mismatch that quietly hurts measured accuracy for no security benefit.
     """
-    match = _UNTRUSTED_WRAPPER_RE.match(text)
-    return match.group(1) if match else text
+    clean = text.strip()
+    match = _UNTRUSTED_WRAPPER_RE.match(clean)
+    return match.group(1).strip() if match else clean
 
 
 class LocalMLProvider:
@@ -125,6 +127,45 @@ class LocalMLProvider:
         ocr_lines = [
             OcrLine(text=ln["text"], top=ln["top"], bottom=ln["bottom"]) for ln in raw_lines
         ]
+
+        # Manual fields entry path (structured JSON text)
+        if text.strip().startswith("{") and text.strip().endswith("}"):
+            try:
+                parsed_manual = json.loads(text)
+                if isinstance(parsed_manual, dict) and parsed_manual:
+                    detected_fields: list[AIDetectedField] = []
+                    raw_values: dict[str, Any] = {}
+                    for k, v in parsed_manual.items():
+                        state_spec = next((f for f in manifest.state_schema if f.key == k), None)
+                        if state_spec:
+                            is_money = state_spec.type == FieldType.MONEY
+                            display_v = (
+                                f"₹{int(v):,}"
+                                if is_money and isinstance(v, (int, float))
+                                else str(v)
+                            )
+                            detected_fields.append(
+                                AIDetectedField(
+                                    key=k,
+                                    label=state_spec.label,
+                                    display_value=display_v,
+                                    value=v,
+                                )
+                            )
+                            raw_values[k] = v
+                    if detected_fields:
+                        n_fields = len(detected_fields)
+                        return AIInterpretationResult(
+                            verified=True,
+                            confidence=0.95,
+                            detected=detected_fields,
+                            summary=f"Verified {n_fields} field(s) from manual submission.",
+                            conflicts=[],
+                            raw_values=raw_values,
+                            resolved_doc_type=doc_type.upper(),
+                        )
+            except Exception as exc:
+                logger.warning("local_ml_manual_fields_error", error=str(exc))
 
         classifier = get_classifier(manifest.metadata.journey_type)
         if classifier is None:
@@ -410,8 +451,7 @@ class LocalMLProvider:
                 summary=(
                     f"Recognized this as a "
                     f"{effective_doc_type.replace('_', ' ').title()}, but could not "
-                    "reliably extract the required value from it. Please try a clearer copy, "
-                    "or enter the details manually."
+                    "reliably extract the required value from it. Please try a clearer copy."
                 ),
                 conflicts=[],
                 raw_values={},

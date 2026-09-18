@@ -65,7 +65,9 @@ export function Screen04CurrentStatus(): ReactElement {
   const { completed, pending, blockers, total } = journey.progress;
 
   const handleResolve = (actionId: string): void => {
-    navigate(`/j/${journey.journey_id}/act/${actionId}`);
+    navigate(`/j/${journey.journey_id}/act/${actionId}`, {
+      state: { snapshotId: journey.snapshot_id },
+    });
   };
 
   return (

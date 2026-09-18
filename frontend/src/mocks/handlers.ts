@@ -356,6 +356,7 @@ function applyGenericAction(
     progress: { from: progressBefore, to: deepClone(journey.progress) },
   };
 
+  journey.updated_at = new Date().toISOString();
   journeyStore.set(journey.journey_id, journey);
   journeyDiffStore.set(journey.journey_id, diff);
   persistMockState();
@@ -474,7 +475,27 @@ export const handlers = [
       return HttpResponse.json({ journeys: [] });
     }
 
-    return HttpResponse.json(journeysListFixture);
+    const list = journeysListFixture.journeys.map((item) => {
+      const stored = journeyStore.get(item.journey_id);
+      if (stored) {
+        return {
+          ...item,
+          status: stored.status,
+          readiness: stored.readiness,
+          progress: stored.progress,
+          updated_at: (stored.updated_at as string) || item.updated_at,
+          resume_screen:
+            stored.readiness === 'READY'
+              ? 'COMPLETE'
+              : stored.readiness === 'NEEDS_REVIEW'
+              ? 'NEEDS_REVIEW'
+              : 'STATUS',
+        };
+      }
+      return item;
+    });
+
+    return HttpResponse.json({ journeys: list });
   }),
 
   // 6. POST /api/v1/journeys (Create Journey)
@@ -498,15 +519,15 @@ export const handlers = [
     }
 
     const initialState = deepClone(packInitialStates[type] || lendingV1State) as MockJourney;
+    initialState.updated_at = new Date().toISOString();
     if (type === 'LENDING') {
       currentLendingStep = 1;
-    } else {
-      // Fresh creation always resets that pack's demo journey back to its
-      // pristine initial state, even if a previous action in this session
-      // had already mutated it.
-      journeyStore.set(initialState.journey_id, initialState);
-      journeyDiffStore.delete(initialState.journey_id);
     }
+    // Fresh creation always resets that pack's demo journey back to its
+    // pristine initial state, even if a previous action in this session
+    // had already mutated it.
+    journeyStore.set(initialState.journey_id, initialState);
+    journeyDiffStore.delete(initialState.journey_id);
     persistMockState();
 
     return HttpResponse.json(initialState, { status: 201 });

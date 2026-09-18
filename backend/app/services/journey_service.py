@@ -240,26 +240,37 @@ def get_resolve_action_id(
         )
         selected_action = primary_act
 
-    # Check if preconditions are satisfied
-    is_executable = True
-    unsatisfied_pre = []
-    for p in selected_action.preconditions:
-        p_state = derived_states.get(p)
-        status_val = None
-        if p_state:
-            status_val = p_state.status if hasattr(p_state, "status") else p_state.get("status")
-        if status_val not in [CoreFieldStatus.SATISFIED, "SATISFIED"]:
-            is_executable = False
-            unsatisfied_pre.append(p)
+    field_prereqs = [dep.source for dep in manifest.dependencies if dep.target == field_key]
+    if field_prereqs:
+        current_statuses: dict[str, Any] = {}
+        for k, v in derived_states.items():
+            if hasattr(v, "status"):
+                current_statuses[k] = v.status
+            elif isinstance(v, dict):
+                current_statuses[k] = v.get("status", "BLOCKED")
+            else:
+                current_statuses[k] = "BLOCKED"
 
-    if is_executable:
-        return selected_action.action_id
-
-    # If blocked by a single prerequisite, find the executable action for that prerequisite
-    if len(unsatisfied_pre) == 1:
-        p_action_id = get_resolve_action_id(unsatisfied_pre[0], derived_states, manifest)
-        if p_action_id:
-            return p_action_id
+        unsatisfied_pre = [
+            p
+            for p in field_prereqs
+            if current_statuses.get(p) != CoreFieldStatus.SATISFIED
+            and current_statuses.get(p) != "SATISFIED"
+        ]
+        if len(unsatisfied_pre) == 1:
+            pre_field = unsatisfied_pre[0]
+            pre_satisfiers = [a for a in manifest.actions if pre_field in a.satisfies]
+            if pre_satisfiers and (
+                not selected_action.preconditions or pre_field in selected_action.preconditions
+            ):
+                next_action = pre_satisfiers[0]
+                if next_action.action_group and next_action.action_group in action_groups:
+                    group_spec = action_groups[next_action.action_group]
+                    next_action = next(
+                        (a for a in manifest.actions if a.action_id == group_spec.primary),
+                        next_action,
+                    )
+                selected_action = next_action
 
     return selected_action.action_id
 
@@ -390,7 +401,21 @@ class JourneyService:
                 ).model_dump(mode="json"),
             )
 
-        validated_goal = validate_goal(manifest, goal)
+        parsed_nl_goal: dict[str, Any] = {}
+        if (
+            natural_language
+            and natural_language.strip()
+            and manifest.metadata.supports_natural_language
+        ):
+            ai_provider = get_ai_provider()
+            parsed_nl_goal = await ai_provider.parse_goal(
+                journey_type=manifest.metadata.journey_type.value,
+                natural_language=natural_language.strip(),
+                goal_schema=manifest.goal_schema,
+            )
+
+        merged_goal = {**goal, **parsed_nl_goal}
+        validated_goal = validate_goal(manifest, merged_goal)
         display_info = format_journey_display(manifest, validated_goal)
 
         # 1. Setup initial fields
@@ -905,6 +930,9 @@ class JourneyService:
                     if aid in candidates_by_id
                 ]
                 if ranked:
+                    for c in ordered_candidates:
+                        if c not in ranked:
+                            ranked.append(c)
                     ordered_candidates = ranked
             recommendation_source = (
                 RecommendationSource.AI_RANKED

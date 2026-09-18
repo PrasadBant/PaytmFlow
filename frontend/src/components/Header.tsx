@@ -1,10 +1,11 @@
 import type React from 'react';
-import { Menu, Bell, User } from 'lucide-react';
+import { Menu, Bell, User, Bot } from 'lucide-react';
 import { useUiStore } from '../state/ui';
 import { IconButton } from './primitives/IconButton';
 
 export const Header: React.FC = () => {
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
+  const openAssistant = useUiStore((state) => state.openAssistant);
 
   return (
     <header className="h-header bg-surface border-b border-surface-border flex items-center justify-between px-4 md:px-8 flex-shrink-0">
@@ -28,6 +29,13 @@ export const Header: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-2 ml-auto">
+        <IconButton
+          icon={<Bot className="w-5 h-5 text-paytm-blue" />}
+          onClick={() => openAssistant()}
+          aria-label="Open PaytmFlow Assistant"
+          data-testid="header-assistant-toggle"
+          variant="ghost"
+        />
         <div className="relative">
           <IconButton
             icon={<Bell className="w-5 h-5" />}

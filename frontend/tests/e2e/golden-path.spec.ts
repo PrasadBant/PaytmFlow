@@ -211,7 +211,8 @@ test.describe("Lending golden path (Screen 1 → 9)", () => {
     await page.goto(`/j/${JOURNEY_ID}/act/UPLOAD_INCOME_PROOF`);
     await expect(page.getByTestId("screen-06-upload-evidence")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("tab", { name: /Upload File/i })).toBeVisible({ timeout: 6_000 });
-    await expect(page.getByRole("tab", { name: /Enter Details/i })).toBeVisible();
+    // Error 2 & 10: Evidence-only action with no input_schema does not render Enter Details
+    await expect(page.getByRole("tab", { name: /Enter Details/i })).not.toBeVisible();
     await expect(page.getByTestId("tabpanel-upload")).toBeVisible();
   });
 

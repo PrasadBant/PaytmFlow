@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-_CURRENCY_PREFIX = re.compile(r"^(₹|Rs\.?|INR)\s*", re.IGNORECASE)
+_CURRENCY_PREFIX = re.compile(r"^(?:₹|Rs\.?|INR|[I|l](?=\d))\s*", re.IGNORECASE)
 _OCR_DIGIT_CONFUSIONS = {
     "O": "0",
     "o": "0",
@@ -26,7 +26,7 @@ _OCR_DIGIT_CONFUSIONS = {
 
 def normalize_indian_amount(raw: str) -> int | None:
     """Parses an Indian-formatted currency string ("₹1,98,000", "Rs. 85,000",
-    "INR 85000", "85,000.00") into a plain integer rupee amount.
+    "INR 85000", "I85,000", "85,000.00") into a plain integer rupee amount.
 
     Returns None (never a fabricated number) if the string cannot be
     confidently parsed as a number.
@@ -51,27 +51,23 @@ def try_fix_ocr_digit_confusion(raw: str) -> str:
     confusions (O/0, I/1, S/5) ONLY inside a token that is otherwise
     entirely digits/punctuation/confusable-letters - i.e. only when the
     surrounding characters already look numeric, so a real word is never
-    mangled. This is contextual correction (mission Phase 11), not blind
-    substitution: a token containing any character outside
-    `[0-9OoIlSB,.]` is left untouched by the outer regex scope, and a
-    token that is already fully within that scope is safe to substitute
-    unconditionally, since every character in it is either a digit, a
-    grouping separator, or one of the specific known OCR digit-confusion
-    letters - there is nothing else it could legitimately be.
+    mangled.
+
+    Guards leading currency symbol glyphs (e.g. 'I' or '|' in 'I85,000' representing
+    Rupee / INR font glyph) so they are preserved as currency prefix rather than
+    falsely converted to a leading digit '1'.
     """
+    raw_str = raw.strip()
+    prefix_match = _CURRENCY_PREFIX.match(raw_str)
+    prefix = prefix_match.group(0) if prefix_match else ""
+    numeric_part = raw_str[len(prefix):]
 
     def _fix_token(match: re.Match) -> str:
         token = match.group(0)
         return "".join(_OCR_DIGIT_CONFUSIONS.get(c, c) for c in token)
 
-    # Word-boundary guarded: a run of confusable characters is only
-    # substituted when it is NOT directly attached to an ordinary letter
-    # on either side. Without this, a real word that merely starts or
-    # ends with confusable letters (e.g. "Solutions" begins with "Sol",
-    # all three chars individually confusable) would have that fragment
-    # silently mangled ("Sol" -> "501") even though the token as a whole
-    # is plainly a word, not a number.
-    return re.sub(r"(?<![A-Za-z])[0-9OoIlSB,.]{3,}(?![A-Za-z])", _fix_token, raw)
+    fixed = re.sub(r"(?<![A-Za-z])[0-9OoIlSB,.]{3,}(?![A-Za-z])", _fix_token, numeric_part)
+    return prefix + fixed
 
 
 _DATE_PATTERNS = [

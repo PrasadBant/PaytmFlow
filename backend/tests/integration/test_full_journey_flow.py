@@ -68,6 +68,7 @@ async def test_lending_golden_path_end_to_end_integration(client: AsyncClient):
         },
         headers=headers,
     )
+    print("ACT1 RESP ERROR:", act1_resp.status_code, act1_resp.json())
     assert act1_resp.status_code == 200
     curr_snap_id = act1_resp.json()["journey"]["snapshot_id"]
     assert act1_resp.json()["journey"]["version_number"] == 2

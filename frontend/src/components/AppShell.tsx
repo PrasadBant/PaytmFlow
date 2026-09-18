@@ -2,6 +2,7 @@ import type React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { AssistantModal } from './AssistantModal';
 
 export const AppShell: React.FC = () => {
   const location = useLocation();
@@ -16,6 +17,7 @@ export const AppShell: React.FC = () => {
           <Outlet />
         </main>
       </div>
+      <AssistantModal />
     </div>
   );
 };

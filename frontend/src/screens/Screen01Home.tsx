@@ -2,6 +2,7 @@ import type React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/primitives/Button';
 import { Wand2, ShieldCheck, Shield, FileText, CheckCircle2, BarChart3 } from 'lucide-react';
+import { useUiStore } from '@/state/ui';
 
 export const Screen01Home: React.FC = () => {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ export const Screen01Home: React.FC = () => {
             Resolve application blockers, complete your journey, and move forward with confidence — all in one place.
           </p>
 
-          <div className="pt-2">
+          <div className="pt-2 flex flex-wrap items-center gap-3">
             <Button
               variant="primary"
               size="lg"
@@ -31,6 +32,17 @@ export const Screen01Home: React.FC = () => {
               aria-label="Start Your Journey →"
             >
               <span>Start Your Journey →</span>
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => useUiStore.getState().openAssistant()}
+              className="h-12 px-6 py-3.5 text-base font-semibold inline-flex items-center gap-2"
+              aria-label="Ask AI Assistant"
+              data-testid="home-ask-ai-btn"
+            >
+              <Wand2 className="w-4 h-4 text-paytm-blue" />
+              <span>Ask AI Assistant</span>
             </Button>
           </div>
         </div>

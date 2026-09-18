@@ -15,6 +15,7 @@ import { Card } from '@/components/primitives/Card';
 import { Input } from '@/components/primitives/Input';
 import { Button } from '@/components/primitives/Button';
 import { cn } from '@/lib/utils';
+import { useUiStore } from '@/state/ui';
 
 interface HelpCategory {
   key: string;
@@ -213,11 +214,21 @@ export const HelpScreen: React.FC = () => {
       {/* Still need help */}
       <Card className="text-center space-y-4 bg-surface-subtle">
         <h2 className="text-base font-bold text-content-primary">Still need help?</h2>
+        <p className="text-xs text-content-secondary max-w-sm mx-auto">
+          Have a question about your documents, requirements, or next steps? Our assistant is ready to help.
+        </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Button variant="primary" onClick={() => navigate('/my-journeys')}>
+          <Button
+            variant="primary"
+            onClick={() => useUiStore.getState().openAssistant()}
+            data-testid="help-ask-assistant-btn"
+          >
+            Ask AI Assistant
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/my-journeys')}>
             View My Journeys
           </Button>
-          <Button variant="secondary" onClick={() => navigate('/')}>
+          <Button variant="outline" onClick={() => navigate('/')}>
             Back to Home
           </Button>
         </div>

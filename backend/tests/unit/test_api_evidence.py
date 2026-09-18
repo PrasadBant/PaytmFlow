@@ -6,6 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.config import settings
 from app.db.models import Base
 from app.db.session import create_immutability_triggers, get_db
 from app.main import app
@@ -22,7 +23,8 @@ def create_sample_pdf(text: str) -> bytes:
 
 
 @pytest.fixture(autouse=True)
-def load_manifests():
+def load_manifests(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "AI_PROVIDER", "mock")
     pack_registry.load_all()
 
 

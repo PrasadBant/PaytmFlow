@@ -28,16 +28,7 @@ export type InteractionType =
 
 const VIDEO_PATTERN = /VIDEO|LIVENESS/i;
 const SCHEDULING_PATTERN = /^SCHEDULE_|SCHEDULING/i;
-// Deliberately SIGN_/ACCEPT_/MANDATE only - "sign" and "accept" are
-// unambiguous consent verbs in this domain. A bare CONFIRM_ prefix was
-// tried and removed: the real Credit Card manifest's confirm_dispatch_address
-// ("Confirm Delivery Location") is a genuine data-entry FORM (an address),
-// not a consent checkbox, and would have been misclassified. Where an
-// action IS a real confirmation-of-terms action, its own action_id should
-// use accept_/sign_ instead (e.g. "accept_policy_terms"), which is
-// unambiguous. When in doubt, this deliberately under-matches and falls
-// through to generic FORM rather than risk a false positive.
-const CONSENT_PATTERN = /^(SIGN|ACCEPT)_|MANDATE/i;
+const CONSENT_PATTERN = /^(SIGN|ACCEPT)_|MANDATE|CONSENT|UNDERTAKING|TERMS|AGREEMENT/i;
 
 export function classifyInteraction(action: ActionOption | undefined): InteractionType {
   if (!action) return 'FORM';
@@ -47,6 +38,16 @@ export function classifyInteraction(action: ActionOption | undefined): Interacti
   const id = action.action_id || '';
   if (VIDEO_PATTERN.test(id)) return 'VIDEO_VERIFICATION';
   if (SCHEDULING_PATTERN.test(id)) return 'SCHEDULING';
+
+  // If an action has text, number, money, or enum fields (e.g. setup_insurance_mandate
+  // or register_enach_mandate which collect bank account & IFSC), it must render
+  // through SchemaForm to collect those inputs, not a single-checkbox ConsentPanel.
+  const schema = Array.isArray(action.input_schema) ? action.input_schema : [];
+  const hasDataFields = schema.some((f) => f && f.type !== 'boolean');
+  if (hasDataFields) {
+    return 'FORM';
+  }
+
   if (CONSENT_PATTERN.test(id)) return 'CONSENT';
   return 'FORM';
 }

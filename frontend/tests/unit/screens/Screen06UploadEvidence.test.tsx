@@ -50,14 +50,14 @@ describe('Screen06UploadEvidence (F19)', () => {
     window.sessionStorage.clear();
   });
 
-  it('renders title, back button, and all 3 tabs', async () => {
+  it('renders title, back button, and active tabs', async () => {
     renderScreen6();
 
     expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
     expect(screen.getByTestId('back-to-rec-btn')).toBeInTheDocument();
 
     expect(screen.getByRole('tab', { name: /Upload File/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Enter Details/i })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Enter Details/i })).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /How it helps/i })).toBeInTheDocument();
   });
 
@@ -91,39 +91,24 @@ describe('Screen06UploadEvidence (F19)', () => {
     expect(await screen.findByTestId('screen-07-stub')).toBeInTheDocument();
   });
 
-  it('EVIDENCE action with no input_schema: Enter Details tab shows the safe "not available" state, never invented fields (regression)', async () => {
-    // Bug: an EVIDENCE action with no input_schema (true of every EVIDENCE
-    // action on every pack - the contract never gives one) fell back to a
-    // hardcoded "Net Monthly Income" / "Employer or Organization Name" form.
-    // That is Lending-specific business content with no relationship to
-    // whatever document is actually being requested, and it could appear on
-    // ANY journey's manual-entry path. The default route here
-    // (UPLOAD_INCOME_PROOF) is itself a real EVIDENCE action with no
-    // input_schema, so this exercises the exact previously-broken path.
-    const user = userEvent.setup();
+  it('EVIDENCE action with no input_schema: Enter Details tab is omitted so dead-end placeholder is never rendered (Error 2 & 10)', async () => {
+    // Error 2 & 10: If an action has no usable manual-entry/input_schema,
+    // do NOT render Enter Details. Evidence-only actions should show only the
+    // evidence interaction. Never render a dead-end manual form.
     renderScreen6();
 
     await screen.findByRole('heading', { level: 1 });
 
-    const manualTab = screen.getByRole('tab', { name: /Enter Details/i });
-    await user.click(manualTab);
+    // The Enter Details tab must NOT be rendered
+    expect(screen.queryByRole('tab', { name: /Enter Details/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Upload File/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /How it helps/i })).toBeInTheDocument();
 
-    expect(await screen.findByTestId('manual-entry-unavailable')).toBeInTheDocument();
-    expect(screen.getByText(/Details entry isn't available for this document yet\./i)).toBeInTheDocument();
-
-    // No Lending-specific (or any invented) fields anywhere on the panel.
+    // No invented fields anywhere on the panel.
     expect(screen.queryByLabelText(/Net Monthly Income/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Employer.*Organization Name/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/85,?000/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Submit Details/i })).not.toBeInTheDocument();
-
-    // Recovery controls are present and functional.
-    expect(screen.getByTestId('manual-unavailable-back-to-upload-btn')).toBeInTheDocument();
-    expect(screen.getByTestId('manual-unavailable-return-btn')).toBeInTheDocument();
-    expect(screen.getByTestId('manual-unavailable-cancel-btn')).toBeInTheDocument();
-
-    await user.click(screen.getByTestId('manual-unavailable-back-to-upload-btn'));
-    expect(await screen.findByTestId('tabpanel-upload')).toBeInTheDocument();
   });
 
   it('EVIDENCE action with a genuine input_schema: renders and submits that schema dynamically, never a substituted one (regression)', async () => {
@@ -222,10 +207,39 @@ describe('Screen06UploadEvidence (F19)', () => {
       expect(heading).not.toHaveTextContent('Upload Income Proof');
 
       expect(screen.getByRole('tab', { name: /Upload File/i })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: /Enter Details/i })).toBeInTheDocument();
+      // Error 2 & 10: actions without input_schema do NOT render Enter Details dead-end tab
+      expect(screen.queryByRole('tab', { name: /Enter Details/i })).not.toBeInTheDocument();
       expect(screen.getByRole('tab', { name: /How it helps/i })).toBeInTheDocument();
       expect(screen.getByTestId('tabpanel-upload')).toBeInTheDocument();
       expect(screen.getByTestId('evidence-file-input')).toBeInTheDocument();
+    });
+
+    it('EVIDENCE action with input_schema: shows both Upload File and Enter Details tabs', async () => {
+      renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/UPLOAD_BANK_STATEMENT', {
+        action: {
+          action_id: 'UPLOAD_BANK_STATEMENT',
+          title: 'Upload Bank Statement',
+          kind: 'EVIDENCE',
+          why: 'Required to verify salary credits.',
+          unlocks: [],
+          accepts: ['BANK_STATEMENT'],
+          input_schema: [
+            {
+              key: 'account_number',
+              type: 'text',
+              label: 'Account Number',
+              required: true,
+            },
+          ],
+        },
+        snapshotId: '33333333-3333-3333-3333-333333333333',
+      });
+
+      const heading = await screen.findByRole('heading', { level: 1 });
+      expect(heading).toHaveTextContent('Upload Bank Statement');
+
+      expect(screen.getByRole('tab', { name: /Upload File/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /Enter Details/i })).toBeInTheDocument();
     });
 
     it('FORM action: shows action title, only 1 tab, and no upload UI at all', async () => {

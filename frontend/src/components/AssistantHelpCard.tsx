@@ -3,6 +3,7 @@ import { Bot } from 'lucide-react';
 import { Card } from '@/components/primitives/Card';
 import { Button } from '@/components/primitives/Button';
 import { cn } from '@/lib/utils';
+import { useUiStore } from '@/state/ui';
 
 export interface AssistantHelpCardProps {
   title?: string;
@@ -19,6 +20,8 @@ export function AssistantHelpCard({
   onAskNow,
   className,
 }: AssistantHelpCardProps): ReactElement {
+  const openAssistant = useUiStore((state) => state.openAssistant);
+  const handleAsk = onAskNow || (() => openAssistant());
   return (
     <Card
       data-testid="assistant-help-card"
@@ -57,7 +60,8 @@ export function AssistantHelpCard({
         variant="outline"
         size="sm"
         className="w-full font-bold"
-        onClick={onAskNow}
+        onClick={handleAsk}
+        data-testid="assistant-ask-now-btn"
       >
         Ask Now
       </Button>

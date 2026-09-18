@@ -126,7 +126,6 @@ export function Screen03GoalBasicInfo(): ReactElement {
         <p className="mt-1.5 text-sm text-content-secondary leading-relaxed">
           {subtext}
         </p>
-        <span className="sr-only">{(pack as { title?: string }).title || pack.display_name}</span>
         {pack.ui_labels?.goal_heading && <span className="sr-only">{pack.ui_labels.goal_heading}</span>}
         {pack.ui_labels?.goal_subtext && <span className="sr-only">{pack.ui_labels.goal_subtext}</span>}
       </div>
@@ -143,59 +142,56 @@ export function Screen03GoalBasicInfo(): ReactElement {
 
       {/* Goal Form Card */}
       <Card className="p-6 md:p-8 shadow-xs border border-surface-border bg-white rounded-card">
-        {/* "I want to" context strip - the reference mockup shows this as a selectable
-            field, but the real goal_schema has no such field/options for any pack
-            (verified against contract/openapi.yaml and every pack manifest). Rather
-            than fabricate a dropdown with invented choices, this renders the pack's
-            own real, already-fetched, contract-required `description` (JourneyPackSummary.
-            description) as a plain read-only line - same position and framing as the
-            reference, zero fabricated data, zero contract change. See visual audit
-            notes for the full mismatch writeup. */}
-        <div className="mb-5 space-y-1.5">
-          <p className="text-sm font-semibold text-content-primary">
-            I want to
-          </p>
-          <div className="w-full rounded-button bg-surface-subtle border border-surface-border px-3.5 py-2.5 text-sm text-content-secondary">
-            {pack.description}
-          </div>
-        </div>
-
-        {/* Optional Natural Language Progressive Disclosure */}
-        <div className="mb-6 border-b border-surface-border pb-6">
-          <button
-            type="button"
-            onClick={() => setIsNlOpen(!isNlOpen)}
-            className="flex items-center justify-between w-full text-left py-2 group text-sm font-semibold text-paytm-blue hover:text-paytm-navy transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paytm-cyan rounded-button"
-            aria-expanded={isNlOpen}
-            aria-controls="nl-input-section"
-          >
-            <span className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-paytm-blue" />
-              <span>Describe in your own words (Optional)</span>
-            </span>
-            {isNlOpen ? (
-              <ChevronUp className="w-4 h-4 text-content-secondary" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-content-secondary" />
-            )}
-          </button>
-
-          {isNlOpen && (
-            <div id="nl-input-section" className="mt-3 space-y-2">
-              <label htmlFor="natural-language-input" className="block text-xs text-content-secondary">
-                Add any additional context or describe your goal in natural language.
-              </label>
-              <textarea
-                id="natural-language-input"
-                rows={3}
-                value={naturalLanguage}
-                onChange={(e) => setNaturalLanguage(e.target.value)}
-                placeholder="e.g. Need a 5 lakh loan for home renovation, monthly salary is 85000..."
-                className="w-full rounded-button bg-surface border border-surface-border p-3 text-sm text-content-primary placeholder:text-content-tertiary focus-visible:ring-2 focus-visible:ring-paytm-cyan focus-visible:border-paytm-cyan focus-visible:outline-none transition-colors duration-150 resize-none"
-              />
-            </div>
+        {/* Selected Journey Static Context */}
+        <div className="mb-6 pb-5 border-b border-surface-border" data-testid="selected-journey-context">
+          <h2 className="text-base sm:text-lg font-bold text-content-primary">
+            {pack.display_name}
+          </h2>
+          {pack.description && (
+            <p className="text-xs sm:text-sm text-content-secondary mt-1">
+              {pack.description}
+            </p>
           )}
         </div>
+
+        {/* Optional Natural Language Progressive Disclosure (only when supported by the pack) */}
+        {pack.supports_natural_language && (
+          <div className="mb-6 border-b border-surface-border pb-6">
+            <button
+              type="button"
+              onClick={() => setIsNlOpen(!isNlOpen)}
+              className="flex items-center justify-between w-full text-left py-2 group text-sm font-semibold text-paytm-blue hover:text-paytm-navy transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paytm-cyan rounded-button"
+              aria-expanded={isNlOpen}
+              aria-controls="nl-input-section"
+            >
+              <span className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-paytm-blue" />
+                <span>Describe in your own words (Optional)</span>
+              </span>
+              {isNlOpen ? (
+                <ChevronUp className="w-4 h-4 text-content-secondary" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-content-secondary" />
+              )}
+            </button>
+
+            {isNlOpen && (
+              <div id="nl-input-section" className="mt-3 space-y-2">
+                <label htmlFor="natural-language-input" className="block text-xs text-content-secondary">
+                  Add any additional context or describe your goal in natural language.
+                </label>
+                <textarea
+                  id="natural-language-input"
+                  rows={3}
+                  value={naturalLanguage}
+                  onChange={(e) => setNaturalLanguage(e.target.value)}
+                  placeholder="e.g. Need a 5 lakh loan for home renovation, monthly salary is 85000..."
+                  className="w-full rounded-button bg-surface border border-surface-border p-3 text-sm text-content-primary placeholder:text-content-tertiary focus-visible:ring-2 focus-visible:ring-paytm-cyan focus-visible:border-paytm-cyan focus-visible:outline-none transition-colors duration-150 resize-none"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Structured Schema Form */}
         <SchemaForm

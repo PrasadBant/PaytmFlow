@@ -220,9 +220,33 @@ def _find_amount_near_label(
         candidates: list[tuple[bool, int, float, re.Match, str]] = []
 
         for line in text.splitlines():
-            if label_re.search(line):
+            lbl_m = label_re.search(line)
+            if lbl_m:
+                lbl_start, lbl_end = lbl_m.span()
                 for m in _amounts_in_line(line):
-                    candidates.append((_is_marked_amount(m.group(0)), 0, 0.0, m, line.strip()))
+                    prefix_to_amt = line[:m.start()]
+                    last_excluded = list(_EXCLUDED_INCOME_LABELS.finditer(prefix_to_amt))
+                    if last_excluded:
+                        last_ex_end = last_excluded[-1].end()
+                        is_excluded = (
+                            m.start() >= last_ex_end
+                            and (last_ex_end > lbl_end or m.start() < lbl_start)
+                        )
+                        if is_excluded:
+                            continue
+
+                    if m.start() >= lbl_end:
+                        char_dist = float(m.start() - lbl_end)
+                    else:
+                        char_dist = float(1000 + abs(lbl_start - m.end()))
+
+                    candidates.append((
+                        _is_marked_amount(m.group(0)),
+                        0,
+                        char_dist,
+                        m,
+                        line.strip(),
+                    ))
 
         if lines:
             label_line = next((ln for ln in lines if label_re.search(ln.text)), None)

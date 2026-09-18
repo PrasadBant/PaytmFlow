@@ -4,6 +4,7 @@
   "description": "Complete your investment onboarding",
   "icon": "chart",
   "flagship_demo": false,
+  "supports_natural_language": false,
   "lifecycle_status": "SUPPORTED",
   "goal_schema": [
     {

@@ -44,6 +44,9 @@ export function formatRelativeTime(dateInput: string | Date | undefined | null):
     return `${diffInHours}h ago`;
   }
   const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays === 1) {
+    return 'Yesterday';
+  }
   if (diffInDays < 30) {
     return `${diffInDays}d ago`;
   }

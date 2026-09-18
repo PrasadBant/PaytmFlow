@@ -26,7 +26,7 @@ async def test_submit_clarification_flow(client: AsyncClient, session_headers: d
     ev_data = {
         "doc_type": "SALARY_SLIP",
         "expected_snapshot_id": snapshot_v1_id,
-        "manual_fields": json.dumps({"monthly_income": 62000, "declared_income": 85000}),
+        "manual_fields": json.dumps({"monthly_income": 85000}),
     }
     ev_resp = await client.post(
         f"/api/v1/journeys/{journey_id}/evidence",

@@ -117,7 +117,9 @@ export function Screen05Recommendation(): ReactElement {
       setFormModalAction(action);
       return;
     }
-    navigate(`/j/${id}/act/${action.action_id}`);
+    navigate(`/j/${id}/act/${action.action_id}`, {
+      state: { action },
+    });
   };
 
   const handleFormActionSuccess = (response: ActionResponse): void => {

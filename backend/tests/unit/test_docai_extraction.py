@@ -556,3 +556,83 @@ class TestMonthlyNetIncomeExtractionRegression:
         assert field.value == 134000
         assert field.validated
 
+    def test_case_e_real_demo_salary_slip_currency_glyph_prefix(self):
+        """CASE E:
+        Real demo document paytmflow_correct_salary_slip_demo.pdf where Rupee glyph /
+        INR prefix is rendered/extracted as 'I' before amounts:
+        - Gross Earnings: I1,00,000
+        - Total Deductions: I15,000
+        - MONTHLY NET INCOME: I85,000
+
+        Expected extraction = 85000 (never 185000 or summed).
+        """
+        text = (
+            "SALARY SLIP\n"
+            "PAYTMFLOW DEMO DOCUMENT – SYNTHETIC DATA\n"
+            "Employer: Acme Technologies Private Limited\n"
+            "Employee: Aarav Sharma\n"
+            "Gross Earnings\n"
+            "I1,00,000\n"
+            "Total Deductions\n"
+            "I15,000\n"
+            "MONTHLY NET INCOME\n"
+            "I85,000\n"
+        )
+        lines = [
+            OcrLine(text="Gross Earnings", top=931, bottom=969),
+            OcrLine(text="I1,00,000", top=931, bottom=969),
+            OcrLine(text="Total Deductions", top=1353, bottom=1391),
+            OcrLine(text="I15,000", top=1353, bottom=1391),
+            OcrLine(text="MONTHLY NET INCOME", top=1439, bottom=1485),
+            OcrLine(text="I85,000", top=1482, bottom=1551),
+        ]
+        field = extract_monthly_income(text, "SALARY_SLIP", lines=lines)
+        assert field.value == 85000
+        assert field.validated
+        assert field.value != 185000
+
+        # Also test with actual file if present on disk
+        demo_pdf_path = Path(r"C:\Users\vishu\Downloads\paytmflow_correct_salary_slip_demo.pdf")
+        if demo_pdf_path.exists():
+            from app.docai.ocr import extract_text
+            pdf_bytes = demo_pdf_path.read_bytes()
+            ocr_res = extract_text(pdf_bytes, "application/pdf")
+            demo_field = extract_monthly_income(ocr_res.text, "SALARY_SLIP", lines=ocr_res.lines)
+            assert demo_field.value == 85000
+            assert demo_field.validated
+
+    def test_single_line_multiple_components_extracts_net_only(self):
+        """Single-line text containing Gross, Deductions, and Monthly Net Income:
+        Gross Earnings = ₹1,00,000 Total Deductions = ₹15,000 Monthly Net Income = ₹85,000
+        Must extract exactly 85000, never 100000, 15000, or 185000.
+        """
+        text = "Gross Earnings: ₹1,00,000 | Total Deductions: ₹15,000 | Monthly Net Income: ₹85,000"
+        field = extract_monthly_income(text, "SALARY_SLIP")
+        assert field.value == 85000
+        assert field.validated
+        assert field.value != 185000
+        assert field.value != 100000
+
+    def test_synonyms_with_gross_and_deductions(self):
+        """Test all synonym labels (Net Pay, Take Home, Net Amount Payable, Net Salary)
+        in documents with Gross and Deductions.
+        """
+        labels = [
+            "Net Pay",
+            "Take Home",
+            "Net Amount Payable",
+            "Net Salary",
+            "Monthly Net Income",
+        ]
+        for label in labels:
+            text = (
+                f"Gross Earnings: ₹1,00,000\n"
+                f"Total Deductions: ₹15,000\n"
+                f"{label}: ₹85,000\n"
+            )
+            field = extract_monthly_income(text, "SALARY_SLIP")
+            assert field.value == 85000, f"Failed for label {label}: got {field.value}"
+            assert field.validated
+
+
+
