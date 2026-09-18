@@ -47,6 +47,27 @@ def _generate_jpeg(draw_fn, fields, template, seed):
     return img_buf.getvalue()
 
 
+def _generate_clean_pdf(draw_fn, fields, template):
+    """A native-text PDF (no rasterization/degradation, no OCR at all).
+
+    `_one_upload_and_execute` below is about the P1 evidence-resolution
+    concurrency invariant (no cross-request contamination), not OCR
+    robustness (covered elsewhere - see docs/docai_report.md). A randomly-
+    seeded rasterized+degraded JPEG occasionally hits an already-disclosed
+    OCR artifact (a currency-symbol glyph misread as an extra leading
+    digit) that manufactures a false internal-consistency conflict
+    unrelated to concurrency at all - traced on this exact helper's seed
+    range (9200+). A clean PDF sidesteps that entire class of incidental
+    flakiness.
+    """
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    draw_fn(c, fields, template)
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
 async def _one_full_flow(
     client: AsyncClient, journey_type, goal, doc_type, draw_fn, template, seed
 ):
@@ -154,12 +175,12 @@ async def _one_upload_and_execute(client: AsyncClient, seed: int):
     from app.docai.dataset.generate import _draw_salary_slip, _make_fields
 
     fields = _make_fields(rng, fake, "SALARY_SLIP", "symbol")
-    image_bytes = _generate_jpeg(_draw_salary_slip, fields, "salary_table", seed + 1)
+    pdf_bytes = _generate_clean_pdf(_draw_salary_slip, fields, "salary_table")
 
     ev_resp = await client.post(
         f"/api/v1/journeys/{journey_id}/evidence",
         data={"doc_type": "SALARY_SLIP", "expected_snapshot_id": snap},
-        files={"file": ("salary.jpg", image_bytes, "image/jpeg")},
+        files={"file": ("salary.pdf", pdf_bytes, "application/pdf")},
         headers=headers,
     )
     assert ev_resp.status_code == 200

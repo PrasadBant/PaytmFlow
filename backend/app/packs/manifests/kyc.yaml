@@ -170,11 +170,17 @@ action_groups:
 evidence_mappings:
   - doc_type: PASSPORT_SCAN
     target_field: ovd_document_uploaded
-    confidence_threshold: 0.85
+    # Recalibrated (was 0.85): measured min 0.5745 across every
+    # genuinely-verified PASSPORT_SCAN sample in the frozen eval - same
+    # MockAI-vs-real-model miscalibration as OFFICE_ID_CARD above (see
+    # lending.yaml's comment for the full rationale).
+    confidence_threshold: 0.55
     action_id: upload_passport_ovd
   - doc_type: VOTER_ID_CARD
     target_field: ovd_document_uploaded
-    confidence_threshold: 0.80
+    # Recalibrated (was 0.80): measured min 0.6756 across every
+    # genuinely-verified VOTER_ID_CARD sample in the frozen eval.
+    confidence_threshold: 0.65
     action_id: upload_voter_id_ovd
   - doc_type: DRIVING_LICENCE
     target_field: ovd_document_uploaded

@@ -9,17 +9,14 @@ import io
 import random
 from uuid import uuid4
 
-import pymupdf
 import pytest
 from faker import Faker
 from httpx import AsyncClient
-from PIL import Image
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 from app.config import settings
 from app.docai.classifier import get_classifier
-from app.docai.dataset.generate import _degrade
 from app.docai.ocr import TESSERACT_AVAILABLE
 
 pytestmark = [
@@ -29,20 +26,26 @@ pytestmark = [
 ]
 
 
-def _generate_jpeg(draw_fn, fields, template, seed):
-    rng = random.Random(seed)
+def _generate_clean_pdf(draw_fn, fields, template):
+    """A native-text PDF (no rasterization/degradation, no OCR at all -
+
+    PyMuPDF's real text layer is exact). This suite's tests are about
+    action-execution/security/idempotency invariants, not OCR robustness
+    (that has its own dedicated coverage - see docs/docai_report.md's OCR
+    robustness section and evaluate_ocr_robustness.py). Randomly-seeded
+    rasterized+degraded JPEGs occasionally hit a genuine, already-disclosed
+    OCR artifact (a currency-symbol glyph misread as an extra leading
+    digit, e.g. Deductions "9,450" -> "89,450") that manufactures a false
+    internal-consistency conflict unrelated to whatever this test is
+    actually checking - traced on this exact helper at seeds 9104/9105/
+    9200+. A clean PDF sidesteps that entire class of incidental flakiness.
+    """
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     draw_fn(c, fields, template)
     c.showPage()
     c.save()
-    doc = pymupdf.open(stream=buf.getvalue(), filetype="pdf")
-    pix = doc[0].get_pixmap(dpi=150)
-    pil_img = Image.open(io.BytesIO(pix.tobytes("png")))
-    pil_img, _ = _degrade(pil_img, rng)
-    img_buf = io.BytesIO()
-    pil_img.save(img_buf, format="JPEG", quality=85)
-    return img_buf.getvalue()
+    return buf.getvalue()
 
 
 async def _create_lending_journey(client: AsyncClient, headers: dict):
@@ -65,12 +68,12 @@ async def _upload_real_salary_slip(client: AsyncClient, headers: dict, journey_i
     fake = Faker()
     Faker.seed(seed)
     fields = _make_fields(rng, fake, "SALARY_SLIP", "symbol")
-    image_bytes = _generate_jpeg(_draw_salary_slip, fields, "salary_table", seed + 1)
+    pdf_bytes = _generate_clean_pdf(_draw_salary_slip, fields, "salary_table")
 
     resp = await client.post(
         f"/api/v1/journeys/{journey_id}/evidence",
         data={"doc_type": "SALARY_SLIP", "expected_snapshot_id": snap},
-        files={"file": ("salary.jpg", image_bytes, "image/jpeg")},
+        files={"file": ("salary.pdf", pdf_bytes, "application/pdf")},
         headers=headers,
     )
     assert resp.status_code == 200

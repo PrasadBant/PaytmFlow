@@ -181,11 +181,7 @@ async def test_insurance_e2e_real_evidence_advances_state(
         journey_id,
         snap,
         "submit_medical_declaration",
-        {
-            "has_existing_conditions": False,
-            "tobacco_consumer": False,
-            "previous_hospitalization": False,
-        },
+        {"has_medical_history": "NO"},
     )
     assert med_act.status_code == 200, med_act.text
     snap = med_act.json()["journey"]["snapshot_id"]
@@ -807,6 +803,18 @@ async def test_native_text_pdf_with_label_value_in_table_columns_is_extracted(
     w, h = A4
     c.setFont("Helvetica-Bold", 14)
     c.drawString(60, h - 60, "MONTHLY SALARY SLIP")
+    # Real salary slips carry an employer header and pay-period line above
+    # the field/value table - added so this fixture has the same genuine
+    # salary-slip vocabulary a real document would, rather than being just
+    # a bare 2-row table (which was already only marginally above the
+    # classifier's confidence floor even before the cross-journey "OTHER"
+    # training fix below, at 0.489 - this is the classification signal a
+    # real such document actually carries, not a change to what's under
+    # test: the row-band table-column extraction mechanism itself, which
+    # is still exactly the same two-column "Field"/"Value" layout.
+    c.setFont("Helvetica", 9)
+    c.drawString(60, h - 78, "Acme Technologies Pvt Ltd")
+    c.drawString(60, h - 90, "Payslip for the month of March 2026")
     c.setFont("Helvetica", 10)
     c.drawString(60, h - 100, "Field")
     c.drawString(300, h - 100, "Value")

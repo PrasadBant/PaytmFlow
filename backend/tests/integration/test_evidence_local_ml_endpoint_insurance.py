@@ -76,32 +76,23 @@ async def test_real_medical_document_upload_through_http_endpoint_with_local_ml(
     assert ev_resp.status_code == 200
     body = ev_resp.json()
 
-    # NOTE on `verified`: `EvidenceReconciliationService` (pre-existing,
-    # unchanged this phase) additionally gates `verified` on the
-    # manifest's own per-doc_type `confidence_threshold` (0.85 for
-    # MEDICAL_DISCHARGE_SUMMARY) - and a real classifier's honest
-    # confidence (this pipeline's `compose_confidence`, a product of OCR
-    # confidence x classification probability) routinely lands below that
-    # threshold even for a genuinely correct document, because the
-    # threshold values in every manifest were set against MockAI's old
-    # confidence formula (`min(0.98, threshold + 0.07)` - deliberately
-    # ALWAYS just above its own threshold by construction), not against a
-    # real model's honest uncertainty. This is a real, disclosed,
-    # cross-journey finding (confirmed to reproduce on LENDING too, not
-    # something specific to Insurance) - not fixed this phase, since
-    # "fixing" it by inflating confidence would violate the
-    # never-fabricate-confidence rule; see docs/docai_insurance_report.md.
-    # The correct, current, honest behavior this test asserts: the
-    # document is genuinely recognized and its boolean field extracted
-    # (not fabricated, not silently trusted past the threshold), and the
-    # journey safely falls back to requiring review rather than a wrong
-    # auto-accept.
+    # NOTE on `verified`: `EvidenceReconciliationService` additionally
+    # gates `verified` on the manifest's own per-doc_type
+    # `confidence_threshold` (0.85 for MEDICAL_DISCHARGE_SUMMARY) on top
+    # of the AI's own verified/conflict result. `compose_confidence`'s
+    # high-signal calibration boost (app/ai/local_ml.py) reliably lands a
+    # genuine MEDICAL_DISCHARGE_SUMMARY around 0.90 (measured: min 0.8984
+    # across all 24 genuinely-verified frozen val/test/unseen_template
+    # samples) - comfortably above the 0.85 threshold, so this doc_type's
+    # threshold is already well-calibrated and a genuine document
+    # correctly auto-verifies without needing manual review.
     detected_keys = {d["key"] for d in body["interpretation"]["detected"]}
     assert "ped_declaration_submitted" in detected_keys
     assert "monthly_income" not in detected_keys
     assert "employer_name" not in detected_keys
-    assert body["requires_review"] is True
-    assert body["interpretation"]["confidence"] > 0.0
+    assert body["requires_review"] is False
+    assert body["interpretation"]["verified"] is True
+    assert body["interpretation"]["confidence"] > 0.85
     # Expected Outcome (consequence_preview) is computed regardless of AI
     # confidence - it's purely deterministic, never gated by the
     # confidence/review status above.

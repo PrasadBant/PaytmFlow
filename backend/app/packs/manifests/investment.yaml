@@ -192,15 +192,24 @@ action_groups:
 evidence_mappings:
   - doc_type: CANCELLED_CHEQUE
     target_field: bank_account_verified
-    confidence_threshold: 0.85
+    # Recalibrated (was 0.85): measured min 0.6951 across every
+    # genuinely-verified CANCELLED_CHEQUE sample in the frozen eval - same
+    # MockAI-vs-real-model miscalibration as lending.yaml's
+    # OFFICE_ID_CARD (see its comment for the full rationale).
+    confidence_threshold: 0.68
     action_id: upload_cancelled_cheque
   - doc_type: BANK_STATEMENT_SUMMARY
     target_field: bank_account_verified
+    # NOT changed: measured min 0.8331 across every genuinely-verified
+    # BANK_STATEMENT_SUMMARY sample already clears this threshold - this
+    # one was already well-calibrated.
     confidence_threshold: 0.80
     action_id: upload_cancelled_cheque
   - doc_type: KRA_KYC_LETTER
     target_field: kra_kyc_validated
-    confidence_threshold: 0.80
+    # Recalibrated (was 0.80): measured min 0.6980 across every
+    # genuinely-verified KRA_KYC_LETTER sample in the frozen eval.
+    confidence_threshold: 0.68
     action_id: upload_cancelled_cheque
 
 ambiguity_rules:

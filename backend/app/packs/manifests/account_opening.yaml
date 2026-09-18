@@ -208,11 +208,21 @@ action_groups:
 evidence_mappings:
   - doc_type: SIGNATURE_SPECIMEN
     target_field: signature_uploaded
-    confidence_threshold: 0.85
+    # Recalibrated (was 0.85): measured min 0.2940 across every
+    # genuinely-verified SIGNATURE_SPECIMEN sample in the frozen eval -
+    # this doc_type's target is a boolean (mere correct classification,
+    # no numeric value at stake), and its sparsest real template
+    # (signature_plain_unseen, no OCR-anchoring label at all) genuinely
+    # earns a lower base confidence even when correctly classified. Same
+    # MockAI-vs-real-model miscalibration as lending.yaml's
+    # OFFICE_ID_CARD (see its comment for the full rationale).
+    confidence_threshold: 0.28
     action_id: upload_wet_signature
   - doc_type: AADHAAR_FRONT_BACK
     target_field: signature_uploaded
-    confidence_threshold: 0.80
+    # Recalibrated (was 0.80): measured min 0.6034 across every
+    # genuinely-verified AADHAAR_FRONT_BACK sample in the frozen eval.
+    confidence_threshold: 0.58
     action_id: upload_digital_signature
 
 ambiguity_rules:

@@ -429,7 +429,16 @@ class EvidenceReconciliationService:
         consequence_preview: SimulationPreview | None = None
         diff_preview: JourneyDiff | None = None
 
-        if proposed_action and is_verified:
+        # Gated on `evidence_is_genuine` (verified AND no conflicts), NOT
+        # `is_verified` (which ALSO requires clearing the confidence
+        # threshold). A low-confidence-but-genuine document (extraction
+        # succeeded, no conflicts, just under the auto-apply confidence
+        # bar) is not a wrong document - the preview must still show what
+        # WOULD happen, exactly as the comment above already states the
+        # intent to be ("must only ever be computed for evidence the AI
+        # genuinely verified"). Gating on `is_verified` instead silently
+        # suppressed the preview for every needs-confidence-review case.
+        if proposed_action and evidence_is_genuine:
             action_input: dict[str, Any] = {
                 "evidence_id": str(evidence_record.id),
             }

@@ -85,9 +85,41 @@ def _render_and_ocr(draw_fn, fields: dict, template: str, seed: int):
     return ocr_result.text, ocr_meta
 
 
-async def _reconcile(journey_type, doc_type, draw_fn, fields, template, seed, existing_fields):
+def _render_clean(draw_fn, fields: dict, template: str):
+    """Native-text PDF, no rasterization/degradation/Tesseract at all.
+
+    Used only where a random seed through the full degraded-JPEG path was
+    traced to occasionally hit an already-disclosed OCR artifact (a
+    currency-symbol glyph misread as an extra leading digit) that
+    manufactures a SECOND, spurious conflict unrelated to whatever the
+    test is actually isolating (see TestLendingConsistency below). This
+    is still a real code path (docai/ocr.py's native-PDF-text-layer
+    branch, not a mock), just the other real path.
+    """
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    draw_fn(c, fields, template)
+    c.showPage()
+    c.save()
+    ocr_result = extract_text(buf.getvalue(), "application/pdf")
+    ocr_meta = {
+        "confidence": ocr_result.mean_word_confidence,
+        "word_count": ocr_result.word_count,
+        "engine": ocr_result.engine,
+        "lines": [{"text": ln.text, "top": ln.top, "bottom": ln.bottom} for ln in ocr_result.lines],
+    }
+    return ocr_result.text, ocr_meta
+
+
+async def _reconcile(
+    journey_type, doc_type, draw_fn, fields, template, seed, existing_fields, clean=False
+):
     manifest = pack_registry.get_pack(journey_type)
-    text, ocr_meta = _render_and_ocr(draw_fn, fields, template, seed)
+    text, ocr_meta = (
+        _render_clean(draw_fn, fields, template)
+        if clean
+        else _render_and_ocr(draw_fn, fields, template, seed)
+    )
     provider = LocalMLProvider()
     return await provider.reconcile_evidence(
         doc_type=doc_type,
@@ -416,6 +448,12 @@ class TestLendingConsistency:
         Faker.seed(20260930)
         fields = _make_fields(rng, fake, "SALARY_SLIP", "symbol")
         fields["name"] = "Different Employee"
+        # clean=True: a real-OCR run at this exact seed was traced to
+        # additionally hit the already-disclosed currency-symbol/extra-
+        # leading-digit artifact on the Gross/Deductions figures, adding a
+        # SECOND, spurious INCOME_MISMATCH(monthly_income) conflict
+        # alongside the intentional name conflict this test isolates -
+        # unrelated to the consistency mechanism under test here.
         result = await _reconcile(
             "LENDING",
             "SALARY_SLIP",
@@ -424,6 +462,7 @@ class TestLendingConsistency:
             "salary_table",
             6112,
             {"name": "Original Applicant"},
+            clean=True,
         )
         assert len(result.conflicts) == 1
         assert result.conflicts[0].ambiguity_id == "INCOME_MISMATCH"

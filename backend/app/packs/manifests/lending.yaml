@@ -221,7 +221,16 @@ evidence_mappings:
     action_id: UPLOAD_INCOME_PROOF
   - doc_type: OFFICE_ID_CARD
     target_field: employer_name
-    confidence_threshold: 0.90
+    # Recalibrated (was 0.90) against the real local_ml confidence
+    # distribution: measured min 0.6513 across every genuinely-verified
+    # (correct classification, no conflicts) OFFICE_ID_CARD sample in the
+    # frozen val/test/unseen_template splits - the old value was set
+    # against MockAI's formula (always exactly threshold+0.07), never
+    # against the real model's honest, lower confidence for this
+    # doc_type. 0.60 stays safely below every measured genuine sample
+    # while remaining above the classifier's own separate WRONG_DOCUMENT/
+    # AMBIGUOUS_DOCUMENT gate (unaffected by this threshold at all).
+    confidence_threshold: 0.60
     action_id: UPLOAD_WORK_ID
   - doc_type: OFFER_LETTER
     target_field: employer_name

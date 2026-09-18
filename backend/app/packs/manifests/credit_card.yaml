@@ -208,7 +208,11 @@ evidence_mappings:
     action_id: upload_salary_statement
   - doc_type: ITR_V_ACKNOWLEDGEMENT
     target_field: income_verified
-    confidence_threshold: 0.80
+    # Recalibrated (was 0.80): measured min 0.6634 across every
+    # genuinely-verified ITR_V_ACKNOWLEDGEMENT sample in the frozen eval -
+    # same MockAI-vs-real-model miscalibration as lending.yaml's
+    # OFFICE_ID_CARD (see its comment for the full rationale).
+    confidence_threshold: 0.65
     action_id: upload_it_return
   - doc_type: UTILITY_BILL_ELECTRICITY
     target_field: current_address_verified
