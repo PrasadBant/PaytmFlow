@@ -355,6 +355,38 @@ def extract_monthly_income(text: str, doc_type: str, lines: list | None = None) 
     )
 
 
+GROSS_LABELS_SALARY_SLIP = [
+    r"gross\s*earnings",
+    r"gross\s*pay",
+    r"gross\s*salary",
+    r"total\s*gross",
+    r"total\s*earnings",
+]
+
+DEDUCTION_LABELS_SALARY_SLIP = [
+    r"total\s*deductions?",
+    r"total\s*deduction",
+    r"deductions?",
+]
+
+
+def extract_gross_pay(text: str, lines: list | None = None) -> int | None:
+    raw_amount, _ = _find_amount_near_label(text, GROSS_LABELS_SALARY_SLIP, lines=lines)
+    if not raw_amount:
+        return None
+    fixed = try_fix_ocr_digit_confusion(raw_amount)
+    return normalize_indian_amount(fixed)
+
+
+def extract_total_deductions(text: str, lines: list | None = None) -> int | None:
+    raw_amount, _ = _find_amount_near_label(text, DEDUCTION_LABELS_SALARY_SLIP, lines=lines)
+    if not raw_amount:
+        return None
+    fixed = try_fix_ocr_digit_confusion(raw_amount)
+    return normalize_indian_amount(fixed)
+
+
+
 def extract_employer_name(text: str) -> ExtractedField:
     match = EMPLOYER_SUFFIX_PATTERN.search(text)
     if not match:

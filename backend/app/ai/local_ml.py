@@ -56,8 +56,13 @@ from app.docai.consistency import (
     check_identifier_consistency,
     check_income_consistency,
     check_name_consistency,
+    check_salary_slip_internal_consistency,
 )
-from app.docai.extraction import extract_fields_for_doc_type
+from app.docai.extraction import (
+    extract_fields_for_doc_type,
+    extract_gross_pay,
+    extract_total_deductions,
+)
 from app.docai.ocr import OcrLine
 from app.packs.contract import ActionSpec, GoalFieldSpec, JourneyPackManifest
 from app.schemas.enums import FieldType
@@ -384,6 +389,41 @@ class LocalMLProvider:
                     )
                 )
 
+                # Internal consistency check for financial calculation integrity (e.g. Salary Slip)
+                if (
+                    effective_doc_type == "SALARY_SLIP"
+                    and field.key == "monthly_income"
+                    and isinstance(field.value, int)
+                ):
+                    gross_pay = extract_gross_pay(text, lines=ocr_lines)
+                    total_deductions = extract_total_deductions(text, lines=ocr_lines)
+                    internal_finding = check_salary_slip_internal_consistency(
+                        gross_income=gross_pay,
+                        total_deductions=total_deductions,
+                        net_income=field.value,
+                    )
+                    if internal_finding and internal_finding.is_conflict:
+                        ambiguity = next(
+                            (a for a in (manifest.ambiguity_rules or []) if a.field == field.key),
+                            None,
+                        )
+                        ambiguity_id = (
+                            ambiguity.ambiguity_id
+                            if ambiguity
+                            else (
+                                manifest.ambiguity_rules[0].ambiguity_id
+                                if manifest.ambiguity_rules
+                                else "INCOME_MISMATCH"
+                            )
+                        )
+                        conflicts.append(
+                            AIConflict(
+                                ambiguity_id=ambiguity_id,
+                                field=field.key,
+                                message=internal_finding.message,
+                            )
+                        )
+
                 # Cross-document consistency (mission Phase 13): compare
                 # against whatever this journey's snapshot already has
                 # recorded for the same field from a PRIOR action/evidence.
@@ -482,10 +522,17 @@ class LocalMLProvider:
         # still returned in full on `AIInterpretationResult.confidence` /
         # `EvidenceInterpretation.confidence` for any caller that needs the
         # real number - it is just never turned into displayed text here.
-        summary = (
-            f"Recognized as {doc_name_clean} and extracted {len(detected_fields)} field(s) "
-            "using local document AI."
-        )
+        if conflicts:
+            conflict_reasons = "; ".join(c.message for c in conflicts)
+            summary = (
+                f"Recognized as {doc_name_clean}, but internal value inconsistencies "
+                f"were detected: {conflict_reasons}"
+            )
+        else:
+            summary = (
+                f"Recognized as {doc_name_clean} and extracted {len(detected_fields)} field(s) "
+                "using local document AI."
+            )
         return AIInterpretationResult(
             verified=len(conflicts) == 0,
             confidence=confidence,

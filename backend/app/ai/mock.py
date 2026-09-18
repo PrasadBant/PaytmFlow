@@ -216,39 +216,73 @@ class MockAI:
             "conflict" in text
             or "mismatch" in text
             or "differ" in text
+            or "inconsistent" in text
+            or "wrong_value" in text
             or (
-                doc_type in ["BANK_STATEMENT", "BANK_STATEMENT_SUMMARY"]
+                doc_type.upper() in ["BANK_STATEMENT", "BANK_STATEMENT_SUMMARY"]
                 and existing_fields.get("monthly_income") == 85000
                 and "62000" in text
             )
         )
 
+        salary_slip_conflict_msg: str | None = None
+        if doc_type.upper() == "SALARY_SLIP":
+            from app.docai.consistency import check_salary_slip_internal_consistency
+            from app.docai.extraction import (
+                extract_gross_pay,
+                extract_monthly_income,
+                extract_total_deductions,
+            )
+
+            gross = extract_gross_pay(extracted_text)
+            ded = extract_total_deductions(extracted_text)
+            net_field = extract_monthly_income(extracted_text, "SALARY_SLIP")
+            if gross and ded and net_field.value and isinstance(net_field.value, int):
+                finding = check_salary_slip_internal_consistency(gross, ded, net_field.value)
+                if finding and finding.is_conflict:
+                    is_conflict_simulated = True
+                    salary_slip_conflict_msg = finding.message
+
         if is_conflict_simulated and manifest.ambiguity_rules:
-            amb = manifest.ambiguity_rules[0]
+            amb = next(
+                (a for a in manifest.ambiguity_rules if a.field == "monthly_income"),
+                manifest.ambiguity_rules[0],
+            )
+            msg = salary_slip_conflict_msg or (
+                f"Document data conflicts with previously declared or verified {amb.field}"
+            )
             conflicts.append(
                 AIConflict(
                     ambiguity_id=amb.ambiguity_id,
                     field=amb.field,
-                    message=(
-                        f"Document data conflicts with previously declared or verified {amb.field}"
-                    ),
+                    message=msg,
                 )
+            )
+            conflict_val: int = 90000 if ("90000" in text or "90,000" in text) else 62000
+            conflict_disp = f"₹{conflict_val:,}"
+            field_label = (
+                "Monthly Net Income"
+                if doc_type.upper() == "SALARY_SLIP"
+                else "Average Monthly Inflow"
             )
             detected_fields.append(
                 AIDetectedField(
                     key="monthly_income",
-                    label="Average Monthly Inflow",
-                    display_value="₹62,000",
-                    value=62000,
+                    label=field_label,
+                    display_value=conflict_disp,
+                    value=conflict_val,
                 )
             )
             return AIInterpretationResult(
                 verified=False,
                 confidence=0.81,
                 detected=detected_fields,
-                summary=f"Detected potential mismatch in {doc_type} requiring user confirmation.",
+                summary=(
+                    f"Detected potential mismatch in {doc_type} "
+                    f"requiring user confirmation: {msg}"
+                ),
                 conflicts=conflicts,
-                raw_values={"monthly_income": 62000},
+                raw_values={"monthly_income": conflict_val},
             )
 
         # Standard deterministic extraction based on doc_type and manifest mapping

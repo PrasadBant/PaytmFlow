@@ -135,7 +135,9 @@ def extract_pdf_text_layer(content: bytes) -> OcrResult:
     processed."""
     try:
         doc = pymupdf.open(stream=content, filetype="pdf")
-        pages_text = [doc[i].get_text().strip() for i in range(len(doc)) if doc[i].get_text().strip()]
+        pages_text = [
+            doc[i].get_text().strip() for i in range(len(doc)) if doc[i].get_text().strip()
+        ]
         combined_lines: list[OcrLine] = []
         for i in range(len(doc)):
             page = doc[i]

@@ -233,3 +233,35 @@ async def test_unsupported_journey_returns_safe_not_fabricated_result(
     assert result.verified is False
     assert result.detected == []
     assert result.confidence == 0.0
+
+
+async def test_salary_slip_internal_calculation_conflict_flagged():
+    salary_slip_text = """
+    EMPLOYEE PAYSLIP - ACME TECHNOLOGIES PVT LTD
+    Employee Name: Rahul Sharma
+    Designation: Senior Software Engineer
+    Month: March 2026
+
+    Gross Earnings: ₹80,000
+    Total Deductions: ₹12,000
+    Net Pay: ₹90,000
+    """
+    manifest = pack_registry.get_pack("LENDING")
+    provider = LocalMLProvider()
+
+    result = await provider.reconcile_evidence(
+        doc_type="SALARY_SLIP",
+        extracted_text=salary_slip_text,
+        manifest=manifest,
+        existing_fields={},
+    )
+
+    assert result.verified is False
+    assert len(result.conflicts) == 1
+    assert result.conflicts[0].field == "monthly_income"
+    assert "Gross Earnings (₹80,000)" in result.conflicts[0].message
+    assert "Total Deductions (₹12,000)" in result.conflicts[0].message
+    assert "₹68,000" in result.conflicts[0].message
+    assert "Net Pay (₹90,000)" in result.conflicts[0].message
+    assert "internal value inconsistencies were detected" in result.summary
+

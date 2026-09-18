@@ -114,3 +114,32 @@ def check_identifier_consistency(
         existing_value=existing_identifier,
         new_value=new_identifier,
     )
+
+
+def check_salary_slip_internal_consistency(
+    gross_income: int | None, total_deductions: int | None, net_income: int | None
+) -> ConsistencyFinding | None:
+    """Verifies that the salary slip's internal arithmetic (Gross - Deductions == Net)
+    is consistent.
+    """
+    if gross_income is None or total_deductions is None or net_income is None:
+        return None
+    if gross_income <= 0:
+        return None
+    expected_net = gross_income - total_deductions
+    if expected_net <= 0:
+        return None
+    if expected_net != net_income:
+        return ConsistencyFinding(
+            is_conflict=True,
+            field="monthly_income",
+            message=(
+                f"Document internal calculation conflict: Gross Earnings (₹{gross_income:,}) "
+                f"minus Total Deductions (₹{total_deductions:,}) equals ₹{expected_net:,}, "
+                f"which conflicts with stated Net Pay (₹{net_income:,})."
+            ),
+            existing_value=expected_net,
+            new_value=net_income,
+        )
+    return None
+

@@ -343,3 +343,80 @@ async def test_upload_evidence_missing_snapshot_returns_clean_404(
     body = upload_res.json()
     assert body["error"]["code"] == "NOT_FOUND"
     assert body["error"]["message"] == "Snapshot not found"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_name", ["mock", "local_ml"])
+async def test_upload_evidence_salary_slip_internal_inconsistency_requires_review(
+    client_with_db: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    provider_name: str,
+):
+    monkeypatch.setattr(settings, "AI_PROVIDER", provider_name)
+
+    session_res = await client_with_db.get("/api/v1/session")
+    session_id = session_res.json()["session_id"]
+    headers = {"X-Session-Id": session_id}
+
+    create_res = await client_with_db.post(
+        "/api/v1/journeys",
+        headers=headers,
+        json={
+            "journey_type": "LENDING",
+            "goal": {
+                "loan_amount": 250000,
+                "loan_purpose": "HOME_RENOVATION",
+                "tenure_months": 24,
+            },
+        },
+    )
+    assert create_res.status_code == 201
+    journey_data = create_res.json()
+    journey_id = journey_data["journey_id"]
+    snapshot_id = journey_data["snapshot_id"]
+
+    # Salary slip with Gross 80,000, Deductions 12,000, Net 90,000
+    # (calculation conflict: 80k - 12k = 68k != 90k)
+    pdf_bytes = create_sample_pdf(
+        "ACME TECHNOLOGIES PVT LTD\n"
+        "PAYSLIP FOR MARCH 2026\n"
+        "Employee Name: Rahul Sharma\n"
+        "Gross Earnings: ₹80,000\n"
+        "Total Deductions: ₹12,000\n"
+        "Net Pay: ₹90,000\n"
+    )
+
+    files = {
+        "file": ("salary_slip_wrong_value_test.pdf", pdf_bytes, "application/pdf"),
+    }
+    data = {
+        "doc_type": "salary_slip",
+        "expected_snapshot_id": snapshot_id,
+    }
+
+    upload_res = await client_with_db.post(
+        f"/api/v1/journeys/{journey_id}/evidence",
+        headers=headers,
+        data=data,
+        files=files,
+    )
+    assert upload_res.status_code == 200
+    res_json = upload_res.json()
+
+    # 1. State must require review and not be verified
+    assert res_json["requires_review"] is True
+    assert res_json["interpretation"]["verified"] is False
+
+    # 2. Consequence and diff preview must be None (do NOT complete Monthly Net Income)
+    assert res_json["consequence_preview"] is None
+    assert res_json["diff_preview"] is None
+
+    # 3. Conflict message must clearly explain the arithmetic calculation conflict
+    assert len(res_json["interpretation"]["conflicts"]) > 0
+    conflict = res_json["interpretation"]["conflicts"][0]
+    assert conflict["field"] == "monthly_income"
+    assert "80,000" in conflict["message"]
+    assert "12,000" in conflict["message"]
+    assert "68,000" in conflict["message"]
+    assert "90,000" in conflict["message"]
+

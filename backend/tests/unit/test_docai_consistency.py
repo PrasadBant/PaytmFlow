@@ -77,3 +77,32 @@ class TestIdentifierConsistency:
     def test_missing_values_no_conflict(self):
         assert check_identifier_consistency(None, "ABCDE1234F") is None
         assert check_identifier_consistency("ABCDE1234F", None) is None
+
+
+class TestSalarySlipInternalConsistency:
+    def test_consistent_salary_slip_calculation(self):
+        from app.docai.consistency import check_salary_slip_internal_consistency
+
+        # Gross 80,000 - Deductions 12,000 = 68,000 == Net 68,000
+        assert check_salary_slip_internal_consistency(80000, 12000, 68000) is None
+
+    def test_inconsistent_salary_slip_calculation_flagged(self):
+        from app.docai.consistency import check_salary_slip_internal_consistency
+
+        # Gross 80,000 - Deductions 12,000 = 68,000 != Net 90,000
+        finding = check_salary_slip_internal_consistency(80000, 12000, 90000)
+        assert finding is not None
+        assert finding.is_conflict
+        assert finding.field == "monthly_income"
+        assert "Gross Earnings (₹80,000)" in finding.message
+        assert "Total Deductions (₹12,000)" in finding.message
+        assert "₹68,000" in finding.message
+        assert "Net Pay (₹90,000)" in finding.message
+
+    def test_missing_gross_or_deductions_no_false_positive(self):
+        from app.docai.consistency import check_salary_slip_internal_consistency
+
+        assert check_salary_slip_internal_consistency(None, 12000, 68000) is None
+        assert check_salary_slip_internal_consistency(80000, None, 68000) is None
+        assert check_salary_slip_internal_consistency(80000, 12000, None) is None
+

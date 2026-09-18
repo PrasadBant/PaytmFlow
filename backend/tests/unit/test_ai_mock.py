@@ -160,6 +160,34 @@ async def test_reconcile_evidence_conflict_detection():
 
 
 @pytest.mark.asyncio
+async def test_reconcile_evidence_salary_slip_internal_conflict():
+    ai = MockAI()
+    lending_pack = pack_registry.get_pack(JourneyType.LENDING)
+    assert lending_pack is not None
+
+    salary_slip_text = """
+    EMPLOYEE PAYSLIP
+    Gross Earnings: ₹80,000
+    Total Deductions: ₹12,000
+    Net Pay: ₹90,000
+    """
+    res = await ai.reconcile_evidence(
+        doc_type="SALARY_SLIP",
+        extracted_text=salary_slip_text,
+        manifest=lending_pack,
+    )
+    assert isinstance(res, AIInterpretationResult)
+    assert res.verified is False
+    assert len(res.conflicts) == 1
+    assert res.conflicts[0].field == "monthly_income"
+    assert "Gross Earnings (₹80,000)" in res.conflicts[0].message
+    assert "Total Deductions (₹12,000)" in res.conflicts[0].message
+    assert "₹68,000" in res.conflicts[0].message
+    assert "Net Pay (₹90,000)" in res.conflicts[0].message
+
+
+
+@pytest.mark.asyncio
 async def test_select_action_and_explain():
     ai = MockAI()
     lending_pack = pack_registry.get_pack(JourneyType.LENDING)
