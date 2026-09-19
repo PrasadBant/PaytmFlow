@@ -320,7 +320,12 @@ class EvidenceReconciliationService:
         is_confidence_sufficient = ai_res.confidence >= min_confidence
         is_verified = ai_res.verified and is_confidence_sufficient and not has_conflicts
 
-        requires_review = not is_verified or has_conflicts
+        # Requires review only when justified (conflicts or low confidence on genuine document).
+        # Wrong or invalid documents are rejected outright (requires_review = False).
+        requires_review = bool(
+            has_conflicts
+            or (ai_res.verified and not is_confidence_sufficient and bool(ai_res.detected))
+        )
         evidence_is_genuine = ai_res.verified and not has_conflicts
 
         display_summary = ai_res.summary
@@ -390,7 +395,7 @@ class EvidenceReconciliationService:
             extracted_text=extracted_text[:4000] if extracted_text else None,
             extracted_data=extracted_data,
             confidence=ai_res.confidence,
-            verified=evidence_is_genuine,
+            verified=is_verified,
             raw_values=ai_res.raw_values,
         )
 
@@ -405,6 +410,33 @@ class EvidenceReconciliationService:
             confidence=ai_res.confidence,
             extracted_data=extracted_data,
         )
+
+        # 9. Customer ↔ Reviewer Handoff Loop:
+        # If the customer uploads evidence while a review case is waiting for them
+        # (ADDITIONAL_INFO_REQUIRED), transition it back so the reviewer sees it.
+        from app.db.repositories.review_cases import ReviewCaseRepository
+        from app.schemas.enums import ReviewCaseStatus
+        
+        review_repo = ReviewCaseRepository(self.session)
+        open_cases = await review_repo.list_by_journey(journey_id)
+        for case_model in open_cases:
+            if case_model.status == ReviewCaseStatus.ADDITIONAL_INFO_REQUIRED.value:
+                new_status = (
+                    ReviewCaseStatus.UNDER_REVIEW.value
+                    if case_model.assigned_reviewer
+                    else ReviewCaseStatus.REVIEW_REQUIRED.value
+                )
+                await review_repo.save(
+                    case_model,
+                    status=new_status,
+                    case_version=case_model.case_version + 1,
+                )
+                await self.audit_writer.record_review_case_reopened(
+                    journey_id=journey_id,
+                    session_id=current_session.id,
+                    case_id=case_model.id,
+                )
+
         await self.session.commit()
 
         # 10. Compute deterministic simulation preview and diff preview

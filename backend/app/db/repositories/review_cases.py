@@ -93,7 +93,7 @@ class ReviewCaseRepository:
             ReviewCaseModel.status
         )
         result = await self.session.execute(stmt)
-        return dict(result.all())
+        return {str(row[0]): int(row[1]) for row in result.all()}
 
     async def count_resolved_today(self) -> int:
         now = datetime.now(UTC)

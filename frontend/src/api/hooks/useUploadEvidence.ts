@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../client';
 import type { components } from '../types.gen';
 
@@ -13,6 +13,8 @@ export interface UploadEvidencePayload {
 }
 
 export const useUploadEvidence = () => {
+  const queryClient = useQueryClient();
+  
   return useMutation<EvidenceResponse, Error, UploadEvidencePayload>({
     mutationFn: ({ journeyId, file, manual_fields, doc_type, expected_snapshot_id }) => {
       const formData = new FormData();
@@ -30,10 +32,11 @@ export const useUploadEvidence = () => {
 
       return apiClient.postForm<EvidenceResponse>(`/journeys/${journeyId}/evidence`, formData);
     },
-    onSuccess: () => {
-      // Intentionally do nothing with cache here. 
-      // /evidence is a preview-only endpoint that does NOT mutate the backend journey.
-      // Cache invalidation/updates only happen in useApplyAction.ts.
+    onSuccess: (_, variables) => {
+      // Invalidate the review status because an upload might clear an ADDITIONAL_INFO_REQUIRED block.
+      queryClient.invalidateQueries({ queryKey: ['journey-review-status', variables.journeyId] });
+      // We also invalidate the journey state just in case, though the preview usually drives UI updates.
+      queryClient.invalidateQueries({ queryKey: ['journey', variables.journeyId] });
     },
   });
 };

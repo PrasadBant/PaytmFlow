@@ -95,8 +95,22 @@ def _validation_error(message: str) -> HTTPException:
     )
 
 
+def _to_utc(dt: datetime) -> datetime:
+    """Normalize a datetime to UTC-aware, treating naive datetimes as UTC.
+
+    SQLite returns naive datetimes even for DateTime(timezone=True), while
+    PostgreSQL returns timezone-aware datetimes. This helper provides ONE
+    consistent UTC representation across both database drivers.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
 def _is_locked_future(case: ReviewCaseModel, now: datetime) -> bool:
-    return bool(case.review_lock_until and case.review_lock_until > now)
+    if not case.review_lock_until:
+        return False
+    return _to_utc(case.review_lock_until) > _to_utc(now)
 
 
 def _case_number(case: ReviewCaseModel) -> str:
@@ -158,6 +172,23 @@ class ReviewCaseService:
         base_key = f"{ambiguity.ambiguity_id}:{ambiguity.field}"
         existing = await repo.find_open_by_base_key(journey.id, base_key)
         if existing:
+            if existing.status == ReviewCaseStatus.ADDITIONAL_INFO_REQUIRED.value:
+                new_status = (
+                    ReviewCaseStatus.UNDER_REVIEW.value
+                    if existing.assigned_reviewer
+                    else ReviewCaseStatus.REVIEW_REQUIRED.value
+                )
+                existing = await repo.save(
+                    existing,
+                    status=new_status,
+                    case_version=existing.case_version + 1,
+                )
+                await AuditWriter(db).record_review_case_reopened(
+                    journey_id=journey.id,
+                    session_id=journey.session_id,
+                    case_id=existing.id,
+                )
+                await db.commit()
             return existing
 
         attempt = await repo.count_by_base_key(journey.id, base_key) + 1

@@ -45,6 +45,7 @@ export const useReviewQueue = (filters?: ReviewQueueFilters) => {
       apiClient.get<{ cases: ReviewCase[] }>('/review/cases', {
         params: filters as Record<string, string | number | boolean | undefined | null>,
       }),
+    refetchInterval: 5000,
   });
 };
 
@@ -53,6 +54,7 @@ export const useReviewCase = (caseId: string | undefined) => {
     queryKey: ['review', 'case', caseId],
     queryFn: () => apiClient.get<ReviewCaseDetail>(`/review/cases/${caseId}`),
     enabled: !!caseId,
+    refetchInterval: 5000,
   });
 };
 
@@ -139,5 +141,6 @@ export const useJourneyReviewStatus = (journeyId: string | undefined) => {
     queryFn: () =>
       apiClient.get<CustomerReviewStatus>(`/journeys/${journeyId}/review-status`),
     enabled: !!journeyId,
+    refetchInterval: 5000,
   });
 };

@@ -115,3 +115,50 @@ class TestLockCheck:
         )
         assert result.is_locked is True
         assert result.locked_by_other is False
+
+
+class TestLockTimezoneHandling:
+    def test_to_utc_with_naive_and_aware(self) -> None:
+        from datetime import UTC, datetime
+
+        from app.services.review_service import _to_utc
+
+        naive_dt = datetime(2026, 9, 19, 12, 0, 0)
+        utc_dt = _to_utc(naive_dt)
+        assert utc_dt.tzinfo == UTC
+        assert utc_dt.hour == 12
+
+        aware_dt = datetime(2026, 9, 19, 12, 0, 0, tzinfo=UTC)
+        assert _to_utc(aware_dt) == aware_dt
+
+    def test_is_locked_future_handles_sqlite_naive_and_postgres_aware(self) -> None:
+        from datetime import UTC, datetime, timedelta
+        from types import SimpleNamespace
+
+        from app.services.review_service import _is_locked_future
+
+        now_aware = datetime.now(UTC)
+
+        # None lock
+        case_none = SimpleNamespace(review_lock_until=None)
+        assert _is_locked_future(case_none, now_aware) is False  # type: ignore[arg-type]
+
+        # Naive future datetime (typical from SQLite DateTime column)
+        future_naive = (datetime.now(UTC) + timedelta(minutes=15)).replace(tzinfo=None)
+        case_future_naive = SimpleNamespace(review_lock_until=future_naive)
+        assert _is_locked_future(case_future_naive, now_aware) is True  # type: ignore[arg-type]
+
+        # Naive past datetime (expired lock from SQLite)
+        past_naive = (datetime.now(UTC) - timedelta(minutes=5)).replace(tzinfo=None)
+        case_past_naive = SimpleNamespace(review_lock_until=past_naive)
+        assert _is_locked_future(case_past_naive, now_aware) is False  # type: ignore[arg-type]
+
+        # Aware future datetime (typical from PostgreSQL TIMESTAMP WITH TIME ZONE)
+        future_aware = datetime.now(UTC) + timedelta(minutes=15)
+        case_future_aware = SimpleNamespace(review_lock_until=future_aware)
+        assert _is_locked_future(case_future_aware, now_aware) is True  # type: ignore[arg-type]
+
+        # Aware past datetime (expired lock from PostgreSQL)
+        past_aware = datetime.now(UTC) - timedelta(minutes=5)
+        case_past_aware = SimpleNamespace(review_lock_until=past_aware)
+        assert _is_locked_future(case_past_aware, now_aware) is False  # type: ignore[arg-type]

@@ -1,7 +1,7 @@
 import re
 from typing import Any
 
-from app.ai.models import ActionRankingResult, AIConflict, AIDetectedField, AIInterpretationResult
+from app.ai.models import ActionRankingResult, AIInterpretationResult
 from app.core.models import CoreSnapshot
 from app.packs.contract import ActionSpec, FieldType, GoalFieldSpec, JourneyPackManifest
 from app.schemas.journeys import FieldState, JourneyStateResponse, RecommendationResponse
@@ -263,177 +263,49 @@ class MockAI:
         existing_fields: dict[str, Any] | None = None,
         ocr_meta: dict[str, Any] | None = None,
     ) -> AIInterpretationResult:
-        """Deterministically extracts evidence data and detects potential conflicts.
+        """Deterministically extracts evidence data and detects potential conflicts using
+        content-based validation.
 
         `ocr_meta` is accepted for AIProvider Protocol compatibility and
-        intentionally unused - MockAI's whole purpose is fixed, reproducible
+        intentionally unused - MockAI's purpose is fixed, reproducible
         output regardless of real OCR signals.
         """
-        existing_fields = existing_fields or {}
-        text = (extracted_text or "").lower()
+        from app.docai.document_validator import validate_document
 
-        # Find matching evidence mapping in pack manifest
-        mapping = next(
-            (m for m in manifest.evidence_mappings if m.doc_type == doc_type),
+        existing_fields = existing_fields or {}
+        declared_mapping = next(
+            (m for m in manifest.evidence_mappings if m.doc_type.upper() == doc_type.upper()),
             None,
         )
-
-        state_schema_map = {f.key: f for f in manifest.state_schema}
-        raw_values: dict[str, Any] = {}
-        detected_fields: list[AIDetectedField] = []
-        conflicts: list[AIConflict] = []
-
-        # Check for simulated conflict triggers
-        is_conflict_simulated = (
-            "conflict" in text
-            or "mismatch" in text
-            or "differ" in text
-            or "inconsistent" in text
-            or "wrong_value" in text
-            or (
-                doc_type.upper() in ["BANK_STATEMENT", "BANK_STATEMENT_SUMMARY"]
-                and existing_fields.get("monthly_income") == 85000
-                and "62000" in text
-            )
+        accepted_doc_types = (
+            {
+                m.doc_type.upper()
+                for m in manifest.evidence_mappings
+                if m.action_id == declared_mapping.action_id
+            }
+            if declared_mapping
+            else {doc_type.upper()}
         )
 
-        salary_slip_conflict_msg: str | None = None
-        if doc_type.upper() == "SALARY_SLIP":
-            from app.docai.consistency import check_salary_slip_internal_consistency
-            from app.docai.extraction import (
-                extract_gross_pay,
-                extract_monthly_income,
-                extract_total_deductions,
-            )
-
-            gross = extract_gross_pay(extracted_text)
-            ded = extract_total_deductions(extracted_text)
-            net_field = extract_monthly_income(extracted_text, "SALARY_SLIP")
-            if gross and ded and net_field.value and isinstance(net_field.value, int):
-                finding = check_salary_slip_internal_consistency(gross, ded, net_field.value)
-                if finding and finding.is_conflict:
-                    is_conflict_simulated = True
-                    salary_slip_conflict_msg = finding.message
-
-        if is_conflict_simulated and manifest.ambiguity_rules:
-            amb = next(
-                (a for a in manifest.ambiguity_rules if a.field == "monthly_income"),
-                manifest.ambiguity_rules[0],
-            )
-            msg = salary_slip_conflict_msg or (
-                f"Document data conflicts with previously declared or verified {amb.field}"
-            )
-            conflicts.append(
-                AIConflict(
-                    ambiguity_id=amb.ambiguity_id,
-                    field=amb.field,
-                    message=msg,
-                )
-            )
-            conflict_val: int = 90000 if ("90000" in text or "90,000" in text) else 62000
-            conflict_disp = f"₹{conflict_val:,}"
-            field_label = (
-                "Monthly Net Income"
-                if doc_type.upper() == "SALARY_SLIP"
-                else "Average Monthly Inflow"
-            )
-            detected_fields.append(
-                AIDetectedField(
-                    key="monthly_income",
-                    label=field_label,
-                    display_value=conflict_disp,
-                    value=conflict_val,
-                )
-            )
-            return AIInterpretationResult(
-                verified=False,
-                confidence=0.81,
-                detected=detected_fields,
-                summary=(
-                    f"Detected potential mismatch in {doc_type} "
-                    f"requiring user confirmation: {msg}"
-                ),
-                conflicts=conflicts,
-                raw_values={"monthly_income": conflict_val},
-            )
-
-        # Standard deterministic extraction based on doc_type and manifest mapping
-        if mapping:
-            target_keys = mapping.extraction_keys or [mapping.target_field]
-        else:
-            target_keys = [f.key for f in manifest.state_schema[:2]]
-
-        confidence_threshold = mapping.confidence_threshold if mapping else 0.80
-        confidence = min(0.98, confidence_threshold + 0.07)
-
-        for key in target_keys:
-            field_spec = state_schema_map.get(key)
-            if not field_spec:
-                continue
-
-            # Deterministic values by field key and type
-            val: Any = None
-            disp: str = ""
-            if field_spec.type == FieldType.MONEY:
-                val = 85000
-                disp = "₹85,000"
-            elif field_spec.type == FieldType.BOOLEAN:
-                val = True
-                disp = "Verified"
-            elif field_spec.type == FieldType.TEXT:
-                if "employer" in key or "company" in key or "organization" in key:
-                    val = "Acme Technologies India Pvt Ltd"
-                    disp = val
-                elif "pan" in key:
-                    val = "ABCDE1234F"
-                    disp = val
-                elif "account" in key:
-                    val = "HDFC0001234"
-                    disp = "HDFC Bank ··· 1234"
-                elif "nominee" in key:
-                    val = "Ananya Sharma"
-                    disp = val
-                else:
-                    val = "Verified Document Record"
-                    disp = val
-            elif field_spec.type == FieldType.ENUM and field_spec.options:
-                val = field_spec.options[0].value
-                disp = field_spec.options[0].label
-            elif field_spec.type == FieldType.NUMBER:
-                val = 1
-                disp = "1"
-            elif field_spec.type == FieldType.DATE:
-                val = "2026-03-01"
-                disp = "01 Mar 2026"
-            else:
-                val = True
-                disp = "Verified"
-
-            raw_values[key] = val
-            detected_fields.append(
-                AIDetectedField(
-                    key=key,
-                    label=field_spec.label,
-                    display_value=disp,
-                    value=val,
-                )
-            )
-
-        doc_name_clean = doc_type.replace("_", " ").title()
-        # No numeric confidence percentage in this user-facing string - see
-        # the identical fix/rationale in app/ai/local_ml.py.
-        summary = (
-            f"Verified {doc_name_clean} with high confidence. "
-            f"Extracted {len(detected_fields)} attribute(s) successfully."
+        outcome = validate_document(
+            text=extracted_text,
+            expected_doc_type=doc_type,
+            manifest=manifest,
+            accepted_doc_types=accepted_doc_types,
+            existing_fields=existing_fields,
+            ocr_confidence=0.95,
+            is_mock=True,
         )
 
         return AIInterpretationResult(
-            verified=True,
-            confidence=confidence,
-            detected=detected_fields,
-            summary=summary,
-            conflicts=[],
-            raw_values=raw_values,
+            verified=outcome.is_verified,
+            confidence=outcome.confidence,
+            detected=outcome.detected_fields,
+            summary=outcome.reason,
+            conflicts=outcome.conflicts,
+            raw_values=outcome.raw_values,
+            auxiliary_facts=outcome.auxiliary_facts,
+            resolved_doc_type=outcome.predicted_doc_type,
         )
 
     async def select_action(

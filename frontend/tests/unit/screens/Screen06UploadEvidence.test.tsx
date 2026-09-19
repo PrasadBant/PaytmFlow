@@ -689,5 +689,53 @@ describe('Screen06UploadEvidence (F19)', () => {
       expect(screen.queryByTestId('screen-06-upload-evidence')).not.toBeInTheDocument();
       expect(await screen.findByTestId('screen-04-stub')).toBeInTheDocument();
     });
+
+    it('CONSENT action: renders dynamic loan terms summary and interactive full loan agreement modal (Error 39)', async () => {
+      const user = userEvent.setup();
+      renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/ACCEPT_LOAN_TERMS', {
+        action: {
+          action_id: 'ACCEPT_LOAN_TERMS',
+          title: 'Accept Loan Terms & Conditions',
+          kind: 'FORM',
+          why: 'Accepting customized loan terms is required to finalize your application.',
+          unlocks: ['loan_agreement_accepted'],
+          input_schema: [
+            { key: 'accept_terms', type: 'boolean', label: 'I accept the loan agreement and terms & conditions', required: true }
+          ]
+        },
+        journeyType: 'LENDING',
+        fields: {
+          requested_amount: 500000,
+          loan_tenure_months: 36,
+        },
+        snapshotId: '33333333-3333-3333-3333-333333333333',
+      });
+
+      expect(await screen.findByTestId('loan-terms-summary')).toBeInTheDocument();
+      expect(screen.getByTestId('loan-term-amount')).toHaveTextContent('5,00,000');
+      expect(screen.getByTestId('loan-term-tenure')).toHaveTextContent('36 months');
+      expect(screen.getByTestId('loan-term-rate')).toHaveTextContent('10.5% p.a.');
+      expect(screen.getByTestId('loan-term-emi')).toBeInTheDocument();
+      expect(screen.getByTestId('loan-term-total')).toBeInTheDocument();
+
+      // Open full loan agreement modal
+      const viewAgreementBtn = screen.getByTestId('view-full-agreement-btn');
+      expect(viewAgreementBtn).toBeInTheDocument();
+      await user.click(viewAgreementBtn);
+
+      // Modal is visible with terms details
+      expect(await screen.findByTestId('full-loan-agreement-modal')).toBeInTheDocument();
+      expect(screen.getByText(/Schedule of Loan Terms/i)).toBeInTheDocument();
+      expect(screen.getByText(/Disbursement & Utilization/i)).toBeInTheDocument();
+
+      // Close modal via Acknowledge & Close button
+      const closeBtn = screen.getByRole('button', { name: /Acknowledge & Close/i });
+      await user.click(closeBtn);
+      expect(screen.queryByTestId('full-loan-agreement-modal')).not.toBeInTheDocument();
+
+      // Consent checkbox was automatically checked by acknowledgement
+      const checkbox = screen.getByTestId('consent-checkbox');
+      expect(checkbox).toBeChecked();
+    });
   });
 });

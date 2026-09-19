@@ -25,6 +25,9 @@ type ActionOption = components['schemas']['ActionOption'];
 interface LocationState {
   action?: ActionOption;
   snapshotId?: string;
+  journeyType?: string;
+  goal?: unknown;
+  fields?: unknown;
 }
 
 function humanizeDocType(docType: string): string {
@@ -513,8 +516,12 @@ export const Screen06UploadEvidence: React.FC = () => {
               <ConsentPanel
                 actionTitle={screenTitle}
                 why={action?.why}
+                actionId={actionId}
+                journeyType={journey?.journey_type || locationState.journeyType}
+                goal={locationState.goal || journey?.display?.summary}
+                fields={journey?.fields || locationState.fields}
                 fieldKey={interactionFieldKey}
-                submitLabel={applyAction.isPending ? 'Submitting...' : 'Confirm →'}
+                submitLabel={applyAction.isPending ? 'Submitting...' : 'Confirm Agreement →'}
                 isSubmitting={applyAction.isPending}
                 onSubmit={handleManualSubmit}
               />

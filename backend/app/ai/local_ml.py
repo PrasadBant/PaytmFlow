@@ -216,6 +216,13 @@ class LocalMLProvider:
             else {doc_type.upper()}
         )
 
+        from app.docai.document_validator import (
+            detect_document_type,
+            score_doc_type,
+            validate_cancelled_cheque_content,
+            validate_passport_content,
+        )
+
         classification = classifier.classify(
             text=text,
             expected_doc_type=doc_type,
@@ -226,6 +233,23 @@ class LocalMLProvider:
         classification_confidence = classification.probabilities.get(
             classification.predicted_doc_type, 0.0
         )
+
+        # Content-based classification refinement: If the statistical classifier is ambiguous
+        # or unreadable, check deterministic domain-specific content markers before giving up.
+        if (
+            classification.outcome in ("AMBIGUOUS_DOCUMENT", "UNREADABLE_DOCUMENT")
+            and word_count >= 5
+        ):
+            detected_dt, detected_sc = detect_document_type(text, accepted_doc_types)
+            expected_sc = score_doc_type(text, doc_type)
+            if expected_sc >= 0.35:
+                classification.outcome = "CORRECT_DOCUMENT"
+                classification.predicted_doc_type = doc_type.upper()
+                classification_confidence = max(classification_confidence, 0.85)
+            elif detected_sc >= 0.40 and detected_dt in accepted_doc_types:
+                classification.outcome = "CORRECT_DOCUMENT"
+                classification.predicted_doc_type = detected_dt
+                classification_confidence = max(classification_confidence, 0.85)
 
         if classification.outcome != "CORRECT_DOCUMENT":
             summary_by_outcome = {
@@ -251,14 +275,35 @@ class LocalMLProvider:
 
         # The classifier landed on CORRECT_DOCUMENT against the acceptable
         # SET, but that may be a different doc_type string than the client
-        # declared (e.g. declared SALARY_SLIP, real file is a
-        # BANK_STATEMENT - both accepted for the same action). From here
-        # on, treat the classifier's own real prediction as the document's
-        # actual type - extraction dispatch and the target-field/
-        # confidence-threshold mapping lookup (both here and in the
-        # caller, app/evidence/reconcile.py) must reflect what the
-        # document REALLY is, not what the client guessed when uploading.
+        # declared.
         effective_doc_type = classification.predicted_doc_type
+
+        # Strict Doc-Type Content Validation (Errors 40 & 41)
+        if effective_doc_type == "PASSPORT_SCAN":
+            passed, msg, aux = validate_passport_content(text)
+            if not passed:
+                return AIInterpretationResult(
+                    verified=False,
+                    confidence=round(ocr_confidence * 0.35, 4),
+                    detected=[],
+                    summary=msg,
+                    conflicts=[],
+                    raw_values={},
+                    resolved_doc_type=effective_doc_type,
+                )
+
+        elif effective_doc_type == "CANCELLED_CHEQUE":
+            passed, msg, aux = validate_cancelled_cheque_content(text)
+            if not passed:
+                return AIInterpretationResult(
+                    verified=False,
+                    confidence=round(ocr_confidence * 0.35, 4),
+                    detected=[],
+                    summary=msg,
+                    conflicts=[],
+                    raw_values={},
+                    resolved_doc_type=effective_doc_type,
+                )
 
         state_schema_map = {f.key: f for f in manifest.state_schema}
         extracted = extract_fields_for_doc_type(text, effective_doc_type, lines=ocr_lines)
@@ -269,16 +314,7 @@ class LocalMLProvider:
         any_target_field_extracted = False
         all_target_fields_validated = True
 
-        # BOOLEAN target fields (e.g. Insurance's `ped_declaration_submitted`,
-        # satisfied by any one of 3 accepted evidence doc types) have no
-        # money/text VALUE to extract - genuine classification of the
-        # document as the expected type IS the fact being verified, not a
-        # missing extraction. Without this, `any_target_field_extracted`
-        # would stay False forever for every boolean-target journey and
-        # every correctly-classified evidence document would be wrongly
-        # reported as unverified - a real gap traced while auditing
-        # Insurance's manifest (Lending has no boolean evidence_mappings
-        # target, so this path was never exercised until now).
+        # BOOLEAN target fields
         mapping = next(
             (
                 m

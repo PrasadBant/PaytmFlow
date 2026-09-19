@@ -66,9 +66,10 @@ class TestGoldenPath:
         self, client: AsyncClient, session_headers: dict
     ) -> None:
         journey = await _create_lending_journey(client, session_headers)
-        await _trigger_income_mismatch(
+        mismatch_resp = await _trigger_income_mismatch(
             client, session_headers, journey["journey_id"], journey["snapshot_id"]
         )
+        current_snapshot_id = mismatch_resp["journey"]["snapshot_id"]
 
         # Customer sees a review status, never internal case metadata
         status_resp = await client.get(
@@ -116,14 +117,32 @@ class TestGoldenPath:
         assert status_resp2.json()["status"] == "ADDITIONAL_INFO_REQUIRED"
         assert status_resp2.json()["requested_information"]["requested_docs"] == ["BANK_STATEMENT"]
 
-        await _become_reviewer(client, session_headers)
-        reclaim_resp = await client.post(
-            f"/api/v1/review/cases/{case_id}/claim",
-            json={"expected_case_version": 3},
+        # Customer uploads the requested evidence
+        ev_resp = await client.post(
+            f"/api/v1/journeys/{journey['journey_id']}/evidence",
+            data={
+                "doc_type": "BANK_STATEMENT",
+                "expected_snapshot_id": current_snapshot_id,
+                "manual_fields": '{"monthly_income": 50000}',
+            },
             headers=session_headers,
         )
-        assert reclaim_resp.status_code == 200
-        assert reclaim_resp.json()["case_version"] == 4
+        assert ev_resp.status_code == 200, ev_resp.text
+
+        # Customer's state should now transition back to UNDER_REVIEW
+        status_resp3 = await client.get(
+            f"/api/v1/journeys/{journey['journey_id']}/review-status", headers=session_headers
+        )
+        assert status_resp3.json()["status"] == "UNDER_REVIEW"
+
+        await _become_reviewer(client, session_headers)
+        # Because we re-uploaded evidence, the case was automatically updated back to UNDER_REVIEW
+        # We don't need to manually claim it again unless it got unassigned.
+        # It should still be assigned to the reviewer and in UNDER_REVIEW.
+        queue_resp2 = await client.get("/api/v1/review/cases", headers=session_headers)
+        updated_case = next(c for c in queue_resp2.json()["cases"] if c["case_id"] == case_id)
+        assert updated_case["status"] == "UNDER_REVIEW"
+        assert updated_case["case_version"] == 4
 
         resolve_resp = await client.post(
             f"/api/v1/review/cases/{case_id}/resolve",
@@ -328,3 +347,38 @@ class TestSafetyProperties:
         )
         assert resp.status_code == 400
         assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
+    async def test_escalate_case_requires_reason(
+        self, client: AsyncClient, session_headers: dict
+    ) -> None:
+        journey = await _create_lending_journey(client, session_headers)
+        await _trigger_income_mismatch(
+            client, session_headers, journey["journey_id"], journey["snapshot_id"]
+        )
+        await _become_reviewer(client, session_headers)
+        cases = (await client.get("/api/v1/review/cases", headers=session_headers)).json()["cases"]
+        case_id = next(c for c in cases if c["journey_id"] == journey["journey_id"])["case_id"]
+        await client.post(
+            f"/api/v1/review/cases/{case_id}/claim",
+            json={"expected_case_version": 1},
+            headers=session_headers,
+        )
+        
+        # Test escalation
+        resp = await client.post(
+            f"/api/v1/review/cases/{case_id}/escalate",
+            json={
+                "escalation_reason": "Needs manager approval",
+                "expected_case_version": 2,
+            },
+            headers=session_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ESCALATED"
+        
+        audit_resp = await client.get(
+            f"/api/v1/review/cases/{case_id}/audit", headers=session_headers
+        )
+        escalated_events = [
+            e for e in audit_resp.json()["entries"] if e["event_type"] == "REVIEW_CASE_ESCALATED"
+        ]
+        assert len(escalated_events) == 1

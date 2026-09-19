@@ -320,6 +320,16 @@ export const Screen07AiAnalysis: React.FC = () => {
               )}
             </Button>
           </div>
+        ) : !interpretation.verified ? (
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => navigate(actionId ? `/j/${journeyId}/act/${actionId}` : `/j/${journeyId}/next`)}
+            data-testid="reupload-doc-btn"
+            className="w-full sm:w-auto px-8 py-2.5 inline-flex items-center justify-center gap-2"
+          >
+            <span>Upload Correct Document →</span>
+          </Button>
         ) : (
           <Button
             type="button"

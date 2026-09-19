@@ -48,6 +48,7 @@ export function EvidenceCard({
   filename,
   uploadedAt,
   sizeBytes,
+  verified = false,
   requiresReview = false,
   detected = [],
   className,
@@ -89,12 +90,20 @@ export function EvidenceCard({
               <AlertCircle className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Review Needed</span>
             </Badge>
-          ) : (
+          ) : verified ? (
             <span
               className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-[#e6f9f1] text-[#00b972] border border-[#00b972]/20"
               data-testid="evidence-badge-verified"
             >
               Verified
+            </span>
+          ) : (
+            <span
+              className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-paytm-red-light text-paytm-red border border-paytm-red/20 gap-1"
+              data-testid="evidence-badge-rejected"
+            >
+              <AlertCircle className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Not Verified</span>
             </span>
           )}
         </div>

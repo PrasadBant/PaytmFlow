@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -172,6 +172,137 @@ describe('Review Center (Human Review / Exception Resolution)', () => {
 
     expect(await screen.findByTestId('resolution-form-error')).toBeInTheDocument();
     expect(resolutionValueInput).toBeInTheDocument();
+  });
+
+  it('handles REQUEST_ADDITIONAL_INFORMATION flow with doc tags and live customer preview', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ReviewCaseDetail />, `/review/case/${DEMO_CASE_ID}`);
+
+    await screen.findByTestId('review-case-detail');
+    const claimBtn = screen.getByRole('button', { name: /Claim Case/i });
+    await user.click(claimBtn);
+
+    const select = await screen.findByTestId('resolution-type-select');
+    await user.selectOptions(select, 'REQUEST_ADDITIONAL_INFORMATION');
+
+    expect(await screen.findByTestId('requested-docs-input')).toBeInTheDocument();
+    expect(screen.getByTestId('customer-message-input')).toBeInTheDocument();
+
+    const docTag = screen.getByRole('button', { name: /\+ Bank Statement/i });
+    await user.click(docTag);
+
+    expect(screen.getByTestId('requested-docs-input')).toHaveValue('Bank Statement (PDF)');
+
+    await user.type(screen.getByTestId('customer-message-input'), 'Please upload your latest bank statement.');
+
+    expect(screen.getByText(/Live Customer Experience Preview/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Bank Statement \(PDF\)/i).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('handles ESCALATE_FOR_SPECIALIST_REVIEW flow with category and reason', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ReviewCaseDetail />, `/review/case/${DEMO_CASE_ID}`);
+
+    await screen.findByTestId('review-case-detail');
+    const claimBtn = screen.getByRole('button', { name: /Claim Case/i });
+    await user.click(claimBtn);
+
+    const select = await screen.findByTestId('resolution-type-select');
+    await user.selectOptions(select, 'ESCALATE_FOR_SPECIALIST_REVIEW');
+
+    expect(await screen.findByLabelText(/Escalation Category/i)).toBeInTheDocument();
+    expect(screen.getByTestId('resolution-reason-input')).toBeInTheDocument();
+
+    await user.type(screen.getByTestId('resolution-reason-input'), 'Income tax returns show conflicting gross turnover.');
+
+    const submitBtn = screen.getByTestId('submit-resolution-btn');
+    await user.click(submitBtn);
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/Escalate Case to Underwriting Specialist/i)).toBeInTheDocument();
+  });
+
+  it('shows state-aware waiting for customer banner when status is ADDITIONAL_INFO_REQUIRED', async () => {
+    server.use(
+      http.get('*/api/v1/review/cases/:case_id', () => {
+        return HttpResponse.json({
+          case_id: DEMO_CASE_ID,
+          case_number: 'PF-DEMO-1024',
+          journey_id: '11111111-1111-1111-1111-111111111111',
+          journey_type: 'LENDING',
+          journey_display_name: 'Personal Loan',
+          field_key: 'monthly_income',
+          reason_code: 'INCOME_MISMATCH',
+          reason_title: 'Bank statement credit differs from salary slip',
+          reason_description: 'Salary Slip: ₹50,000. Bank Evidence: ₹35,000.',
+          priority: 'HIGH',
+          status: 'ADDITIONAL_INFO_REQUIRED',
+          case_version: 3,
+          assigned_reviewer: 'Reviewer-mock',
+          is_locked: false,
+          resolution_type: null,
+          resolution_reason: null,
+          resolution_notes: null,
+          requested_information: {
+            requested_docs: ['Latest 3-Month Salary Slip', 'Bank Statement'],
+            customer_message: 'Please provide certified documents.',
+          },
+          escalation_reason: null,
+          created_at: '2026-09-19T04:00:00Z',
+          updated_at: '2026-09-19T04:30:00Z',
+          resolved_at: null,
+          journey_context: {
+            journey_id: '11111111-1111-1111-1111-111111111111',
+            journey_type: 'LENDING',
+            schema_version: '1.0.0',
+            snapshot_id: '22222222-2222-2222-2222-222222222222',
+            version_number: 3,
+            readiness: 'NEEDS_REVIEW',
+            status: 'NEEDS_REVIEW',
+            fields: [
+              { key: 'monthly_income', label: 'Monthly Net Income', status: 'AMBIGUOUS' },
+            ],
+            progress: { completed: 3, pending: 3, blockers: 1, total: 7 },
+            display: { title: 'Personal Loan', summary: '₹2,00,000' },
+            updated_at: '2026-09-19T04:30:00Z',
+          },
+          evidence: [],
+        });
+      })
+    );
+
+    renderWithProviders(<ReviewCaseDetail />, `/review/case/${DEMO_CASE_ID}`);
+
+    await screen.findByTestId('review-case-detail');
+    expect(screen.getByText(/Waiting on Customer Response/i)).toBeInTheDocument();
+    expect(screen.getByText(/Latest 3-Month Salary Slip, Bank Statement/i)).toBeInTheDocument();
+    expect(screen.getByText(/Please provide certified documents/i)).toBeInTheDocument();
+  });
+
+  it('displays audit timeline with categorized actors and chronological events', async () => {
+    server.use(
+      http.get('*/api/v1/review/cases/:case_id/audit', () => {
+        return HttpResponse.json({
+          entries: [
+            { event_type: 'CUSTOMER_EVIDENCE_UPLOADED', payload: {}, created_at: '2026-09-19T04:00:00Z' },
+            { event_type: 'REVIEW_CASE_CREATED', payload: {}, created_at: '2026-09-19T04:01:00Z' },
+            { event_type: 'AI_EXTRACTION_COMPLETED', payload: {}, created_at: '2026-09-19T04:02:00Z' },
+            { event_type: 'REVIEWER_CLAIMED_CASE', payload: { reviewer: 'Officer-Anjali' }, created_at: '2026-09-19T04:05:00Z' },
+          ],
+        });
+      })
+    );
+
+    renderWithProviders(<ReviewCaseDetail />, `/review/case/${DEMO_CASE_ID}`);
+
+    await screen.findByTestId('review-case-detail');
+    const timeline = await screen.findByTestId('audit-timeline');
+    expect(timeline).toBeInTheDocument();
+    expect(within(timeline).getByText('Customer')).toBeInTheDocument();
+    expect(within(timeline).getByText('System')).toBeInTheDocument();
+    expect(within(timeline).getByText('AI Model')).toBeInTheDocument();
+    expect(within(timeline).getByText('Reviewer')).toBeInTheDocument();
+    expect(within(timeline).getByText(/Officer-Anjali/i)).toBeInTheDocument();
   });
 
   it('customer-facing review status card shows customer-safe copy, no internal metadata', async () => {

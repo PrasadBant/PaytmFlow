@@ -28,6 +28,7 @@ ALLOWED_TRANSITIONS: dict[ReviewCaseStatus, set[ReviewCaseStatus]] = {
         ReviewCaseStatus.CANCELLED,
     },
     ReviewCaseStatus.UNDER_REVIEW: {
+        ReviewCaseStatus.UNDER_REVIEW,
         ReviewCaseStatus.RESOLVED,
         ReviewCaseStatus.ADDITIONAL_INFO_REQUIRED,
         ReviewCaseStatus.ESCALATED,

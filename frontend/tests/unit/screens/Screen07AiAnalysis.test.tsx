@@ -374,6 +374,35 @@ describe('Screen07AiAnalysis (F20)', () => {
     );
   });
 
+  it('renders Not Verified badge and Upload Correct Document button when document is rejected (Errors 38/40/41)', async () => {
+    const rejectedEvidence: EvidenceResponse = {
+      ...mockEvidenceResponse,
+      interpretation: {
+        verified: false,
+        confidence: 0.2,
+        detected: [],
+        summary: 'The uploaded file does not appear to be a Cancelled Cheque. Please upload the correct document.',
+        conflicts: [],
+      },
+      consequence_preview: null,
+      diff_preview: null,
+      requires_review: false,
+    };
+
+    renderScreen7('/j/11111111-1111-1111-1111-111111111111/analysis', {
+      evidenceResponse: rejectedEvidence,
+      journeyId: '11111111-1111-1111-1111-111111111111',
+      actionId: 'UPLOAD_CANCELLED_CHEQUE',
+      snapshotId: '11111111-1111-1111-1111-111111111111',
+    });
+
+    await screen.findByTestId('ai-summary-card');
+    expect(screen.getByTestId('evidence-badge-rejected')).toHaveTextContent('Not Verified');
+    expect(screen.getByTestId('reupload-doc-btn')).toHaveTextContent('Upload Correct Document →');
+    expect(screen.queryByTestId('continue-apply-btn')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('submit-for-review-btn')).not.toBeInTheDocument();
+  });
+
   it('strictly contains no prohibited words or percentage indicators', async () => {
     const { container } = renderScreen7();
 
