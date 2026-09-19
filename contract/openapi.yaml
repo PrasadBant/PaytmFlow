@@ -345,6 +345,234 @@ paths:
               schema: { $ref: "#/components/schemas/ChatResponse" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/review/role:
+    post:
+      tags: [review]
+      operationId: switchPrototypeRole
+      description: >
+        Prototype-only: flips the CURRENT session's own role between CUSTOMER
+        and REVIEW_OFFICER. This is not enterprise auth - see the Review
+        Center product notes. Every /review/* endpoint still independently
+        enforces the resulting role server-side.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { $ref: "#/components/schemas/ReviewerRole" }
+      responses:
+        "200":
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [role]
+                properties:
+                  role: { $ref: "#/components/schemas/ReviewerRole" }
+
+  /api/v1/review/dashboard:
+    get:
+      tags: [review]
+      operationId: getReviewDashboardMetrics
+      description: Real, server-computed queue counts - never hard-coded.
+      responses:
+        "200":
+          description: Dashboard metrics
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewDashboardMetrics" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/review/cases:
+    get:
+      tags: [review]
+      operationId: listReviewQueue
+      parameters:
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/ReviewCaseStatus" } }
+        - { name: priority, in: query, schema: { $ref: "#/components/schemas/ReviewCasePriority" } }
+        - { name: journey_type, in: query, schema: { $ref: "#/components/schemas/JourneyType" } }
+        - { name: mine, in: query, schema: { type: boolean } }
+      responses:
+        "200":
+          description: Review queue
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewQueueResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/review/cases/{case_id}:
+    get:
+      tags: [review]
+      operationId: getReviewCase
+      parameters: [{ $ref: "#/components/parameters/CaseIdPath" }]
+      responses:
+        "200":
+          description: Case detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewCaseDetail" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/review/cases/{case_id}/customer-view:
+    get:
+      tags: [review]
+      operationId: getReviewCaseCustomerView
+      description: Read-only - lets a reviewer see exactly what the customer currently sees.
+      parameters: [{ $ref: "#/components/parameters/CaseIdPath" }]
+      responses:
+        "200":
+          description: Case detail, as the customer sees their journey
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewCaseDetail" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/review/cases/{case_id}/audit:
+    get:
+      tags: [review]
+      operationId: getReviewCaseAudit
+      parameters: [{ $ref: "#/components/parameters/CaseIdPath" }]
+      responses:
+        "200":
+          description: Full audit timeline for this case's journey
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewCaseAuditResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/review/cases/{case_id}/claim:
+    post:
+      tags: [review]
+      operationId: claimReviewCase
+      parameters: [{ $ref: "#/components/parameters/CaseIdPath" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expected_case_version]
+              properties:
+                expected_case_version: { type: integer }
+      responses:
+        "200":
+          description: Case claimed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewCase" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/ReviewCaseConflict" }
+
+  /api/v1/review/cases/{case_id}/resolve:
+    post:
+      tags: [review]
+      operationId: resolveReviewCase
+      description: >
+        Never approves/rejects a financial product - resolves the EVIDENCE
+        exception. EVIDENCE_SUFFICIENT re-enters the exact same deterministic
+        mutation chain a customer's own clarification answer uses.
+      parameters: [{ $ref: "#/components/parameters/CaseIdPath" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resolution_type, resolution_reason, expected_case_version]
+              properties:
+                resolution_type: { $ref: "#/components/schemas/ReviewResolutionType" }
+                resolution_reason: { type: string, minLength: 1 }
+                resolution_notes: { type: string }
+                resolution_value: {}
+                expected_case_version: { type: integer }
+      responses:
+        "200":
+          description: Case resolved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewCaseDetail" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/ReviewCaseConflict" }
+
+  /api/v1/review/cases/{case_id}/request-information:
+    post:
+      tags: [review]
+      operationId: requestReviewCaseInformation
+      parameters: [{ $ref: "#/components/parameters/CaseIdPath" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requested_docs, customer_message, expected_case_version]
+              properties:
+                requested_docs: { type: array, items: { type: string }, minItems: 1 }
+                customer_message: { type: string, minLength: 1 }
+                expected_case_version: { type: integer }
+      responses:
+        "200":
+          description: Information requested; case moves to ADDITIONAL_INFO_REQUIRED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewCase" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/ReviewCaseConflict" }
+
+  /api/v1/review/cases/{case_id}/escalate:
+    post:
+      tags: [review]
+      operationId: escalateReviewCase
+      parameters: [{ $ref: "#/components/parameters/CaseIdPath" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [escalation_reason, expected_case_version]
+              properties:
+                escalation_reason: { type: string, minLength: 1 }
+                expected_case_version: { type: integer }
+      responses:
+        "200":
+          description: Case escalated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewCase" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/ReviewCaseConflict" }
+
+  /api/v1/journeys/{journey_id}/review-status:
+    get:
+      tags: [review]
+      operationId: getJourneyReviewStatus
+      description: >
+        Customer-facing, customer-safe phrasing only - never exposes internal
+        case metadata, reviewer identity, or AI confidence numbers.
+      parameters: [{ $ref: "#/components/parameters/JourneyIdPath" }]
+      responses:
+        "200":
+          description: Review status for this journey
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerReviewStatus" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/demo/reset:
     post:
       tags: [demo]
@@ -386,6 +614,11 @@ components:
       in: path
       required: true
       schema: { $ref: "#/components/schemas/JourneyType" }
+    CaseIdPath:
+      name: case_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
 
   responses:
     NotFound:
@@ -405,6 +638,18 @@ components:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     InvalidAction:
       description: ACTION_INVALID. No mutation occurred.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Forbidden:
+      description: FORBIDDEN. The current session's role does not permit this action.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    ReviewCaseConflict:
+      description: >
+        REVIEW_CASE_STALE (case_version mismatch), REVIEW_CASE_LOCKED (claimed by
+        another reviewer), or REVIEW_CASE_INVALID_TRANSITION. No mutation occurred.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
@@ -439,6 +684,11 @@ components:
         - AI_TIMEOUT
         - AI_MALFORMED_OUTPUT
         - EVIDENCE_CONFLICT
+        - NOT_FOUND
+        - FORBIDDEN
+        - REVIEW_CASE_STALE
+        - REVIEW_CASE_LOCKED
+        - REVIEW_CASE_INVALID_TRANSITION
 
     ErrorEnvelope:
       type: object
@@ -770,6 +1020,159 @@ components:
       required: [reply]
       properties:
         reply: { type: string }
+
+    ReviewerRole:
+      type: string
+      enum: [CUSTOMER, REVIEW_OFFICER]
+
+    ReviewCaseStatus:
+      type: string
+      enum:
+        - REVIEW_REQUIRED
+        - UNDER_REVIEW
+        - ADDITIONAL_INFO_REQUIRED
+        - RESOLVED
+        - ESCALATED
+        - CANCELLED
+
+    ReviewCasePriority:
+      type: string
+      enum: [LOW, MEDIUM, HIGH]
+
+    ReviewResolutionType:
+      type: string
+      enum:
+        - EVIDENCE_SUFFICIENT
+        - REQUEST_ADDITIONAL_INFORMATION
+        - EVIDENCE_CANNOT_BE_VERIFIED
+        - CUSTOMER_INFO_NEEDS_CORRECTION
+        - ESCALATE_FOR_SPECIALIST_REVIEW
+
+    ReviewEvidenceSummary:
+      type: object
+      required: [evidence_id, doc_type, filename, uploaded_at, verified]
+      properties:
+        evidence_id: { type: string, format: uuid }
+        doc_type: { type: string }
+        filename: { type: string }
+        uploaded_at: { type: string, format: date-time }
+        verified: { type: boolean }
+        confidence: { type: number }
+        extracted_values: { type: object, additionalProperties: true }
+
+    ReviewCase:
+      type: object
+      required:
+        - case_id
+        - case_number
+        - journey_id
+        - journey_type
+        - journey_display_name
+        - field_key
+        - reason_code
+        - reason_title
+        - reason_description
+        - priority
+        - status
+        - case_version
+        - created_at
+        - updated_at
+      properties:
+        case_id: { type: string, format: uuid }
+        case_number: { type: string, example: "PF-0001" }
+        journey_id: { type: string, format: uuid }
+        journey_type: { $ref: "#/components/schemas/JourneyType" }
+        journey_display_name: { type: string }
+        field_key: { type: string }
+        reason_code: { type: string }
+        reason_title: { type: string }
+        reason_description: { type: string }
+        priority: { $ref: "#/components/schemas/ReviewCasePriority" }
+        status: { $ref: "#/components/schemas/ReviewCaseStatus" }
+        case_version: { type: integer }
+        assigned_reviewer: { type: string, nullable: true }
+        is_locked: { type: boolean }
+        resolution_type: { $ref: "#/components/schemas/ReviewResolutionType" }
+        resolution_reason: { type: string, nullable: true }
+        resolution_notes: { type: string, nullable: true }
+        requested_information:
+          type: object
+          nullable: true
+          properties:
+            requested_docs: { type: array, items: { type: string } }
+            customer_message: { type: string }
+        escalation_reason: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        resolved_at: { type: string, format: date-time, nullable: true }
+
+    ReviewCaseDetail:
+      allOf:
+        - $ref: "#/components/schemas/ReviewCase"
+        - type: object
+          required: [journey_context, evidence]
+          properties:
+            journey_context: { $ref: "#/components/schemas/JourneyStateResponse" }
+            evidence:
+              type: array
+              items: { $ref: "#/components/schemas/ReviewEvidenceSummary" }
+            impact_preview:
+              $ref: "#/components/schemas/JourneyDiff"
+              description: >
+                Deterministic, non-persisting preview of resolving this case
+                EVIDENCE_SUFFICIENT - null when no evidence-derived value
+                exists yet to preview.
+
+    ReviewQueueResponse:
+      type: object
+      required: [cases]
+      properties:
+        cases:
+          type: array
+          items: { $ref: "#/components/schemas/ReviewCase" }
+
+    ReviewDashboardMetrics:
+      type: object
+      required: [pending_review, under_review, waiting_customer, escalated, resolved_today]
+      properties:
+        pending_review: { type: integer }
+        under_review: { type: integer }
+        waiting_customer: { type: integer }
+        escalated: { type: integer }
+        resolved_today: { type: integer }
+
+    ReviewCaseAuditEntry:
+      type: object
+      required: [event_type, payload, created_at]
+      properties:
+        event_type: { type: string }
+        payload: { type: object, additionalProperties: true }
+        created_at: { type: string, format: date-time }
+
+    ReviewCaseAuditResponse:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/ReviewCaseAuditEntry" }
+
+    CustomerReviewStatus:
+      type: object
+      required: [has_open_case]
+      properties:
+        has_open_case: { type: boolean }
+        case_number: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/ReviewCaseStatus" }
+        title: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        requested_information:
+          type: object
+          nullable: true
+          properties:
+            requested_docs: { type: array, items: { type: string } }
+            customer_message: { type: string }
+        updated_at: { type: string, format: date-time, nullable: true }
 
 security:
   - sessionCookie: []

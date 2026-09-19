@@ -151,6 +151,113 @@ class AuditWriter:
             },
         )
 
+    async def record_review_case_created(
+        self,
+        journey_id: UUID,
+        session_id: UUID | None,
+        case_id: UUID,
+        reason_code: str,
+        field_key: str,
+    ) -> AuditEventModel:
+        return await self.repo.create(
+            journey_id=journey_id,
+            session_id=session_id,
+            event_type=AuditEventType.REVIEW_CASE_CREATED,
+            payload={
+                "case_id": str(case_id),
+                "reason_code": reason_code,
+                "field_key": field_key,
+            },
+        )
+
+    async def record_review_case_claimed(
+        self,
+        journey_id: UUID,
+        session_id: UUID | None,
+        case_id: UUID,
+        reviewer: str,
+    ) -> AuditEventModel:
+        return await self.repo.create(
+            journey_id=journey_id,
+            session_id=session_id,
+            event_type=AuditEventType.REVIEW_CASE_CLAIMED,
+            payload={"case_id": str(case_id), "reviewer": reviewer},
+        )
+
+    async def record_review_case_info_requested(
+        self,
+        journey_id: UUID,
+        session_id: UUID | None,
+        case_id: UUID,
+        reviewer: str,
+        requested_docs: list[str],
+        customer_message: str,
+    ) -> AuditEventModel:
+        return await self.repo.create(
+            journey_id=journey_id,
+            session_id=session_id,
+            event_type=AuditEventType.REVIEW_CASE_INFO_REQUESTED,
+            payload={
+                "case_id": str(case_id),
+                "reviewer": reviewer,
+                "requested_docs": requested_docs,
+                "customer_message": customer_message,
+            },
+        )
+
+    async def record_review_case_resolved(
+        self,
+        journey_id: UUID,
+        session_id: UUID | None,
+        case_id: UUID,
+        reviewer: str,
+        resolution_type: str,
+        resolution_reason: str,
+    ) -> AuditEventModel:
+        return await self.repo.create(
+            journey_id=journey_id,
+            session_id=session_id,
+            event_type=AuditEventType.REVIEW_CASE_RESOLVED,
+            payload={
+                "case_id": str(case_id),
+                "reviewer": reviewer,
+                "resolution_type": resolution_type,
+                "resolution_reason": resolution_reason,
+            },
+        )
+
+    async def record_review_case_escalated(
+        self,
+        journey_id: UUID,
+        session_id: UUID | None,
+        case_id: UUID,
+        reviewer: str,
+        escalation_reason: str,
+    ) -> AuditEventModel:
+        return await self.repo.create(
+            journey_id=journey_id,
+            session_id=session_id,
+            event_type=AuditEventType.REVIEW_CASE_ESCALATED,
+            payload={
+                "case_id": str(case_id),
+                "reviewer": reviewer,
+                "escalation_reason": escalation_reason,
+            },
+        )
+
+    async def record_review_case_reopened(
+        self,
+        journey_id: UUID,
+        session_id: UUID | None,
+        case_id: UUID,
+    ) -> AuditEventModel:
+        return await self.repo.create(
+            journey_id=journey_id,
+            session_id=session_id,
+            event_type=AuditEventType.REVIEW_CASE_REOPENED,
+            payload={"case_id": str(case_id)},
+        )
+
     async def record_state_transition(
         self,
         journey_id: UUID,

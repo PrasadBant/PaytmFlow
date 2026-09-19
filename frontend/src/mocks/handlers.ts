@@ -32,6 +32,7 @@ import accountOpeningV1State from './fixtures/account_opening/v1.state.json';
 import investmentV1State from './fixtures/investment/v1.state.json';
 
 import journeysListFixture from './fixtures/journeys.list.json';
+import reviewCaseDemoFixture from './fixtures/review/case.PF-DEMO-1024.json';
 
 const packDetailsMap: Record<string, unknown> = {
   LENDING: packsLendingFixture,
@@ -107,6 +108,79 @@ const journeyStore = new Map<string, MockJourney>();
 // endpoint previously always returned the Lending v2 diff regardless of
 // which journey (or even action) was asked about.
 const journeyDiffStore = new Map<string, unknown>();
+
+// --- Human Review / Exception Resolution mock state ---
+type MockRole = 'CUSTOMER' | 'REVIEW_OFFICER';
+let mockRole: MockRole = 'CUSTOMER';
+
+interface MockReviewCase {
+  case_id: string;
+  case_number: string;
+  journey_id: string;
+  journey_type: string;
+  journey_display_name: string;
+  field_key: string;
+  reason_code: string;
+  reason_title: string;
+  reason_description: string;
+  priority: string;
+  status: string;
+  case_version: number;
+  assigned_reviewer: string | null;
+  is_locked: boolean;
+  resolution_type: string | null;
+  resolution_reason: string | null;
+  resolution_notes: string | null;
+  requested_information: { requested_docs: string[]; customer_message: string } | null;
+  escalation_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  journey_context?: unknown;
+  evidence?: unknown[];
+}
+
+const reviewCaseStore = new Map<string, MockReviewCase>();
+
+function seedReviewCaseStore(): void {
+  reviewCaseStore.clear();
+  const demo = deepClone(reviewCaseDemoFixture) as MockReviewCase & {
+    evidence: unknown[];
+  };
+  reviewCaseStore.set(demo.case_id, {
+    ...demo,
+    journey_context: journeyStore.get(demo.journey_id) ?? lendingV1State,
+  });
+  mockRole = 'CUSTOMER';
+}
+
+function forbidden() {
+  return HttpResponse.json(
+    { error: { code: 'FORBIDDEN', message: 'This action requires Review Center access.' } },
+    { status: 403 }
+  );
+}
+
+function notFound(message: string) {
+  return HttpResponse.json({ error: { code: 'NOT_FOUND', message } }, { status: 404 });
+}
+
+function staleCase() {
+  return HttpResponse.json(
+    {
+      error: {
+        code: 'REVIEW_CASE_STALE',
+        message: 'This case changed while you were reviewing it. Refresh before submitting.',
+      },
+    },
+    { status: 409 }
+  );
+}
+
+function withoutDetail(c: MockReviewCase): Omit<MockReviewCase, 'journey_context' | 'evidence'> {
+  const { journey_context: _jc, evidence: _ev, ...rest } = c;
+  return rest;
+}
 
 function seedJourneyStore(): void {
   journeyStore.clear();
@@ -189,10 +263,12 @@ function loadMockState(): void {
   }
 }
 loadMockState();
+seedReviewCaseStore();
 
 export function resetMockState(): void {
   currentLendingStep = 1;
   seedJourneyStore();
+  seedReviewCaseStore();
   clearPersistedMockState();
 }
 
@@ -973,6 +1049,152 @@ export const handlers = [
     const body = (await request.json()) as { message?: string };
     return HttpResponse.json({
       reply: `(Mock mode) I received: "${body?.message ?? ''}". Switch to live mode for a real assistant reply.`,
+    });
+  }),
+
+  // --- Human Review / Exception Resolution (mock-mode) ---
+
+  http.post('*/api/v1/review/role', async ({ request }) => {
+    const body = (await request.json()) as { role?: string };
+    mockRole = body?.role === 'REVIEW_OFFICER' ? 'REVIEW_OFFICER' : 'CUSTOMER';
+    return HttpResponse.json({ role: mockRole });
+  }),
+
+  http.get('*/api/v1/review/dashboard', () => {
+    if (mockRole !== 'REVIEW_OFFICER') return forbidden();
+    const cases = Array.from(reviewCaseStore.values());
+    return HttpResponse.json({
+      pending_review: cases.filter((c) => c.status === 'REVIEW_REQUIRED').length,
+      under_review: cases.filter((c) => c.status === 'UNDER_REVIEW').length,
+      waiting_customer: cases.filter((c) => c.status === 'ADDITIONAL_INFO_REQUIRED').length,
+      escalated: cases.filter((c) => c.status === 'ESCALATED').length,
+      resolved_today: cases.filter((c) => c.status === 'RESOLVED').length,
+    });
+  }),
+
+  http.get('*/api/v1/review/cases', ({ request }) => {
+    if (mockRole !== 'REVIEW_OFFICER') return forbidden();
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status');
+    let cases = Array.from(reviewCaseStore.values());
+    if (status) cases = cases.filter((c) => c.status === status);
+    return HttpResponse.json({
+      cases: cases.map(({ journey_context: _jc, evidence: _ev, ...rest }) => rest),
+    });
+  }),
+
+  http.get('*/api/v1/review/cases/:case_id', ({ params }) => {
+    if (mockRole !== 'REVIEW_OFFICER') return forbidden();
+    const c = reviewCaseStore.get(String(params.case_id));
+    if (!c) return notFound('Review case not found');
+    return HttpResponse.json(c);
+  }),
+
+  http.get('*/api/v1/review/cases/:case_id/audit', ({ params }) => {
+    if (mockRole !== 'REVIEW_OFFICER') return forbidden();
+    const c = reviewCaseStore.get(String(params.case_id));
+    if (!c) return notFound('Review case not found');
+    return HttpResponse.json({
+      entries: [
+        { event_type: 'REVIEW_CASE_CREATED', payload: {}, created_at: c.created_at },
+      ],
+    });
+  }),
+
+  http.post('*/api/v1/review/cases/:case_id/claim', async ({ params, request }) => {
+    if (mockRole !== 'REVIEW_OFFICER') return forbidden();
+    const c = reviewCaseStore.get(String(params.case_id));
+    if (!c) return notFound('Review case not found');
+    const body = (await request.json()) as { expected_case_version?: number };
+    if (body.expected_case_version !== c.case_version) return staleCase();
+    c.status = 'UNDER_REVIEW';
+    c.assigned_reviewer = 'Reviewer-mock';
+    c.is_locked = true;
+    c.case_version += 1;
+    c.updated_at = new Date().toISOString();
+    return HttpResponse.json(withoutDetail(c));
+  }),
+
+  http.post('*/api/v1/review/cases/:case_id/request-information', async ({ params, request }) => {
+    if (mockRole !== 'REVIEW_OFFICER') return forbidden();
+    const c = reviewCaseStore.get(String(params.case_id));
+    if (!c) return notFound('Review case not found');
+    const body = (await request.json()) as {
+      expected_case_version?: number;
+      requested_docs?: string[];
+      customer_message?: string;
+    };
+    if (body.expected_case_version !== c.case_version) return staleCase();
+    c.status = 'ADDITIONAL_INFO_REQUIRED';
+    c.requested_information = {
+      requested_docs: body.requested_docs ?? [],
+      customer_message: body.customer_message ?? '',
+    };
+    c.case_version += 1;
+    c.updated_at = new Date().toISOString();
+    return HttpResponse.json(withoutDetail(c));
+  }),
+
+  http.post('*/api/v1/review/cases/:case_id/escalate', async ({ params, request }) => {
+    if (mockRole !== 'REVIEW_OFFICER') return forbidden();
+    const c = reviewCaseStore.get(String(params.case_id));
+    if (!c) return notFound('Review case not found');
+    const body = (await request.json()) as {
+      expected_case_version?: number;
+      escalation_reason?: string;
+    };
+    if (body.expected_case_version !== c.case_version) return staleCase();
+    c.status = 'ESCALATED';
+    c.escalation_reason = body.escalation_reason ?? '';
+    c.case_version += 1;
+    c.updated_at = new Date().toISOString();
+    return HttpResponse.json(withoutDetail(c));
+  }),
+
+  http.post('*/api/v1/review/cases/:case_id/resolve', async ({ params, request }) => {
+    if (mockRole !== 'REVIEW_OFFICER') return forbidden();
+    const c = reviewCaseStore.get(String(params.case_id));
+    if (!c) return notFound('Review case not found');
+    const body = (await request.json()) as {
+      expected_case_version?: number;
+      resolution_type?: string;
+      resolution_reason?: string;
+      resolution_notes?: string;
+    };
+    if (body.expected_case_version !== c.case_version) return staleCase();
+    if (!body.resolution_reason?.trim()) {
+      return HttpResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'resolution_reason is required' } },
+        { status: 400 }
+      );
+    }
+    c.status = 'RESOLVED';
+    c.resolution_type = body.resolution_type ?? null;
+    c.resolution_reason = body.resolution_reason;
+    c.resolution_notes = body.resolution_notes ?? null;
+    c.resolved_at = new Date().toISOString();
+    c.case_version += 1;
+    c.updated_at = new Date().toISOString();
+    return HttpResponse.json(c);
+  }),
+
+  http.get('*/api/v1/journeys/:journey_id/review-status', ({ params }) => {
+    const journeyId = String(params.journey_id);
+    const openCase = Array.from(reviewCaseStore.values()).find(
+      (c) => c.journey_id === journeyId && !['RESOLVED', 'CANCELLED'].includes(c.status)
+    );
+    if (!openCase) {
+      return HttpResponse.json({ has_open_case: false });
+    }
+    return HttpResponse.json({
+      has_open_case: true,
+      case_number: openCase.case_number,
+      status: openCase.status,
+      title: 'Additional verification required',
+      description:
+        'We found information that needs a quick manual review before you can continue.',
+      requested_information: openCase.requested_information,
+      updated_at: openCase.updated_at,
     });
   }),
 ];

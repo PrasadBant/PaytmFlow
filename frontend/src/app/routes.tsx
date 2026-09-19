@@ -1,6 +1,10 @@
 import type { RouteObject } from 'react-router-dom';
 import { createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
+import { ReviewShell } from '../components/ReviewShell';
+import { ReviewDashboard } from '../screens/review/ReviewDashboard';
+import { ReviewQueue } from '../screens/review/ReviewQueue';
+import { ReviewCaseDetail } from '../screens/review/ReviewCaseDetail';
 import {
   Screen01Home,
   Screen02JourneySelection,
@@ -35,6 +39,15 @@ export const routes: RouteObject[] = [
       { path: 'help', element: <HelpScreen /> },
       { path: 'dev/kitchen-sink', element: <KitchenSink /> },
       { path: '*', element: <NotFoundScreen /> },
+    ],
+  },
+  {
+    path: '/review',
+    element: <ReviewShell />,
+    children: [
+      { index: true, element: <ReviewDashboard /> },
+      { path: 'queue', element: <ReviewQueue /> },
+      { path: 'case/:caseId', element: <ReviewCaseDetail /> },
     ],
   },
 ];

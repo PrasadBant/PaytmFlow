@@ -50,9 +50,11 @@ describe('Application Shell Components Suite (F06)', () => {
   describe('Header', () => {
     it('contains PaytmFlow wordmark, notification bell with status dot, and user avatar', () => {
       render(
-        <MemoryRouter>
-          <Header />
-        </MemoryRouter>
+        <QueryClientProvider client={createTestQueryClient()}>
+          <MemoryRouter>
+            <Header />
+          </MemoryRouter>
+        </QueryClientProvider>
       );
 
       // Wordmark verification
@@ -73,9 +75,11 @@ describe('Application Shell Components Suite (F06)', () => {
 
     it('has accessible mobile menu toggle that controls sidebar state', async () => {
       render(
-        <MemoryRouter>
-          <Header />
-        </MemoryRouter>
+        <QueryClientProvider client={createTestQueryClient()}>
+          <MemoryRouter>
+            <Header />
+          </MemoryRouter>
+        </QueryClientProvider>
       );
 
       const menuBtn = screen.getByRole('button', { name: 'Toggle menu' });

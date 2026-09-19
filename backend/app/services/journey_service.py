@@ -1262,6 +1262,21 @@ class JourneyService:
                 snapshot_id=new_snap.id,
             )
 
+        # 10b. Human Review / Exception Resolution: any field forced AMBIGUOUS
+        # by this mutation gets a durable, queryable review case (idempotent -
+        # reuses the SAME manifest ambiguity_rules mechanism above, never a
+        # separate conflict detector). Local import breaks the circular
+        # dependency (review_service imports JourneyService for resolution).
+        if pending_ambiguity:
+            from app.services.review_service import ReviewCaseService
+
+            await ReviewCaseService.create_or_get_open_case(
+                db=db,
+                journey=updated_journey,
+                ambiguity=pending_ambiguity,
+                context_snapshot_id=new_snap.id,
+            )
+
         # 11. Compute Diff
         next_core_snapshot = CoreSnapshot(
             snapshot_id=new_snap.id,

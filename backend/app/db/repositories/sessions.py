@@ -32,6 +32,18 @@ class SessionRepository:
         await self.session.flush()
         return sess
 
+    async def set_meta(
+        self,
+        session_id: UUID,
+        meta_updates: dict[str, Any],
+    ) -> SessionModel | None:
+        sess = await self.get_by_id(session_id)
+        if not sess:
+            return None
+        sess.meta = {**(sess.meta or {}), **meta_updates}
+        await self.session.flush()
+        return sess
+
     async def touch(
         self,
         session_id: UUID,

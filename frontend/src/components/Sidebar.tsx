@@ -1,11 +1,18 @@
 import type React from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { Home, RotateCw, FileText, HelpCircle, X } from 'lucide-react';
 import { useUiStore } from '../state/ui';
 import { IconButton } from './primitives/IconButton';
 import { cn } from '../lib/utils';
 
-const navItems = [
+export interface NavItem {
+  label: string;
+  icon: LucideIcon;
+  to: string;
+}
+
+const customerNavItems: NavItem[] = [
   { label: 'Home', icon: Home, to: '/' },
   { label: 'Start Journey', icon: RotateCw, to: '/start' },
   { label: 'My Journeys', icon: FileText, to: '/my-journeys' },
@@ -14,9 +21,13 @@ const navItems = [
 
 export interface SidebarProps {
   hideOnDesktop?: boolean;
+  navItems?: NavItem[];
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ hideOnDesktop = false }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  hideOnDesktop = false,
+  navItems = customerNavItems,
+}) => {
   const { isSidebarOpen, closeSidebar } = useUiStore();
 
   return (

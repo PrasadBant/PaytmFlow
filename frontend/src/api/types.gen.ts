@@ -224,6 +224,187 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/review/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Prototype-only: flips the CURRENT session's own role between CUSTOMER and REVIEW_OFFICER. This is not enterprise auth - see the Review Center product notes. Every /review/* endpoint still independently enforces the resulting role server-side. */
+        post: operations["switchPrototypeRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Real, server-computed queue counts - never hard-coded. */
+        get: operations["getReviewDashboardMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listReviewQueue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review/cases/{case_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getReviewCase"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review/cases/{case_id}/customer-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read-only - lets a reviewer see exactly what the customer currently sees. */
+        get: operations["getReviewCaseCustomerView"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review/cases/{case_id}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getReviewCaseAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review/cases/{case_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["claimReviewCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review/cases/{case_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Never approves/rejects a financial product - resolves the EVIDENCE exception. EVIDENCE_SUFFICIENT re-enters the exact same deterministic mutation chain a customer's own clarification answer uses. */
+        post: operations["resolveReviewCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review/cases/{case_id}/request-information": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestReviewCaseInformation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review/cases/{case_id}/escalate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["escalateReviewCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journeys/{journey_id}/review-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Customer-facing, customer-safe phrasing only - never exposes internal case metadata, reviewer identity, or AI confidence numbers. */
+        get: operations["getJourneyReviewStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/demo/reset": {
         parameters: {
             query?: never;
@@ -257,7 +438,7 @@ export interface components {
         /** @enum {string} */
         FieldStatus: "SATISFIED" | "BLOCKED" | "AMBIGUOUS";
         /** @enum {string} */
-        ErrorCode: "INVALID_JOURNEY_TYPE" | "VALIDATION_ERROR" | "ACTION_INVALID" | "ACTION_STALE" | "NEEDS_REVIEW" | "DEAD_END" | "AI_TIMEOUT" | "AI_MALFORMED_OUTPUT" | "EVIDENCE_CONFLICT";
+        ErrorCode: "INVALID_JOURNEY_TYPE" | "VALIDATION_ERROR" | "ACTION_INVALID" | "ACTION_STALE" | "NEEDS_REVIEW" | "DEAD_END" | "AI_TIMEOUT" | "AI_MALFORMED_OUTPUT" | "EVIDENCE_CONFLICT" | "NOT_FOUND" | "FORBIDDEN" | "REVIEW_CASE_STALE" | "REVIEW_CASE_LOCKED" | "REVIEW_CASE_INVALID_TRANSITION";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -503,6 +684,100 @@ export interface components {
         ChatResponse: {
             reply: string;
         };
+        /** @enum {string} */
+        ReviewerRole: "CUSTOMER" | "REVIEW_OFFICER";
+        /** @enum {string} */
+        ReviewCaseStatus: "REVIEW_REQUIRED" | "UNDER_REVIEW" | "ADDITIONAL_INFO_REQUIRED" | "RESOLVED" | "ESCALATED" | "CANCELLED";
+        /** @enum {string} */
+        ReviewCasePriority: "LOW" | "MEDIUM" | "HIGH";
+        /** @enum {string} */
+        ReviewResolutionType: "EVIDENCE_SUFFICIENT" | "REQUEST_ADDITIONAL_INFORMATION" | "EVIDENCE_CANNOT_BE_VERIFIED" | "CUSTOMER_INFO_NEEDS_CORRECTION" | "ESCALATE_FOR_SPECIALIST_REVIEW";
+        ReviewEvidenceSummary: {
+            /** Format: uuid */
+            evidence_id: string;
+            doc_type: string;
+            filename: string;
+            /** Format: date-time */
+            uploaded_at: string;
+            verified: boolean;
+            confidence?: number;
+            extracted_values?: {
+                [key: string]: unknown;
+            };
+        };
+        ReviewCase: {
+            /** Format: uuid */
+            case_id: string;
+            /** @example PF-0001 */
+            case_number: string;
+            /** Format: uuid */
+            journey_id: string;
+            journey_type: components["schemas"]["JourneyType"];
+            journey_display_name: string;
+            field_key: string;
+            reason_code: string;
+            reason_title: string;
+            reason_description: string;
+            priority: components["schemas"]["ReviewCasePriority"];
+            status: components["schemas"]["ReviewCaseStatus"];
+            case_version: number;
+            assigned_reviewer?: string | null;
+            is_locked?: boolean;
+            resolution_type?: components["schemas"]["ReviewResolutionType"];
+            resolution_reason?: string | null;
+            resolution_notes?: string | null;
+            requested_information?: {
+                requested_docs?: string[];
+                customer_message?: string;
+            } | null;
+            escalation_reason?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: date-time */
+            resolved_at?: string | null;
+        };
+        ReviewCaseDetail: components["schemas"]["ReviewCase"] & {
+            journey_context: components["schemas"]["JourneyStateResponse"];
+            evidence: components["schemas"]["ReviewEvidenceSummary"][];
+            /** @description Deterministic, non-persisting preview of resolving this case EVIDENCE_SUFFICIENT - null when no evidence-derived value exists yet to preview. */
+            impact_preview?: components["schemas"]["JourneyDiff"];
+        };
+        ReviewQueueResponse: {
+            cases: components["schemas"]["ReviewCase"][];
+        };
+        ReviewDashboardMetrics: {
+            pending_review: number;
+            under_review: number;
+            waiting_customer: number;
+            escalated: number;
+            resolved_today: number;
+        };
+        ReviewCaseAuditEntry: {
+            event_type: string;
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+        };
+        ReviewCaseAuditResponse: {
+            entries: components["schemas"]["ReviewCaseAuditEntry"][];
+        };
+        CustomerReviewStatus: {
+            has_open_case: boolean;
+            case_number?: string | null;
+            status?: components["schemas"]["ReviewCaseStatus"];
+            title?: string | null;
+            description?: string | null;
+            requested_information?: {
+                requested_docs?: string[];
+                customer_message?: string;
+            } | null;
+            /** Format: date-time */
+            updated_at?: string | null;
+        };
     };
     responses: {
         /** @description Not found, or not owned by this session (deliberately indistinguishable) */
@@ -541,10 +816,29 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
+        /** @description FORBIDDEN. The current session's role does not permit this action. */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description REVIEW_CASE_STALE (case_version mismatch), REVIEW_CASE_LOCKED (claimed by another reviewer), or REVIEW_CASE_INVALID_TRANSITION. No mutation occurred. */
+        ReviewCaseConflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
     };
     parameters: {
         JourneyIdPath: string;
         JourneyTypePath: components["schemas"]["JourneyType"];
+        CaseIdPath: string;
     };
     requestBodies: never;
     headers: never;
@@ -954,6 +1248,310 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChatResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    switchPrototypeRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    role: components["schemas"]["ReviewerRole"];
+                };
+            };
+        };
+        responses: {
+            /** @description Role updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        role: components["schemas"]["ReviewerRole"];
+                    };
+                };
+            };
+        };
+    };
+    getReviewDashboardMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dashboard metrics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewDashboardMetrics"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listReviewQueue: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ReviewCaseStatus"];
+                priority?: components["schemas"]["ReviewCasePriority"];
+                journey_type?: components["schemas"]["JourneyType"];
+                mine?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Review queue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewQueueResponse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getReviewCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: components["parameters"]["CaseIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Case detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCaseDetail"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getReviewCaseCustomerView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: components["parameters"]["CaseIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Case detail, as the customer sees their journey */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCaseDetail"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getReviewCaseAudit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: components["parameters"]["CaseIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Full audit timeline for this case's journey */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCaseAuditResponse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    claimReviewCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: components["parameters"]["CaseIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_case_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Case claimed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCase"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ReviewCaseConflict"];
+        };
+    };
+    resolveReviewCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: components["parameters"]["CaseIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    resolution_type: components["schemas"]["ReviewResolutionType"];
+                    resolution_reason: string;
+                    resolution_notes?: string;
+                    resolution_value?: unknown;
+                    expected_case_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Case resolved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCaseDetail"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ReviewCaseConflict"];
+        };
+    };
+    requestReviewCaseInformation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: components["parameters"]["CaseIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    requested_docs: string[];
+                    customer_message: string;
+                    expected_case_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Information requested; case moves to ADDITIONAL_INFO_REQUIRED */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCase"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ReviewCaseConflict"];
+        };
+    };
+    escalateReviewCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: components["parameters"]["CaseIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    escalation_reason: string;
+                    expected_case_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Case escalated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCase"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ReviewCaseConflict"];
+        };
+    };
+    getJourneyReviewStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: components["parameters"]["JourneyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Review status for this journey */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerReviewStatus"];
                 };
             };
             404: components["responses"]["NotFound"];

@@ -5,6 +5,7 @@ import { useJourney } from '@/api/hooks/useJourney';
 import { ProgressRing } from '@/components/ProgressRing';
 import { BlockerCard } from '@/components/BlockerCard';
 import { NeedsReviewCard } from '@/components/NeedsReviewCard';
+import { ReviewStatusCard } from '@/components/ReviewStatusCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Card } from '@/components/primitives/Card';
 import { Button } from '@/components/primitives/Button';
@@ -165,6 +166,11 @@ export function Screen04CurrentStatus(): ReactElement {
           onResolved={() => refetch()}
         />
       )}
+
+      {/* Human Review case status - a durable, reviewer-tracked exception
+          record (see backend review_cases table), distinct from the
+          in-flight ambiguity NeedsReviewCard resolves directly. */}
+      <ReviewStatusCard journeyId={journey.journey_id} />
 
       {/* Blocked Items Section */}
       <div className="space-y-4">

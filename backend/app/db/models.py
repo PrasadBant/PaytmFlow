@@ -214,6 +214,75 @@ class AuditEventModel(Base):
     __table_args__ = (Index("idx_audit_events_journey_created", "journey_id", "created_at"),)
 
 
+class ReviewCaseModel(Base):
+    """A durable, queryable Human Review / Exception Resolution case.
+
+    Created idempotently (unique on journey_id+dedupe_key) whenever the
+    existing ambiguity mechanism forces a field AMBIGUOUS and the journey
+    reaches NEEDS_REVIEW - see JourneyService.apply_action. Resolution
+    re-enters the SAME deterministic mutation chain every other journey
+    write uses (see ReviewCaseService), never a shortcut that writes
+    journey state directly.
+    """
+
+    __tablename__ = "review_cases"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    # Human-facing "PF-xxxx" sequence number. Assigned by the repository at
+    # creation time via MAX(case_seq)+1 under the same row-lock discipline
+    # used elsewhere in this module - NOT a DB-native sequence/identity, so
+    # it is not distributed-safe under heavy concurrent case creation (an
+    # acceptable, documented limitation for this prototype's scale).
+    case_seq: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
+    journey_id: Mapped[UUID] = mapped_column(
+        ForeignKey("journeys.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    session_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("sessions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    dedupe_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    context_snapshot_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("journey_snapshots.id"), nullable=True
+    )
+    field_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    reason_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    reason_title: Mapped[str] = mapped_column(String(300), nullable=False)
+    reason_description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    priority: Mapped[str] = mapped_column(String(20), default="MEDIUM")
+    status: Mapped[str] = mapped_column(String(50), default="REVIEW_REQUIRED", index=True)
+    case_version: Mapped[int] = mapped_column(Integer, default=1)
+    assigned_reviewer: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    review_lock_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    resolution_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    resolution_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolution_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    requested_information: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    escalation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resulting_snapshot_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("journey_snapshots.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        index=True,
+    )
+
+    journey: Mapped["JourneyModel"] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint("journey_id", "dedupe_key", name="uq_review_case_journey_dedupe"),
+        Index("idx_review_cases_status_created", "status", "created_at"),
+        Index("idx_review_cases_journey", "journey_id"),
+    )
+
+
 class PackMetadataModel(Base):
     __tablename__ = "packs_metadata"
 
