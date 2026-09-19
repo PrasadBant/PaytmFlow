@@ -39,4 +39,8 @@ RUN mkdir -p storage/evidence
 EXPOSE 8000
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Uses shell form (not exec-form CMD) so ${PORT:-8000} actually expands -
+# Render (and most PaaS hosts) inject their own PORT env var at runtime and
+# require the container to bind to it; falling back to 8000 keeps `docker
+# run` / docker-compose (which don't set PORT) working unchanged.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
