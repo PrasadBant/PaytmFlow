@@ -36,6 +36,69 @@ async def test_session_endpoint_new_and_existing(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_session_customer_email_defaults_to_none(client: AsyncClient):
+    """The overwhelming majority of sessions never supply an email - GET
+    /session must keep returning null, not error or omit the key."""
+    resp = await client.get("/api/v1/session")
+    assert resp.status_code == 200
+    assert resp.json()["customer_email"] is None
+
+
+@pytest.mark.asyncio
+async def test_session_customer_email_persists_after_journey_creation(client: AsyncClient):
+    session_id = "test-customer-email-session"
+    headers = {"X-Session-Id": session_id}
+
+    create_resp = await client.post(
+        "/api/v1/journeys",
+        json={
+            "journey_type": "LENDING",
+            "goal": {"loan_amount": 200000, "loan_purpose": "EDUCATION", "tenure_months": 24},
+            "customer_email": "customer@example.com",
+        },
+        headers=headers,
+    )
+    assert create_resp.status_code == 201, create_resp.text
+
+    session_resp = await client.get("/api/v1/session", headers=headers)
+    assert session_resp.status_code == 200
+    assert session_resp.json()["customer_email"] == "customer@example.com"
+
+
+@pytest.mark.asyncio
+async def test_create_journey_rejects_invalid_customer_email(client: AsyncClient):
+    resp = await client.post(
+        "/api/v1/journeys",
+        json={
+            "journey_type": "LENDING",
+            "goal": {"loan_amount": 200000, "loan_purpose": "EDUCATION", "tenure_months": 24},
+            "customer_email": "not-an-email",
+        },
+        headers={"X-Session-Id": "test-invalid-email-session"},
+    )
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_create_journey_without_customer_email_is_unaffected(client: AsyncClient):
+    """Existing/anonymous journeys must keep working exactly as before."""
+    headers = {"X-Session-Id": "test-no-email-session"}
+    resp = await client.post(
+        "/api/v1/journeys",
+        json={
+            "journey_type": "LENDING",
+            "goal": {"loan_amount": 200000, "loan_purpose": "EDUCATION", "tenure_months": 24},
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+    session_resp = await client.get("/api/v1/session", headers=headers)
+    assert session_resp.json()["customer_email"] is None
+
+
+@pytest.mark.asyncio
 async def test_demo_reset_endpoint(client: AsyncClient):
     # Without secret header -> 401
     resp_unauth = await client.post("/api/v1/demo/reset")

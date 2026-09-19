@@ -9,6 +9,7 @@ export interface CreateJourneyPayload {
   journey_type: JourneyType;
   goal: Record<string, unknown>;
   natural_language?: string;
+  customer_email?: string;
 }
 
 export const useCreateJourney = () => {

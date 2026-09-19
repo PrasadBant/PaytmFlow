@@ -42,4 +42,5 @@ async def get_session(
     return SessionResponse(
         session_id=str(session.id),
         created=created,
+        customer_email=(session.meta or {}).get("customer_email"),
     )

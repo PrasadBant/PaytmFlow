@@ -1,8 +1,9 @@
+import re
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.enums import (
     ActionKind,
@@ -205,12 +206,35 @@ class JourneysListResponse(BaseModel):
     journeys: list[JourneyListItem]
 
 
+_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 class CreateJourneyRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     journey_type: JourneyType
     goal: dict[str, Any]
     natural_language: str | None = None
+    # Optional customer email for n8n's customer-facing notification path
+    # (CUSTOMER_ACTION_REQUIRED / JOURNEY_RESOLVED events) - the anonymous
+    # session model otherwise has no way to reach the customer at all.
+    # Never used for authorization; purely user-provided contact data,
+    # stored on the session (app/db/models.py's SessionModel.meta), not a
+    # new schema column. Left blank, existing/anonymous journeys are
+    # completely unaffected.
+    customer_email: str | None = Field(default=None, max_length=254)
+
+    @field_validator("customer_email")
+    @classmethod
+    def _validate_customer_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            return None
+        if not _EMAIL_PATTERN.match(stripped):
+            raise ValueError("customer_email must be a valid email address")
+        return stripped
 
 
 class ApplyActionRequest(BaseModel):

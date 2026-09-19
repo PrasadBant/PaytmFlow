@@ -64,6 +64,12 @@ paths:
                 properties:
                   session_id: { type: string }
                   created: { type: boolean, description: true if newly issued this request }
+                  customer_email:
+                    type: string
+                    nullable: true
+                    description: >
+                      Optional contact email for n8n customer-facing notifications, set at
+                      journey creation. Null when never provided. Never a login credential.
 
   /api/v1/journey-packs:
     get:
@@ -151,6 +157,14 @@ paths:
                   type: string
                   maxLength: 2000
                   description: Optional secondary input, parsed by AI into the same goal map.
+                customer_email:
+                  type: string
+                  maxLength: 254
+                  nullable: true
+                  description: >
+                    Optional contact email stored on the session, used only for n8n
+                    customer-facing notifications (CUSTOMER_ACTION_REQUIRED / JOURNEY_RESOLVED).
+                    Never used for authorization or login. Left blank, journeys work unchanged.
       responses:
         "201":
           description: Journey created

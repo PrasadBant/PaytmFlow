@@ -39,13 +39,17 @@ enforced non-empty by the workflow's own "Valid Payload?" node - a request
 missing any of them is rejected with a real, verified `400
 {"success": false, "status": "invalid_payload"}` from its "Respond
 Invalid" node (confirmed by triggering this deliberately while fixing
-this integration). `customer_email` is sent as an empty string: this
-codebase's own SessionModel (app/db/models.py) has no email field
-anywhere - it is an intentionally anonymous, session-only identity model.
-The workflow's "Email Customer" nodes therefore have nothing to send to
-until/unless a real customer identity/email is added to the app itself;
-this is a genuine gap in the surrounding product, not something this
-dispatcher can safely paper over with a fabricated address.
+this integration). `customer_email` is optional contact data: the session
+model (app/db/models.py's SessionModel.meta) may hold a
+customer-supplied email, set at journey creation (see
+CreateJourneyRequest.customer_email) - callers that know the owning
+session (app/services/review_service.py's resolve_case/
+request_information) look it up and thread it through here. It is sent
+as an empty string whenever no email was ever supplied for that session,
+which the workflow's "Email Customer" nodes treat as "nothing to send to"
+(no customer notification fires, but Slack/reviewer-facing notifications
+are unaffected). This is a real, non-fabricated address only - never
+invented, never required.
 """
 
 from __future__ import annotations

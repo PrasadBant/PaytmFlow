@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
+import { server } from '@/mocks/server';
 import { Screen03GoalBasicInfo } from '@/screens/Screen03GoalBasicInfo';
 
 function renderWithProviders(initialRoute = '/start/lending') {
@@ -177,6 +179,60 @@ describe('Screen03GoalBasicInfo', () => {
     expect(screen.getByText('Insurance')).toBeInTheDocument();
     expect(screen.queryByLabelText(/I want to/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId('goal-selector')).not.toBeInTheDocument();
+  });
+
+  it('rejects an invalid email and does not submit the journey', async () => {
+    const user = userEvent.setup();
+    let requestReceived = false;
+    server.use(
+      http.post('*/api/v1/journeys', async () => {
+        requestReceived = true;
+        return HttpResponse.json({}, { status: 201 });
+      })
+    );
+
+    renderWithProviders('/start/kyc');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Aadhaar Number/i)).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByLabelText(/Email for updates/i), 'not-an-email');
+    await user.type(screen.getByLabelText(/Aadhaar Number/i), '1234 5678 9012');
+    await user.selectOptions(screen.getByLabelText(/Verification Purpose/i), 'Wallet Upgrade');
+    await user.click(screen.getByRole('button', { name: /Continue →/i }));
+
+    expect(await screen.findByText(/Enter a valid email address/i)).toBeInTheDocument();
+    expect(requestReceived).toBe(false);
+  });
+
+  it('sends a valid customer_email with the create-journey request, and blank leaves it out', async () => {
+    const user = userEvent.setup();
+    let capturedBody: Record<string, unknown> | undefined;
+    server.use(
+      http.post('*/api/v1/journeys', async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          { journey_id: 'test-journey-id', journey_type: 'KYC' },
+          { status: 201 }
+        );
+      })
+    );
+
+    renderWithProviders('/start/kyc');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Aadhaar Number/i)).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByLabelText(/Email for updates/i), 'customer@example.com');
+    await user.type(screen.getByLabelText(/Aadhaar Number/i), '1234 5678 9012');
+    await user.selectOptions(screen.getByLabelText(/Verification Purpose/i), 'Wallet Upgrade');
+    await user.click(screen.getByRole('button', { name: /Continue →/i }));
+
+    await waitFor(() => {
+      expect(capturedBody?.customer_email).toBe('customer@example.com');
+    });
   });
 
   it('contains no prohibited words or claims', async () => {

@@ -968,6 +968,8 @@ export interface operations {
                         session_id: string;
                         /** @description true if newly issued this request */
                         created: boolean;
+                        /** @description Optional contact email for n8n customer-facing notifications, set at journey creation. Null when never provided. Never a login credential. */
+                        customer_email?: string | null;
                     };
                 };
             };
@@ -1061,6 +1063,8 @@ export interface operations {
                     };
                     /** @description Optional secondary input, parsed by AI into the same goal map. */
                     natural_language?: string;
+                    /** @description Optional contact email stored on the session, used only for n8n customer-facing notifications (CUSTOMER_ACTION_REQUIRED / JOURNEY_RESOLVED). Never used for authorization or login. Left blank, journeys work unchanged. */
+                    customer_email?: string | null;
                 };
             };
         };

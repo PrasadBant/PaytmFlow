@@ -73,6 +73,14 @@ async def create_journey(
             if journey:
                 return await JourneyService.get_journey_state(journey=journey, db=db)
 
+    if body.customer_email:
+        from app.db.repositories.sessions import SessionRepository
+
+        # Stored on the session's existing `meta` JSON column (no new
+        # schema/migration needed) - purely contact data for n8n's
+        # customer-facing notifications, never an auth credential.
+        await SessionRepository(db).set_meta(session.id, {"customer_email": body.customer_email})
+
     result = await JourneyService.create_journey(
         session=session,
         journey_type=body.journey_type,

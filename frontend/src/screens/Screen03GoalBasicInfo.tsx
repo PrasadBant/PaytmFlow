@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Sparkles, ChevronDown, ChevronUp, AlertCircle, Check } from 'lucide-react';
+import { ArrowLeft, Sparkles, ChevronDown, ChevronUp, AlertCircle, Check, Mail } from 'lucide-react';
 import { usePack } from '@/api/hooks/usePack';
 import { useCreateJourney } from '@/api/hooks/useCreateJourney';
 import { SchemaForm } from '@/components/SchemaForm';
@@ -29,6 +29,8 @@ const getPlaceholder = (jType: string): string => {
   );
 };
 
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
 export function Screen03GoalBasicInfo(): ReactElement {
   const { type } = useParams<{ type: string }>();
   const navigate = useNavigate();
@@ -43,6 +45,8 @@ export function Screen03GoalBasicInfo(): ReactElement {
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string> | undefined>(undefined);
   const [formError, setFormError] = useState<string | null>(null);
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -129,12 +133,20 @@ export function Screen03GoalBasicInfo(): ReactElement {
   const handleFormSubmit = async (values: Record<string, unknown>): Promise<void> => {
     setFormError(null);
     setServerErrors(undefined);
+    setEmailError(null);
+
+    const trimmedEmail = customerEmail.trim();
+    if (trimmedEmail && !EMAIL_PATTERN.test(trimmedEmail)) {
+      setEmailError('Enter a valid email address, or leave this field blank.');
+      return;
+    }
 
     try {
       const result = await createJourney.mutateAsync({
         journey_type: pack.journey_type,
         goal: values,
         natural_language: naturalLanguage.trim() ? naturalLanguage.trim() : undefined,
+        customer_email: trimmedEmail || undefined,
       });
 
       navigate(`/j/${result.journey_id}`);
@@ -272,6 +284,41 @@ export function Screen03GoalBasicInfo(): ReactElement {
             )}
           </div>
         )}
+
+        {/* Optional contact email for case updates (applies to all journey types) */}
+        <div className="mb-6 pb-6 border-b border-surface-border space-y-1.5">
+          <label
+            htmlFor="customer-email-input"
+            className="flex items-center gap-1.5 text-sm font-semibold text-content-primary"
+          >
+            <Mail className="w-4 h-4 text-paytm-blue" />
+            Email for updates (Optional)
+          </label>
+          <p className="text-xs text-content-secondary">
+            We&apos;ll only use this to send you updates about this case. Leave blank to skip.
+          </p>
+          <input
+            id="customer-email-input"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={customerEmail}
+            onChange={(e) => {
+              setCustomerEmail(e.target.value);
+              if (emailError) setEmailError(null);
+            }}
+            placeholder="you@example.com"
+            aria-invalid={emailError ? true : undefined}
+            aria-describedby={emailError ? 'customer-email-error' : undefined}
+            className="w-full rounded-button bg-surface border border-surface-border p-3 text-sm text-content-primary placeholder:text-content-tertiary focus-visible:ring-2 focus-visible:ring-paytm-cyan focus-visible:border-paytm-cyan focus-visible:outline-none transition-colors duration-150"
+          />
+          {emailError && (
+            <p id="customer-email-error" className="text-xs text-paytm-red flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              {emailError}
+            </p>
+          )}
+        </div>
 
         {/* Structured Schema Form */}
         <SchemaForm

@@ -27,15 +27,16 @@ def _enable_n8n(monkeypatch) -> None:
     )
 
 
-async def _create_lending_journey(client: AsyncClient, headers: dict[str, str]) -> dict:
-    resp = await client.post(
-        "/api/v1/journeys",
-        json={
-            "journey_type": "LENDING",
-            "goal": {"loan_amount": 200000, "loan_purpose": "EDUCATION", "tenure_months": 24},
-        },
-        headers=headers,
-    )
+async def _create_lending_journey(
+    client: AsyncClient, headers: dict[str, str], customer_email: str | None = None
+) -> dict:
+    body: dict = {
+        "journey_type": "LENDING",
+        "goal": {"loan_amount": 200000, "loan_purpose": "EDUCATION", "tenure_months": 24},
+    }
+    if customer_email:
+        body["customer_email"] = customer_email
+    resp = await client.post("/api/v1/journeys", json=body, headers=headers)
     assert resp.status_code == 201, resp.text
     return resp.json()
 
@@ -173,6 +174,100 @@ class TestN8nNotifications:
             )
         assert resp.status_code == 200, resp.text
         assert "JOURNEY_RESOLVED" in _event_types(mock_dispatch)
+        _assert_valid_payload(mock_dispatch)
+
+    async def test_resolve_case_includes_real_customer_email_when_provided(
+        self, client: AsyncClient, session_headers: dict, monkeypatch
+    ) -> None:
+        """JOURNEY_RESOLVED is the customer-facing event n8n's "Email
+        Customer" node consumes - when the journey was created with a real
+        email, it must reach the payload verbatim, not "" ."""
+        _enable_n8n(monkeypatch)
+        journey = await _create_lending_journey(
+            client, session_headers, customer_email="customer@example.com"
+        )
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()):
+            await _trigger_income_mismatch(client, session_headers, journey)
+        claimed = await _claim_case_for_journey(client, session_headers, journey["journey_id"])
+
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()) as mock_dispatch:
+            resp = await client.post(
+                f"/api/v1/review/cases/{claimed['case_id']}/resolve",
+                json={
+                    "resolution_type": "EVIDENCE_SUFFICIENT",
+                    "resolution_reason": "Bank statement confirms declared income.",
+                    "resolution_value": 30000,
+                    "expected_case_version": claimed["case_version"],
+                },
+                headers=session_headers,
+            )
+        assert resp.status_code == 200, resp.text
+        resolved_payload = next(
+            call.args[0]
+            for call in mock_dispatch.await_args_list
+            if call.args[0]["event"] == "JOURNEY_RESOLVED"
+        )
+        assert resolved_payload["customer_email"] == "customer@example.com"
+        _assert_valid_payload(mock_dispatch)
+
+    async def test_resolve_case_email_is_empty_when_never_provided(
+        self, client: AsyncClient, session_headers: dict, monkeypatch
+    ) -> None:
+        """Anonymous journeys (the overwhelming majority) must keep working
+        exactly as before - an empty string, not a missing key or an error."""
+        _enable_n8n(monkeypatch)
+        journey = await _create_lending_journey(client, session_headers)
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()):
+            await _trigger_income_mismatch(client, session_headers, journey)
+        claimed = await _claim_case_for_journey(client, session_headers, journey["journey_id"])
+
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()) as mock_dispatch:
+            resp = await client.post(
+                f"/api/v1/review/cases/{claimed['case_id']}/resolve",
+                json={
+                    "resolution_type": "EVIDENCE_SUFFICIENT",
+                    "resolution_reason": "Bank statement confirms declared income.",
+                    "resolution_value": 30000,
+                    "expected_case_version": claimed["case_version"],
+                },
+                headers=session_headers,
+            )
+        assert resp.status_code == 200, resp.text
+        resolved_payload = next(
+            call.args[0]
+            for call in mock_dispatch.await_args_list
+            if call.args[0]["event"] == "JOURNEY_RESOLVED"
+        )
+        assert resolved_payload["customer_email"] == ""
+
+    async def test_request_information_includes_real_customer_email_when_provided(
+        self, client: AsyncClient, session_headers: dict, monkeypatch
+    ) -> None:
+        _enable_n8n(monkeypatch)
+        journey = await _create_lending_journey(
+            client, session_headers, customer_email="customer@example.com"
+        )
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()):
+            await _trigger_income_mismatch(client, session_headers, journey)
+        claimed = await _claim_case_for_journey(client, session_headers, journey["journey_id"])
+
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()) as mock_dispatch:
+            resp = await client.post(
+                f"/api/v1/review/cases/{claimed['case_id']}/request-information",
+                json={
+                    "requested_docs": ["Bank Statement"],
+                    "customer_message": "Please upload your latest bank statement.",
+                    "expected_case_version": claimed["case_version"],
+                },
+                headers=session_headers,
+            )
+        assert resp.status_code == 200, resp.text
+        payload = next(
+            call.args[0]
+            for call in mock_dispatch.await_args_list
+            if call.args[0]["event"] == "CUSTOMER_ACTION_REQUIRED"
+        )
+        assert payload["customer_email"] == "customer@example.com"
         _assert_valid_payload(mock_dispatch)
 
     async def test_escalate_case_fires_escalated(

@@ -634,12 +634,18 @@ class ReviewCaseService:
             resolution_type=req.resolution_type.value,
             resolution_reason=req.resolution_reason,
         )
+        customer_email = ""
+        if case.session_id:
+            owner_session = await SessionRepository(db).get_by_id(case.session_id)
+            if owner_session:
+                customer_email = (owner_session.meta or {}).get("customer_email") or ""
         queue_event(
             db,
             "JOURNEY_RESOLVED",
             case.journey_id,
             case_id=str(case.id),
             customer_id=str(case.session_id) if case.session_id else None,
+            customer_email=customer_email,
             message=f"{req.resolution_type.value}: {req.resolution_reason}",
         )
         await db.commit()
@@ -692,12 +698,18 @@ class ReviewCaseService:
             requested_docs=req.requested_docs,
             customer_message=req.customer_message,
         )
+        customer_email = ""
+        if case.session_id:
+            owner_session = await SessionRepository(db).get_by_id(case.session_id)
+            if owner_session:
+                customer_email = (owner_session.meta or {}).get("customer_email") or ""
         queue_event(
             db,
             "CUSTOMER_ACTION_REQUIRED",
             case.journey_id,
             case_id=str(case.id),
             customer_id=str(case.session_id) if case.session_id else None,
+            customer_email=customer_email,
             message=req.customer_message,
         )
         await db.commit()

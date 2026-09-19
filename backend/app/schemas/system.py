@@ -27,3 +27,7 @@ class SessionResponse(BaseModel):
 
     session_id: str
     created: bool
+    # Never a login credential - purely a contact address for n8n customer
+    # notifications, optionally provided at journey creation. None for
+    # every session that never supplied one (the overwhelming majority).
+    customer_email: str | None = None

@@ -111,6 +111,34 @@ async def test_flush_dispatches_queued_events_with_header_auth_and_real_schema(m
 
 
 @pytest.mark.asyncio
+async def test_flush_dispatches_real_customer_email_when_provided(monkeypatch):
+    """When a caller looked up a real, customer-supplied email (see
+    review_service.resolve_case/request_information), it must reach the
+    payload verbatim - not be dropped, and not fall back to "" ."""
+    monkeypatch.setattr(settings, "N8N_ENABLED", True)
+    monkeypatch.setattr(
+        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
+    )
+    db = _FakeSession()
+    queue_event(
+        db,
+        "JOURNEY_RESOLVED",
+        uuid4(),
+        case_id="case-abc",
+        message="RESOLVED_NO_ACTION: resolved",
+        customer_id="session-xyz",
+        customer_email="customer@example.com",
+    )
+
+    mock_post = AsyncMock(return_value=_mock_response(200))
+    with patch("httpx.AsyncClient.post", new=mock_post):
+        await flush_n8n_events(db)
+
+    sent_json = mock_post.call_args.kwargs["json"]
+    assert sent_json["customer_email"] == "customer@example.com"
+
+
+@pytest.mark.asyncio
 async def test_flush_only_sends_once_even_if_called_twice(monkeypatch):
     """Duplicate protection: flush POPS the queue, so a second flush call
     (e.g. a bug in a caller) sends nothing."""
