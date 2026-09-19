@@ -1041,6 +1041,16 @@ export const handlers = [
     });
   }),
 
+  // 14b. POST /api/v1/journeys/:journey_id/chat/voice (Sarvam speech-to-text)
+  http.post('*/api/v1/journeys/:journey_id/chat/voice', async () => {
+    return HttpResponse.json({
+      transcript: '(Mock transcript) What do I need to do next?',
+      language_code: 'en-IN',
+      reply:
+        '(Mock mode) I heard your question. Switch to live mode for answers grounded in your real journey status.',
+    });
+  }),
+
   // 15. POST /api/v1/chat (no journey context)
   http.post('*/api/v1/chat', async ({ request }) => {
     const scenario = getActiveScenario(request.url);
@@ -1049,6 +1059,14 @@ export const handlers = [
     const body = (await request.json()) as { message?: string };
     return HttpResponse.json({
       reply: `(Mock mode) I received: "${body?.message ?? ''}". Switch to live mode for a real assistant reply.`,
+    });
+  }),
+
+  // 15b. POST /api/v1/translate (Sarvam Mayura)
+  http.post('*/api/v1/translate', async ({ request }) => {
+    const body = (await request.json()) as { text?: string; target_language_code?: string };
+    return HttpResponse.json({
+      translated_text: `[${body?.target_language_code ?? 'xx'}] ${body?.text ?? ''}`,
     });
   }),
 
@@ -1098,6 +1116,19 @@ export const handlers = [
       entries: [
         { event_type: 'REVIEW_CASE_CREATED', payload: {}, created_at: c.created_at },
       ],
+    });
+  }),
+
+  http.post('*/api/v1/review/cases/:case_id/ai-summary', ({ params }) => {
+    if (mockRole !== 'REVIEW_OFFICER') return forbidden();
+    const c = reviewCaseStore.get(String(params.case_id));
+    if (!c) return notFound('Review case not found');
+    return HttpResponse.json({
+      summary:
+        'Mock AI summary: the customer declared one value for this field, submitted evidence ' +
+        'indicates a different value, and the case is currently pending reviewer resolution.',
+      disclaimer:
+        'AI-generated summary. Review system evidence and deterministic assessment before taking action.',
     });
   }),
 

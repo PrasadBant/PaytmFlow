@@ -2,6 +2,7 @@ import type React from 'react';
 import { ShieldAlert, User, FileText, Cpu, AlertTriangle } from 'lucide-react';
 import { Card } from '@/components/primitives/Card';
 import type { ReviewCaseDetail } from '@/api/hooks/useReview';
+import { aiProviderLabel } from '@/lib/utils';
 
 interface WhySeeingCaseProps {
   detail: ReviewCaseDetail;
@@ -21,6 +22,9 @@ export const WhySeeingCase: React.FC<WhySeeingCaseProps> = ({ detail }) => {
     .map(([k, v]) => `${k.replace(/_/g, ' ')}: ₹${typeof v === 'number' ? v.toLocaleString('en-IN') : String(v)}`);
 
   const evidenceSummary = evidenceValues.length > 0 ? evidenceValues.join(', ') : 'Evidence unverified or pending extraction';
+  // Source traceability: label the AI provider behind the most recent
+  // evidence upload, when there is one to attribute to.
+  const latestEvidenceSource = aiProviderLabel(detail.evidence[detail.evidence.length - 1]?.provider);
 
   return (
     <Card
@@ -79,6 +83,7 @@ export const WhySeeingCase: React.FC<WhySeeingCaseProps> = ({ detail }) => {
           </p>
           <p className="text-[11px] text-content-tertiary">
             From {detail.evidence.length} submitted document{detail.evidence.length === 1 ? '' : 's'}
+            {latestEvidenceSource ? ` • Source: ${latestEvidenceSource}` : ''}
           </p>
         </div>
 

@@ -39,7 +39,7 @@ paths:
                   db: { type: boolean }
                   packs_loaded: { type: integer }
                   packs_supported: { type: integer }
-                  ai_provider: { type: string, enum: [mock, llm, local_ml] }
+                  ai_provider: { type: string, enum: [mock, llm, local_ml, sarvam] }
                   git_sha: { type: string }
 
   /api/v1/session:
@@ -303,6 +303,33 @@ paths:
               schema: { $ref: "#/components/schemas/JourneyDiff" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/translate:
+    post:
+      tags: [ai]
+      operationId: translateText
+      description: >
+        Translates ONE already-generated canonical explanation/chat string
+        (Sarvam Mayura). Never applied to amounts, statuses, display_value,
+        or resume_screen - the frontend calls this per free-text block, never
+        on the whole API response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TranslateRequest" }
+      responses:
+        "200":
+          description: Translated text
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TranslateResponse" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "504":
+          description: Translation timed out
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
   /api/v1/chat:
     post:
       tags: [journeys]
@@ -344,6 +371,41 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ChatResponse" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/journeys/{journey_id}/chat/voice:
+    post:
+      tags: [journeys]
+      operationId: chatWithAssistantVoice
+      description: >
+        Voice input for the same advisory-only assistant as chatWithAssistant -
+        the audio is transcribed (Sarvam Saaras) and the transcript is fed into
+        the SAME grounded chat() call a typed message would use. Voice is an
+        input modality, not an authorization mechanism: it can never write
+        journey state.
+      parameters: [{ $ref: "#/components/parameters/JourneyIdPath" }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                language_code: { type: string, default: unknown }
+      responses:
+        "200":
+          description: Transcript and assistant reply
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VoiceChatResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "504":
+          description: Transcription timed out
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
 
   /api/v1/review/role:
     post:
@@ -444,6 +506,24 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ReviewCaseAuditResponse" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/review/cases/{case_id}/ai-summary:
+    post:
+      tags: [review]
+      operationId: summarizeReviewCase
+      description: >
+        Advisory-only "AI Evidence Summary", built from the same structured
+        case data already shown to the reviewer. Never a decision -
+        deterministic case-state rules remain authoritative.
+      parameters: [{ $ref: "#/components/parameters/CaseIdPath" }]
+      responses:
+        "200":
+          description: AI-generated advisory summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewSummaryResponse" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -1009,6 +1089,20 @@ components:
           enum: [STATUS, RECOMMENDATION, NEEDS_REVIEW, COMPLETE]
           description: Where Dev1 should route on resume. Server decides, client obeys.
 
+    TranslateRequest:
+      type: object
+      required: [text, target_language_code]
+      properties:
+        text: { type: string, minLength: 1, maxLength: 2000 }
+        target_language_code: { type: string, minLength: 2, maxLength: 10 }
+        source_language_code: { type: string, default: auto }
+
+    TranslateResponse:
+      type: object
+      required: [translated_text]
+      properties:
+        translated_text: { type: string }
+
     ChatRequest:
       type: object
       required: [message]
@@ -1020,6 +1114,18 @@ components:
       required: [reply]
       properties:
         reply: { type: string }
+
+    VoiceChatResponse:
+      type: object
+      required: [reply, transcript]
+      properties:
+        reply: { type: string }
+        transcript:
+          type: string
+          description: >
+            The Sarvam Saaras transcription the assistant actually answered
+            from, shown back to the customer for confirmation.
+        language_code: { type: string, nullable: true }
 
     ReviewerRole:
       type: string
@@ -1059,6 +1165,19 @@ components:
         verified: { type: boolean }
         confidence: { type: number }
         extracted_values: { type: object, additionalProperties: true }
+        provider:
+          type: string
+          nullable: true
+          description: >
+            Which AIProvider produced this extraction ("sarvam", "local_ml",
+            "llm", "mock") - source traceability for the Review Center.
+
+    ReviewSummaryResponse:
+      type: object
+      required: [summary, disclaimer]
+      properties:
+        summary: { type: string }
+        disclaimer: { type: string }
 
     ReviewCase:
       type: object

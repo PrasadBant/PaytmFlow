@@ -20,6 +20,7 @@ from app.api.v1.packs import router as packs_router
 from app.api.v1.recommendation import router as recommendation_router
 from app.api.v1.review import router as review_router
 from app.api.v1.system import router as system_router
+from app.api.v1.translate import router as translate_router
 from app.config import settings
 from app.logging import setup_logging
 from app.schemas.enums import ErrorCode
@@ -122,3 +123,4 @@ app.include_router(diff_router, prefix="/api/v1")
 app.include_router(demo_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(review_router, prefix="/api/v1")
+app.include_router(translate_router, prefix="/api/v1")

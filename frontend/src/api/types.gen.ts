@@ -190,6 +190,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Translates ONE already-generated canonical explanation/chat string (Sarvam Mayura). Never applied to amounts, statuses, display_value, or resume_screen - the frontend calls this per free-text block, never on the whole API response. */
+        post: operations["translateText"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat": {
         parameters: {
             query?: never;
@@ -218,6 +235,23 @@ export interface paths {
         put?: never;
         /** @description Advisory-only Q&A about the caller's own journey. Grounded in the same server-computed journey_state/recommendation data the status/recommendation screens already render. Never writes state. */
         post: operations["chatWithAssistant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/journeys/{journey_id}/chat/voice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Voice input for the same advisory-only assistant as chatWithAssistant - the audio is transcribed (Sarvam Saaras) and the transcript is fed into the SAME grounded chat() call a typed message would use. Voice is an input modality, not an authorization mechanism: it can never write journey state. */
+        post: operations["chatWithAssistantVoice"];
         delete?: never;
         options?: never;
         head?: never;
@@ -317,6 +351,23 @@ export interface paths {
         get: operations["getReviewCaseAudit"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review/cases/{case_id}/ai-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Advisory-only "AI Evidence Summary", built from the same structured case data already shown to the reviewer. Never a decision - deterministic case-state rules remain authoritative. */
+        post: operations["summarizeReviewCase"];
         delete?: never;
         options?: never;
         head?: never;
@@ -678,11 +729,26 @@ export interface components {
              */
             resume_screen?: "STATUS" | "RECOMMENDATION" | "NEEDS_REVIEW" | "COMPLETE";
         };
+        TranslateRequest: {
+            text: string;
+            target_language_code: string;
+            /** @default auto */
+            source_language_code: string;
+        };
+        TranslateResponse: {
+            translated_text: string;
+        };
         ChatRequest: {
             message: string;
         };
         ChatResponse: {
             reply: string;
+        };
+        VoiceChatResponse: {
+            reply: string;
+            /** @description The Sarvam Saaras transcription the assistant actually answered from, shown back to the customer for confirmation. */
+            transcript: string;
+            language_code?: string | null;
         };
         /** @enum {string} */
         ReviewerRole: "CUSTOMER" | "REVIEW_OFFICER";
@@ -704,6 +770,12 @@ export interface components {
             extracted_values?: {
                 [key: string]: unknown;
             };
+            /** @description Which AIProvider produced this extraction ("sarvam", "local_ml", "llm", "mock") - source traceability for the Review Center. */
+            provider?: string | null;
+        };
+        ReviewSummaryResponse: {
+            summary: string;
+            disclaimer: string;
         };
         ReviewCase: {
             /** Format: uuid */
@@ -868,7 +940,7 @@ export interface operations {
                         packs_loaded: number;
                         packs_supported?: number;
                         /** @enum {string} */
-                        ai_provider: "mock" | "llm" | "local_ml";
+                        ai_provider: "mock" | "llm" | "local_ml" | "sarvam";
                         git_sha?: string;
                     };
                 };
@@ -1202,6 +1274,40 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    translateText: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateRequest"];
+            };
+        };
+        responses: {
+            /** @description Translated text */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranslateResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            /** @description Translation timed out */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     generalChat: {
         parameters: {
             query?: never;
@@ -1251,6 +1357,48 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    chatWithAssistantVoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journey_id: components["parameters"]["JourneyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    /** @default unknown */
+                    language_code?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Transcript and assistant reply */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceChatResponse"];
+                };
+            };
+            400: components["responses"]["ValidationError"];
+            404: components["responses"]["NotFound"];
+            /** @description Transcription timed out */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     switchPrototypeRole: {
@@ -1394,6 +1542,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewCaseAuditResponse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    summarizeReviewCase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: components["parameters"]["CaseIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description AI-generated advisory summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewSummaryResponse"];
                 };
             };
             403: components["responses"]["Forbidden"];

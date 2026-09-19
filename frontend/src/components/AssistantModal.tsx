@@ -12,12 +12,15 @@ import {
   Check,
   Copy,
   AlertCircle,
+  Mic,
+  Square,
 } from 'lucide-react';
 import { Modal } from '@/components/primitives/Modal';
 import { IconButton } from '@/components/primitives/IconButton';
 import { useUiStore } from '@/state/ui';
 import { useJourney } from '@/api/hooks/useJourney';
-import { useChat, useGeneralChat } from '@/api/hooks/useChat';
+import { useChat, useGeneralChat, useVoiceChat } from '@/api/hooks/useChat';
+import { useTranslateText } from '@/api/hooks/useTranslate';
 
 interface Message {
   id: string;
@@ -28,6 +31,21 @@ interface Message {
 
 const MAX_MESSAGE_LENGTH = 500;
 const LENGTH_WARNING_THRESHOLD = 400;
+
+// Customer-facing language options (spec: multilingual support scoped to
+// the customer experience, never internal identifiers). "English" sends
+// nothing through /translate at all - it is the language replies already
+// arrive in.
+const LANGUAGE_OPTIONS: { code: string; label: string }[] = [
+  { code: 'en-IN', label: 'English' },
+  { code: 'hi-IN', label: 'Hindi' },
+  { code: 'kn-IN', label: 'Kannada' },
+  { code: 'ta-IN', label: 'Tamil' },
+  { code: 'te-IN', label: 'Telugu' },
+  { code: 'ml-IN', label: 'Malayalam' },
+  { code: 'mr-IN', label: 'Marathi' },
+  { code: 'bn-IN', label: 'Bengali' },
+];
 
 const SUGGESTED_QUESTIONS: { text: string; icon: ReactNode }[] = [
   { text: "What's my next step?", icon: <Sparkles className="w-3 h-3" /> },
@@ -65,6 +83,8 @@ export function AssistantModal(): ReactElement | null {
   const { data: journeyData } = useJourney(journeyId);
   const chatMutation = useChat();
   const generalChatMutation = useGeneralChat();
+  const voiceChatMutation = useVoiceChat();
+  const translateMutation = useTranslateText();
 
   const welcomeText = welcomeMessageFor(journeyData?.display?.title, journeyContext);
 
@@ -76,9 +96,24 @@ export function AssistantModal(): ReactElement | null {
   const [error, setError] = useState<string | null>(null);
   const [lastFailedQuestion, setLastFailedQuestion] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [replyLanguage, setReplyLanguage] = useState(LANGUAGE_OPTIONS[0].code);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  // Voice is only meaningful once a journey exists (the backend endpoint is
+  // journey-scoped so it can ground the reply in real journey state) and
+  // only where the browser actually supports recording - never shown as a
+  // dead button.
+  const supportsVoice =
+    !!journeyId &&
+    typeof navigator !== 'undefined' &&
+    !!navigator.mediaDevices?.getUserMedia &&
+    typeof MediaRecorder !== 'undefined';
 
   useEffect(() => {
     if (isOpen) {
@@ -107,6 +142,23 @@ export function AssistantModal(): ReactElement | null {
 
   if (!isOpen) return null;
 
+  // Translation (spec: multilingual customer experience) is applied ONLY to
+  // an already-generated reply string, never to amounts/statuses/display
+  // values elsewhere in the app - and is best-effort: a translation failure
+  // falls back to the original English text rather than blocking the reply.
+  const translateReply = async (reply: string): Promise<string> => {
+    if (replyLanguage === LANGUAGE_OPTIONS[0].code) return reply;
+    try {
+      const result = await translateMutation.mutateAsync({
+        text: reply,
+        targetLanguageCode: replyLanguage,
+      });
+      return result.translated_text;
+    } catch {
+      return reply;
+    }
+  };
+
   const performRequest = async (question: string): Promise<void> => {
     setIsLoading(true);
     setError(null);
@@ -123,10 +175,11 @@ export function AssistantModal(): ReactElement | null {
       const reply = journeyId
         ? (await chatMutation.mutateAsync({ journeyId, message: question })).reply
         : (await generalChatMutation.mutateAsync(question)).reply;
+      const displayReply = await translateReply(reply);
 
       setMessages((prev) => [
         ...prev,
-        { id: `a-${Date.now()}`, sender: 'assistant', text: reply, time: timeNow() },
+        { id: `a-${Date.now()}`, sender: 'assistant', text: displayReply, time: timeNow() },
       ]);
       setLastFailedQuestion(null);
     } catch {
@@ -155,6 +208,56 @@ export function AssistantModal(): ReactElement | null {
 
   const handleRetry = (): void => {
     if (lastFailedQuestion) void performRequest(lastFailedQuestion);
+  };
+
+  const handleVoiceStop = async (): Promise<void> => {
+    if (!journeyId || audioChunksRef.current.length === 0) return;
+    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Transcript and reply come back from ONE grounded backend call - the
+      // transcript is shown as the user's own message (so they can confirm
+      // they were heard correctly), the reply exactly like a typed answer.
+      const result = await voiceChatMutation.mutateAsync({ journeyId, audioBlob });
+      const displayReply = await translateReply(result.reply);
+      setMessages((prev) => [
+        ...prev,
+        { id: `u-${Date.now()}`, sender: 'user', text: result.transcript, time: timeNow() },
+        { id: `a-${Date.now() + 1}`, sender: 'assistant', text: displayReply, time: timeNow() },
+      ]);
+    } catch {
+      setVoiceError('Could not process that recording. Please try typing your question instead.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startRecording = async (): Promise<void> => {
+    if (!journeyId) return;
+    setVoiceError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        void handleVoiceStop();
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+    } catch {
+      setVoiceError('Microphone access was denied or is unavailable.');
+    }
+  };
+
+  const stopRecording = (): void => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
   };
 
   const handleResetChat = (): void => {
@@ -210,14 +313,32 @@ export function AssistantModal(): ReactElement | null {
               </p>
             </div>
           </div>
-          <IconButton
-            icon={<RotateCcw className="w-3.5 h-3.5" />}
-            aria-label="Restart conversation"
-            variant="ghost"
-            size="sm"
-            onClick={handleResetChat}
-            disabled={isLoading || messages.length <= 1}
-          />
+          <div className="flex items-center gap-2">
+            <label htmlFor="assistant-reply-language" className="sr-only">
+              Reply language
+            </label>
+            <select
+              id="assistant-reply-language"
+              value={replyLanguage}
+              onChange={(e) => setReplyLanguage(e.target.value)}
+              data-testid="assistant-language-select"
+              className="text-[11px] font-semibold text-content-secondary bg-surface border border-surface-border rounded-md px-1.5 py-1 focus-visible:ring-2 focus-visible:ring-paytm-cyan focus-visible:outline-none"
+            >
+              {LANGUAGE_OPTIONS.map((opt) => (
+                <option key={opt.code} value={opt.code}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <IconButton
+              icon={<RotateCcw className="w-3.5 h-3.5" />}
+              aria-label="Restart conversation"
+              variant="ghost"
+              size="sm"
+              onClick={handleResetChat}
+              disabled={isLoading || messages.length <= 1}
+            />
+          </div>
         </div>
 
         {/* Messages List */}
@@ -303,6 +424,16 @@ export function AssistantModal(): ReactElement | null {
             </div>
           )}
 
+          {voiceError && (
+            <div
+              className="flex items-center gap-1.5 p-2.5 rounded bg-paytm-red-light border border-paytm-red/20 text-xs text-paytm-red animate-chat-msg-in"
+              data-testid="voice-error"
+            >
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              {voiceError}
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
 
@@ -365,6 +496,23 @@ export function AssistantModal(): ReactElement | null {
               </span>
             )}
           </div>
+          {supportsVoice && (
+            <button
+              type="button"
+              onClick={() => (isRecording ? stopRecording() : void startRecording())}
+              disabled={isLoading}
+              aria-label={isRecording ? 'Stop recording' : 'Ask by voice'}
+              aria-pressed={isRecording}
+              data-testid="voice-record-btn"
+              className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center shadow-sm transition-all duration-150 active:scale-95 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-paytm-cyan focus-visible:outline-none ${
+                isRecording
+                  ? 'bg-paytm-red text-white animate-pulse'
+                  : 'bg-white text-paytm-blue border border-paytm-blue/20 hover:bg-paytm-blue/5'
+              }`}
+            >
+              {isRecording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+          )}
           <button
             type="submit"
             disabled={!input.trim() || isLoading}

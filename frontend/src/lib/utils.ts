@@ -78,5 +78,22 @@ export function parseIndianCurrency(value: string): number | null {
   return isNaN(num) ? null : num;
 }
 
+// Source traceability (Sarvam integration): a subtle "where did this AI
+// extraction come from" label shared by every Review Center surface that
+// shows evidence (EvidenceComparisonWorkspace, WhySeeingCase) - never a
+// "Powered by AI" banner, just a small factual source line. Falls back to
+// the raw provider string for a value not in this map.
+const AI_PROVIDER_LABELS: Record<string, string> = {
+  sarvam: 'Sarvam Vision',
+  local_ml: 'Local Document AI',
+  llm: 'Hosted LLM',
+  mock: 'Demo Data',
+};
+
+export function aiProviderLabel(provider: string | null | undefined): string | null {
+  if (!provider) return null;
+  return AI_PROVIDER_LABELS[provider] ?? provider;
+}
+
 
 

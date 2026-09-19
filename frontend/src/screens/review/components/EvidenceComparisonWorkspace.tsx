@@ -2,7 +2,7 @@ import type React from 'react';
 import { Scale, FileText, CheckCircle2, XCircle, Info, Sparkles, Clock, History } from 'lucide-react';
 import { Card } from '@/components/primitives/Card';
 import type { ReviewCaseDetail } from '@/api/hooks/useReview';
-import { formatRelativeTime } from '@/lib/utils';
+import { formatRelativeTime, aiProviderLabel } from '@/lib/utils';
 
 interface EvidenceComparisonProps {
   detail: ReviewCaseDetail;
@@ -76,6 +76,7 @@ export const EvidenceComparisonWorkspace: React.FC<EvidenceComparisonProps> = ({
           <div className="grid sm:grid-cols-2 gap-4">
             {evidenceList.map((e) => {
               const confidencePercent = e.confidence != null ? Math.round(e.confidence * 100) : null;
+              const sourceLabel = aiProviderLabel(e.provider);
 
               return (
                 <div
@@ -152,6 +153,15 @@ export const EvidenceComparisonWorkspace: React.FC<EvidenceComparisonProps> = ({
                           }`}
                         >
                           {confidencePercent}% Confidence
+                        </span>
+                      </div>
+                    )}
+
+                    {sourceLabel && (
+                      <div className="flex items-center justify-between gap-2 pt-0.5">
+                        <span className="text-content-secondary font-semibold">Source:</span>
+                        <span className="font-bold text-content-secondary text-[10px]">
+                          {sourceLabel}
                         </span>
                       </div>
                     )}

@@ -15,8 +15,10 @@ class HealthResponse(BaseModel):
     # production-used AI_PROVIDER value, not a dev-only mode - omitting
     # it here made GET /health itself 500 whenever the app was actually
     # configured to run its own real Document AI pipeline (found by
-    # starting the app with AI_PROVIDER=local_ml, final QA phase).
-    ai_provider: Literal["mock", "llm", "local_ml"]
+    # starting the app with AI_PROVIDER=local_ml, final QA phase). "sarvam"
+    # (app/ai/sarvam.py) is the same class of fully-supported value, added
+    # for the same reason.
+    ai_provider: Literal["mock", "llm", "local_ml", "sarvam"]
     git_sha: str | None = "dev"
 
 

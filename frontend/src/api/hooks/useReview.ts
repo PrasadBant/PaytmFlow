@@ -11,6 +11,7 @@ export type ReviewResolutionType = components['schemas']['ReviewResolutionType']
 export type ReviewDashboardMetrics = components['schemas']['ReviewDashboardMetrics'];
 export type ReviewCaseAuditEntry = components['schemas']['ReviewCaseAuditEntry'];
 export type CustomerReviewStatus = components['schemas']['CustomerReviewStatus'];
+export type ReviewSummaryResponse = components['schemas']['ReviewSummaryResponse'];
 
 export interface ReviewQueueFilters {
   status?: ReviewCaseStatus;
@@ -132,6 +133,16 @@ export const useEscalateCase = () => {
     mutationFn: ({ caseId, ...payload }) =>
       apiClient.post<ReviewCase>(`/review/cases/${caseId}/escalate`, payload),
     onSuccess: (_data, variables) => invalidateCase(queryClient, variables.caseId),
+  });
+};
+
+// Advisory-only "AI Evidence Summary" (spec: reviewer AI summary). Not
+// cached/refetched like case data - each click is a fresh, explicit
+// request, never something that silently re-triggers.
+export const useSummarizeCase = () => {
+  return useMutation<ReviewSummaryResponse, Error, { caseId: string }>({
+    mutationFn: ({ caseId }) =>
+      apiClient.post<ReviewSummaryResponse>(`/review/cases/${caseId}/ai-summary`, {}),
   });
 };
 

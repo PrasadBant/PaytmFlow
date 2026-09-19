@@ -151,6 +151,25 @@ describe('Review Center (Human Review / Exception Resolution)', () => {
     expect(screen.getByTestId('resolution-type-select')).toBeInTheDocument();
   });
 
+  it('AI Evidence Summary is advisory-only, explicit-click, and shows the disclaimer', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ReviewCaseDetail />, `/review/case/${DEMO_CASE_ID}`);
+
+    await screen.findByTestId('review-case-detail');
+    const summaryCard = screen.getByTestId('ai-evidence-summary');
+    // Nothing generated yet - no auto-run on mount.
+    expect(within(summaryCard).queryByText(/Mock AI summary/i)).not.toBeInTheDocument();
+
+    await user.click(within(summaryCard).getByTestId('generate-ai-summary-btn'));
+
+    await waitFor(() => {
+      expect(within(summaryCard).getByText(/Mock AI summary/i)).toBeInTheDocument();
+    });
+    expect(
+      within(summaryCard).getByText(/Review system evidence and deterministic assessment/i)
+    ).toBeInTheDocument();
+  });
+
   it('reviewer must claim before the resolution form is enabled', async () => {
     renderWithProviders(<ReviewCaseDetail />, `/review/case/${DEMO_CASE_ID}`);
 

@@ -1,0 +1,155 @@
+"""Unit tests for the n8n outbound webhook dispatcher (app/integrations/n8n_client.py).
+
+Covers: queue/flush semantics (never notify before commit, never flush
+twice), disabled/unconfigured no-op, dispatch failure never raises, header
+auth, and rejection of an unknown event_type.
+"""
+
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
+import pytest
+
+from app.config import settings
+from app.integrations.n8n_client import flush_n8n_events, queue_event
+
+
+class _FakeSession:
+    """Minimal stand-in for AsyncSession's `.info` dict - the only API
+    surface n8n_client actually uses."""
+
+    def __init__(self) -> None:
+        self.info: dict = {}
+
+
+def _mock_response(status_code: int = 200) -> MagicMock:
+    resp = MagicMock()
+    resp.status_code = status_code
+    return resp
+
+
+def test_queue_event_rejects_unknown_event_type():
+    db = _FakeSession()
+    with pytest.raises(ValueError):
+        queue_event(db, "NOT_A_REAL_EVENT", uuid4())
+
+
+@pytest.mark.asyncio
+async def test_flush_is_noop_when_disabled(monkeypatch):
+    monkeypatch.setattr(settings, "N8N_ENABLED", False)
+    monkeypatch.setattr(settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/x")
+    db = _FakeSession()
+    queue_event(db, "REVIEW_REQUIRED", uuid4())
+
+    with patch(
+        "httpx.AsyncClient.post", new=AsyncMock(side_effect=AssertionError("must not call"))
+    ):
+        await flush_n8n_events(db)
+
+
+@pytest.mark.asyncio
+async def test_flush_is_noop_when_url_unconfigured(monkeypatch):
+    monkeypatch.setattr(settings, "N8N_ENABLED", True)
+    monkeypatch.setattr(settings, "N8N_WEBHOOK_URL", "")
+    db = _FakeSession()
+    queue_event(db, "REVIEW_REQUIRED", uuid4())
+
+    with patch(
+        "httpx.AsyncClient.post", new=AsyncMock(side_effect=AssertionError("must not call"))
+    ):
+        await flush_n8n_events(db)
+
+
+@pytest.mark.asyncio
+async def test_flush_dispatches_queued_events_with_header_auth(monkeypatch):
+    monkeypatch.setattr(settings, "N8N_ENABLED", True)
+    monkeypatch.setattr(
+        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
+    )
+    monkeypatch.setattr(settings, "N8N_WEBHOOK_SECRET", "top-secret")
+    db = _FakeSession()
+    journey_id = uuid4()
+    queue_event(db, "REVIEW_REQUIRED", journey_id, {"case_id": "abc"})
+
+    mock_post = AsyncMock(return_value=_mock_response(200))
+    with patch("httpx.AsyncClient.post", new=mock_post):
+        await flush_n8n_events(db)
+
+    mock_post.assert_awaited_once()
+    _, kwargs = mock_post.call_args
+    assert kwargs["headers"][settings.N8N_WEBHOOK_HEADER_NAME] == "top-secret"
+    sent_json = kwargs["json"]
+    assert sent_json["event_type"] == "REVIEW_REQUIRED"
+    assert sent_json["journey_id"] == str(journey_id)
+    assert sent_json["case_id"] == "abc"
+    assert "event_id" in sent_json
+    assert "occurred_at" in sent_json
+
+
+@pytest.mark.asyncio
+async def test_flush_only_sends_once_even_if_called_twice(monkeypatch):
+    """Duplicate protection: flush POPS the queue, so a second flush call
+    (e.g. a bug in a caller) sends nothing."""
+    monkeypatch.setattr(settings, "N8N_ENABLED", True)
+    monkeypatch.setattr(
+        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
+    )
+    db = _FakeSession()
+    queue_event(db, "ESCALATED", uuid4())
+
+    mock_post = AsyncMock(return_value=_mock_response(200))
+    with patch("httpx.AsyncClient.post", new=mock_post):
+        await flush_n8n_events(db)
+        await flush_n8n_events(db)
+
+    assert mock_post.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_flush_never_raises_on_dispatch_failure(monkeypatch):
+    """n8n being down must never fail the request that triggered it."""
+    monkeypatch.setattr(settings, "N8N_ENABLED", True)
+    monkeypatch.setattr(
+        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
+    )
+    db = _FakeSession()
+    queue_event(db, "JOURNEY_RESOLVED", uuid4())
+
+    import httpx
+
+    with patch("httpx.AsyncClient.post", new=AsyncMock(side_effect=httpx.ConnectError("boom"))):
+        await flush_n8n_events(db)  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_flush_with_nothing_queued_does_not_call_http(monkeypatch):
+    monkeypatch.setattr(settings, "N8N_ENABLED", True)
+    monkeypatch.setattr(
+        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
+    )
+    db = _FakeSession()
+
+    with patch(
+        "httpx.AsyncClient.post", new=AsyncMock(side_effect=AssertionError("must not call"))
+    ):
+        await flush_n8n_events(db)
+
+
+@pytest.mark.asyncio
+async def test_multiple_queued_events_all_dispatched_in_order(monkeypatch):
+    monkeypatch.setattr(settings, "N8N_ENABLED", True)
+    monkeypatch.setattr(
+        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
+    )
+    db = _FakeSession()
+    journey_id = uuid4()
+    queue_event(db, "EVIDENCE_UPLOADED", journey_id, {"doc_type": "SALARY_SLIP"})
+    queue_event(db, "REVIEW_REQUIRED", journey_id, {"case_id": "abc"})
+
+    mock_post = AsyncMock(return_value=_mock_response(200))
+    with patch("httpx.AsyncClient.post", new=mock_post):
+        await flush_n8n_events(db)
+
+    assert mock_post.await_count == 2
+    sent_event_types = [call.kwargs["json"]["event_type"] for call in mock_post.await_args_list]
+    assert sent_event_types == ["EVIDENCE_UPLOADED", "REVIEW_REQUIRED"]

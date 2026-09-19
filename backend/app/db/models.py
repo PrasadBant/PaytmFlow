@@ -145,6 +145,13 @@ class EvidenceModel(Base):
     # {"income_verified": True}. Never client-supplied; only ever written
     # from `AIInterpretationResult.raw_values`.
     raw_values: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    # Provider metadata / source traceability (Sarvam integration): which
+    # AIProvider actually produced this evidence's extraction, e.g. "sarvam",
+    # "local_ml", "llm", "mock" - see AIInterpretationResult.provider's
+    # docstring in app/ai/models.py for how this is resolved. Surfaced to
+    # reviewers via ReviewEvidenceSummary.provider so the Review Center can
+    # show "Source: Sarvam Vision" rather than an opaque confidence number.
+    provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

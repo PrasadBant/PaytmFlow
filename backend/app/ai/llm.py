@@ -176,12 +176,14 @@ class LLMProvider:
         manifest: JourneyPackManifest,
         existing_fields: dict[str, Any] | None = None,
         ocr_meta: dict[str, Any] | None = None,
+        raw_file: bytes | None = None,
+        filename: str | None = None,
     ) -> AIInterpretationResult:
         """Interprets evidence text against pack mappings and detects conflicts.
 
-        `ocr_meta` is accepted for AIProvider Protocol compatibility and
-        unused here - the hosted LLM reasons over the text itself, not
-        local OCR bounding-box layout.
+        `ocr_meta`/`raw_file`/`filename` are accepted for AIProvider Protocol
+        compatibility and unused here - the hosted LLM reasons over the text
+        itself, not local OCR bounding-box layout or the original file bytes.
         """
         try:
             mappings_desc = [
@@ -413,8 +415,7 @@ class LLMProvider:
                 "Never claim to have taken any action - you are advisory only."
             )
             user_prompt = (
-                f"Journey Context:\n{json.dumps(context, indent=2)}\n\n"
-                f"User Question: {message}\n"
+                f"Journey Context:\n{json.dumps(context, indent=2)}\n\nUser Question: {message}\n"
             )
 
             reply = await self._call_llm(

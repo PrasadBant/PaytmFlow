@@ -30,6 +30,7 @@ import {
 } from '@/api/hooks/useReview';
 import { WhySeeingCase } from './components/WhySeeingCase';
 import { EvidenceComparisonWorkspace } from './components/EvidenceComparisonWorkspace';
+import { AiEvidenceSummary } from './components/AiEvidenceSummary';
 import { JourneyContextWorkspace } from './components/JourneyContextWorkspace';
 import { CustomerHandoffLoop } from './components/CustomerHandoffLoop';
 import { AuditTimelineWorkspace } from './components/AuditTimelineWorkspace';
@@ -358,6 +359,9 @@ export const ReviewCaseDetail: React.FC = () => {
 
           {/* 2. Evidence Comparison & Extraction */}
           <EvidenceComparisonWorkspace detail={detail} />
+
+          {/* 2b. AI Evidence Summary (advisory only) */}
+          <AiEvidenceSummary caseId={detail.case_id} />
 
           {/* 3. Resolution & Action Panel */}
           <Card padding="lg" className="bg-white border-2 border-slate-200 shadow-sm space-y-5">

@@ -33,6 +33,7 @@ from app.db.repositories.evidence import EvidenceRepository
 from app.db.repositories.idempotency import IdempotencyRepository
 from app.db.repositories.journeys import JourneyRepository
 from app.db.repositories.snapshots import SnapshotRepository
+from app.integrations.n8n_client import flush_n8n_events
 from app.packs.contract import ActionSpec, JourneyPackManifest
 from app.packs.registry import pack_registry
 from app.schemas.enums import (
@@ -1381,6 +1382,10 @@ class JourneyService:
             status_code=200,
         )
         await db.commit()
+        # Flushes any n8n REVIEW_REQUIRED event queued above by
+        # ReviewCaseService.create_or_get_open_case (step 10b) - only now,
+        # since the transaction that made it durable just committed.
+        await flush_n8n_events(db)
 
         return resp_obj
 

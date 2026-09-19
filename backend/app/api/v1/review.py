@@ -17,6 +17,7 @@ from app.schemas.review import (
     ReviewCaseDetail,
     ReviewDashboardMetrics,
     ReviewQueueResponse,
+    ReviewSummaryResponse,
     RoleSwitchRequest,
     RoleSwitchResponse,
 )
@@ -145,6 +146,27 @@ async def get_review_case_audit(
 ) -> ReviewCaseAuditResponse:
     entries = await ReviewCaseService.get_audit_trail(db, case_id)
     return ReviewCaseAuditResponse(entries=entries)
+
+
+@router.post(
+    "/review/cases/{case_id}/ai-summary",
+    response_model=ReviewSummaryResponse,
+    responses={
+        403: {"model": ErrorEnvelope, "description": "Not a reviewer"},
+        404: {"model": ErrorEnvelope, "description": "Not found or AI summary disabled"},
+    },
+    tags=["review"],
+    operation_id="summarizeReviewCase",
+)
+async def summarize_review_case(
+    case_id: UUID,
+    _session: SessionModel = Depends(verify_reviewer),
+    db: AsyncSession = Depends(get_db),
+) -> ReviewSummaryResponse:
+    """Advisory-only AI Evidence Summary - built from the same structured
+    case data the reviewer already sees. Never a decision; deterministic
+    case-state rules remain authoritative (see ReviewCaseService.summarize_case)."""
+    return await ReviewCaseService.summarize_case(db, case_id)
 
 
 @router.post(

@@ -60,6 +60,17 @@ class AIInterpretationResult(BaseModel):
     # response is unaffected - see EvidenceInterpretation in
     # app/schemas/evidence.py, which does not expose this).
     resolved_doc_type: str | None = None
+    # Provider metadata / source traceability (Sarvam integration): which
+    # AIProvider actually produced this result. Only ever set by a provider
+    # that can itself switch which underlying engine answered a given call
+    # (currently only SarvamProvider, which falls back to LocalMLProvider on
+    # any Sarvam failure/timeout/rate-limit - see app/ai/sarvam.py). Every
+    # other provider leaves this None; callers (app/evidence/reconcile.py)
+    # fall back to the globally configured settings.AI_PROVIDER in that case.
+    # Never auto-serialized to the wire response as-is - EvidenceResponse/
+    # ReviewEvidenceSummary read it explicitly where a "source" label is
+    # wanted (same pattern already established by resolved_doc_type above).
+    provider: str | None = None
 
 
 class ActionRankingResult(BaseModel):

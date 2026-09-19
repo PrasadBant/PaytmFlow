@@ -262,6 +262,8 @@ class MockAI:
         manifest: JourneyPackManifest,
         existing_fields: dict[str, Any] | None = None,
         ocr_meta: dict[str, Any] | None = None,
+        raw_file: bytes | None = None,
+        filename: str | None = None,
     ) -> AIInterpretationResult:
         """Deterministically extracts evidence data and detects potential conflicts using
         content-based validation.
@@ -504,7 +506,7 @@ class MockAI:
 
         return (
             "I don't have a specific answer for that in your application data. "
-            'I can help with: your next step, required documents, why something\'s '
+            "I can help with: your next step, required documents, why something's "
             "blocked, or your overall progress - just ask."
         )
 

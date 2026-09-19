@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.provider import get_ai_provider
 from app.audit.writer import AuditWriter
+from app.config import settings
 from app.core.diff import compute_diff
 from app.core.models import (
     CoreFieldStatus,
@@ -27,6 +28,7 @@ from app.evidence.storage import (
     InvalidFileFormatError,
     store_evidence_file,
 )
+from app.integrations.n8n_client import flush_n8n_events, queue_event
 from app.packs.registry import pack_registry
 from app.schemas.enums import ErrorCode, FieldStatus, Readiness
 from app.schemas.errors import ErrorEnvelope, ErrorObject
@@ -275,7 +277,16 @@ class EvidenceReconciliationService:
             manifest=manifest,
             existing_fields=existing_values,
             ocr_meta=ocr_meta,
+            raw_file=file_bytes,
+            filename=final_filename,
         )
+        # Source traceability (Sarvam integration, spec-mandated provider
+        # metadata): only SarvamProvider ever sets `ai_res.provider` itself
+        # (it's the only provider that can internally fall back to a
+        # DIFFERENT engine than the globally configured one - see
+        # app/ai/sarvam.py). Every other provider leaves it None, so the
+        # globally configured provider name is the accurate label.
+        evidence_provider = ai_res.provider or settings.AI_PROVIDER
 
         # 6. Verification & confidence threshold check against manifest mapping
         #
@@ -397,6 +408,7 @@ class EvidenceReconciliationService:
             confidence=ai_res.confidence,
             verified=is_verified,
             raw_values=ai_res.raw_values,
+            provider=evidence_provider,
         )
 
         # 8. Write EVIDENCE_UPLOADED audit event
@@ -410,13 +422,19 @@ class EvidenceReconciliationService:
             confidence=ai_res.confidence,
             extracted_data=extracted_data,
         )
+        queue_event(
+            self.session,
+            "EVIDENCE_UPLOADED",
+            journey_id,
+            {"evidence_id": str(evidence_record.id), "doc_type": doc_type, "verified": is_verified},
+        )
 
         # 9. Customer ↔ Reviewer Handoff Loop:
         # If the customer uploads evidence while a review case is waiting for them
         # (ADDITIONAL_INFO_REQUIRED), transition it back so the reviewer sees it.
         from app.db.repositories.review_cases import ReviewCaseRepository
         from app.schemas.enums import ReviewCaseStatus
-        
+
         review_repo = ReviewCaseRepository(self.session)
         open_cases = await review_repo.list_by_journey(journey_id)
         for case_model in open_cases:
@@ -438,6 +456,7 @@ class EvidenceReconciliationService:
                 )
 
         await self.session.commit()
+        await flush_n8n_events(self.session)
 
         # 10. Compute deterministic simulation preview and diff preview
         #

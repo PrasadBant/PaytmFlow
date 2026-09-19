@@ -45,6 +45,39 @@ class Settings(BaseSettings):
     # key at all - LLMProvider only sends an Authorization header when
     # AI_API_KEY is non-empty, which real local servers like Ollama ignore.
     AI_BASE_URL: str = ""
+    # Sarvam AI (docs.sarvam.ai) - a peer AIProvider alongside mock/llm/local_ml,
+    # selected via AI_PROVIDER=sarvam. SARVAM_API_KEY is backend-only: never
+    # returned in a response body, never logged, never sent to the frontend.
+    SARVAM_ENABLED: bool = False
+    SARVAM_API_KEY: str = ""
+    SARVAM_BASE_URL: str = "https://api.sarvam.ai"
+    SARVAM_DOCUMENT_ENABLED: bool = True
+    SARVAM_SPEECH_ENABLED: bool = True
+    SARVAM_TRANSLATION_ENABLED: bool = True
+    SARVAM_CHAT_ENABLED: bool = True
+    # Document AI is a real async job API (create -> poll -> download), and
+    # genuinely slower than a single hosted-LLM completion - the generic
+    # AI_TIMEOUT_SECONDS (4s, tuned for LLMProvider/local_ml) would starve
+    # every Sarvam Document AI call before the job could ever finish, so this
+    # provider gets its own, larger guardrail timeout (see app/ai/provider.py).
+    SARVAM_TIMEOUT_SECONDS: int = 25
+    SARVAM_POLL_INTERVAL_SECONDS: float = 1.5
+    SARVAM_MAX_POLL_ATTEMPTS: int = 12
+    SARVAM_STT_MODEL: str = "saaras:v3"
+    # n8n Cloud outbound event notifications (Review Center lifecycle ->
+    # Slack/email via the existing n8n workflow). Backend-only secret; never
+    # sent to the frontend. Disabled by default so a missing/misconfigured
+    # webhook can never block or fail a real journey/review-case mutation -
+    # see app/integrations/n8n_client.py.
+    N8N_ENABLED: bool = False
+    N8N_WEBHOOK_URL: str = ""
+    N8N_WEBHOOK_SECRET: str = ""
+    # n8n's "Header Auth" credential type lets the workflow author configure
+    # ANY header name (there is no fixed convention) - must match exactly
+    # whatever header name is set on the webhook node's Header Auth
+    # credential in n8n, not necessarily "Authorization".
+    N8N_WEBHOOK_HEADER_NAME: str = "X-Webhook-Secret"
+    N8N_TIMEOUT_SECONDS: int = 5
     EVIDENCE_STORAGE_DIR: str = "./storage/evidence"
     EVIDENCE_MAX_BYTES: int = 10485760  # 10 MB
     DEMO_RESET_SECRET: str = "change-me-demo-reset-secret"

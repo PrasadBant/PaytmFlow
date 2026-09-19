@@ -24,6 +24,11 @@ class ReviewEvidenceSummary(BaseModel):
     verified: bool
     confidence: float | None = None
     extracted_values: dict[str, Any] = {}
+    # Source traceability (Sarvam integration): which AIProvider produced
+    # this extraction ("sarvam" / "local_ml" / "llm" / "mock"), so the
+    # Review Center can show reviewers a real source label rather than an
+    # opaque confidence number - see app/db/models.py's EvidenceModel.provider.
+    provider: str | None = None
 
 
 class ReviewCase(BaseModel):
@@ -51,6 +56,20 @@ class ReviewCase(BaseModel):
     created_at: datetime
     updated_at: datetime
     resolved_at: datetime | None = None
+
+
+class ReviewSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    # Advisory only - built entirely from the same structured
+    # ReviewCaseDetail data the reviewer already sees (customer declaration,
+    # extracted evidence, reason, system status), never an independent AI
+    # decision. See app/services/review_service.py's summarize_case.
+    summary: str
+    disclaimer: str = (
+        "AI-generated summary. Review system evidence and deterministic "
+        "assessment before taking action."
+    )
 
 
 class ReviewCaseDetail(ReviewCase):

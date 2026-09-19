@@ -44,6 +44,7 @@ class EvidenceRepository:
         evidence_id: UUID | None = None,
         verified: bool = False,
         raw_values: dict[str, Any] | None = None,
+        provider: str | None = None,
     ) -> EvidenceModel:
         evidence = EvidenceModel(
             id=evidence_id or uuid4(),
@@ -59,6 +60,7 @@ class EvidenceRepository:
             confidence=confidence,
             verified=verified,
             raw_values=raw_values,
+            provider=provider,
             created_at=datetime.now(UTC),
         )
         self.session.add(evidence)

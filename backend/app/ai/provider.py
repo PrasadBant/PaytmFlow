@@ -31,6 +31,8 @@ class AIProvider(Protocol):
         manifest: JourneyPackManifest,
         existing_fields: dict[str, Any] | None = None,
         ocr_meta: dict[str, Any] | None = None,
+        raw_file: bytes | None = None,
+        filename: str | None = None,
     ) -> AIInterpretationResult:
         """Interprets extracted evidence text against manifest mappings and detects conflicts.
 
@@ -41,6 +43,15 @@ class AIProvider(Protocol):
         layout-aware extraction and honest confidence composition. It is
         optional and additive: MockAI and LLMProvider both accept and
         ignore it, so this is not a breaking change to either.
+
+        `raw_file`/`filename`, when supplied, carry the ORIGINAL uploaded
+        document bytes (before local OCR ran) - additive for the same
+        reason as `ocr_meta`: a vision-based provider that does its own
+        document understanding (app/ai/sarvam.py's SarvamProvider, calling
+        Sarvam's real Document AI Extract API) needs the source file, not
+        just its locally-OCR'd text, to get any benefit from running its
+        own OCR/layout model. Every other provider (Mock/LLM/LocalML)
+        accepts and ignores these two params.
         """
         ...
 
@@ -93,6 +104,7 @@ class AIProvider(Protocol):
 def get_ai_provider(guardrailed: bool = True) -> AIProvider:
     """Factory retrieving the configured AI provider instance based on settings."""
     base_provider: AIProvider
+    guardrail_timeout: float | None = None
     if settings.AI_PROVIDER == "llm":
         from app.ai.llm import LLMProvider
 
@@ -101,6 +113,18 @@ def get_ai_provider(guardrailed: bool = True) -> AIProvider:
         from app.ai.local_ml import LocalMLProvider
 
         base_provider = LocalMLProvider()
+    elif settings.AI_PROVIDER == "sarvam":
+        from app.ai.local_ml import LocalMLProvider
+        from app.ai.sarvam import SarvamProvider
+
+        # Falls back to the real local Document AI pipeline (not MockAI) on
+        # any Sarvam failure/timeout/rate-limit - see SarvamProvider's own
+        # docstring. Document AI is a genuine async job API and needs more
+        # time per call than the generic AI_TIMEOUT_SECONDS (tuned for a
+        # single hosted-LLM completion), so this branch gives
+        # GuardrailedAIProvider a larger, Sarvam-specific timeout instead.
+        base_provider = SarvamProvider(fallback_provider=LocalMLProvider())
+        guardrail_timeout = float(settings.SARVAM_TIMEOUT_SECONDS)
     else:
         from app.ai.mock import MockAI
 
@@ -109,5 +133,5 @@ def get_ai_provider(guardrailed: bool = True) -> AIProvider:
     if guardrailed:
         from app.ai.guardrails import GuardrailedAIProvider
 
-        return GuardrailedAIProvider(base_provider)
+        return GuardrailedAIProvider(base_provider, timeout_seconds=guardrail_timeout)
     return base_provider

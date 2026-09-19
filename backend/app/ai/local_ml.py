@@ -117,6 +117,8 @@ class LocalMLProvider:
         manifest: JourneyPackManifest,
         existing_fields: dict[str, Any] | None = None,
         ocr_meta: dict[str, Any] | None = None,
+        raw_file: bytes | None = None,
+        filename: str | None = None,
     ) -> AIInterpretationResult:
         """The real local document-intelligence path: classify the
         document, detect wrong/ambiguous/unreadable documents, extract

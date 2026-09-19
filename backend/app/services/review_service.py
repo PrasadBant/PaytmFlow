@@ -14,7 +14,9 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.provider import get_ai_provider
 from app.audit.writer import AuditWriter
+from app.config import settings
 from app.core.models import CoreAmbiguity, CoreFieldStatus, CoreReadiness, CoreSnapshot
 from app.core.review import (
     ReviewCaseStatus as CoreReviewCaseStatus,
@@ -31,6 +33,7 @@ from app.db.repositories.journeys import JourneyRepository
 from app.db.repositories.review_cases import ReviewCaseRepository
 from app.db.repositories.sessions import SessionRepository
 from app.db.repositories.snapshots import SnapshotRepository
+from app.integrations.n8n_client import flush_n8n_events, queue_event
 from app.packs.registry import pack_registry
 from app.schemas.enums import ErrorCode, ReviewCaseStatus, ReviewResolutionType
 from app.schemas.errors import ErrorEnvelope, ErrorObject
@@ -45,6 +48,7 @@ from app.schemas.review import (
     ReviewCaseDetail,
     ReviewDashboardMetrics,
     ReviewEvidenceSummary,
+    ReviewSummaryResponse,
 )
 
 _LOCK_DURATION_MINUTES = 15
@@ -211,6 +215,20 @@ class ReviewCaseService:
             reason_code=ambiguity.ambiguity_id,
             field_key=ambiguity.field,
         )
+        # n8n notification: queued here (no I/O), flushed by the CALLER
+        # (JourneyService.apply_action) right after ITS OWN db.commit() -
+        # this method is nested inside that larger transaction and must
+        # never notify before it's actually durable.
+        queue_event(
+            db,
+            "REVIEW_REQUIRED",
+            journey.id,
+            {
+                "case_id": str(case.id),
+                "field_key": ambiguity.field,
+                "reason_code": ambiguity.ambiguity_id,
+            },
+        )
         return case
 
     @classmethod
@@ -280,6 +298,7 @@ class ReviewCaseService:
                 verified=bool(e.verified),
                 confidence=e.confidence,
                 extracted_values=dict(e.raw_values or {}),
+                provider=e.provider,
             )
             for e in relevant_evidence[:5]
         ]
@@ -296,6 +315,74 @@ class ReviewCaseService:
             evidence=evidence_summaries,
             impact_preview=impact_preview,
         )
+
+    @classmethod
+    async def summarize_case(cls, db: AsyncSession, case_id: UUID) -> ReviewSummaryResponse:
+        """Advisory-only "AI Evidence Summary" (spec: reviewer AI summary).
+
+        Built ENTIRELY from the same structured ReviewCaseDetail data the
+        reviewer already sees on screen - customer declaration, extracted
+        evidence per document, the reason this case was flagged, and current
+        status - never independently fetched or invented. Goes through the
+        SAME `AIProvider.chat()` every customer-facing assistant call already
+        uses, so it inherits the same GuardrailedAIProvider timeout/banned-
+        word-scanning/fallback safety net. The chat call can only produce
+        prose; it never writes case state.
+        """
+        if not settings.SARVAM_CHAT_ENABLED:
+            raise HTTPException(
+                status_code=404,
+                detail=ErrorEnvelope(
+                    error=ErrorObject(
+                        code=ErrorCode.VALIDATION_ERROR,
+                        message="AI evidence summary is not enabled.",
+                    )
+                ).model_dump(mode="json"),
+            )
+
+        detail = await cls.get_case_detail(db, case_id)
+        journey = await JourneyRepository(db).get_by_id(detail.journey_id)
+        manifest = pack_registry.get_pack(detail.journey_type) if journey else None
+        if not journey or not manifest:
+            raise _not_found(f"Journey pack for review case '{case_id}' not found")
+
+        context_field = next(
+            (f for f in detail.journey_context.fields if f.key == detail.field_key), None
+        )
+        declared_value = (
+            context_field.display_value
+            if context_field and context_field.display_value
+            else "Not specified"
+        )
+        evidence_lines = [
+            f"{e.doc_type}: "
+            + (
+                ", ".join(f"{k}={v}" for k, v in (e.extracted_values or {}).items())
+                or "no extracted values"
+            )
+            for e in detail.evidence
+        ]
+        summary_request = (
+            "Summarize this review case for a human reviewer in 3-4 short, factual "
+            "sentences. State the customer's declared value, what the submitted "
+            "evidence shows, the discrepancy if any, and the current system status. "
+            "Do not recommend an outcome, do not claim a decision was made, and do "
+            "not use the words approved/approval/guaranteed.\n\n"
+            f"Field: {detail.field_key}\n"
+            f"Customer declared: {declared_value}\n"
+            f"Evidence: {'; '.join(evidence_lines) if evidence_lines else 'none submitted'}\n"
+            f"Flagged reason: {detail.reason_title} - {detail.reason_description}\n"
+            f"Current status: {detail.status.value}\n"
+        )
+
+        ai_provider = get_ai_provider()
+        summary_text = await ai_provider.chat(
+            message=summary_request,
+            manifest=manifest,
+            journey_state=detail.journey_context,
+            recommendation=None,
+        )
+        return ReviewSummaryResponse(summary=summary_text)
 
     @staticmethod
     async def _compute_impact_preview(
@@ -549,7 +636,18 @@ class ReviewCaseService:
             resolution_type=req.resolution_type.value,
             resolution_reason=req.resolution_reason,
         )
+        queue_event(
+            db,
+            "JOURNEY_RESOLVED",
+            case.journey_id,
+            {
+                "case_id": str(case.id),
+                "reviewer": reviewer_name,
+                "resolution_type": req.resolution_type.value,
+            },
+        )
         await db.commit()
+        await flush_n8n_events(db)
         return await cls.get_case_detail(db, updated.id)
 
     @classmethod
@@ -598,7 +696,18 @@ class ReviewCaseService:
             requested_docs=req.requested_docs,
             customer_message=req.customer_message,
         )
+        queue_event(
+            db,
+            "CUSTOMER_ACTION_REQUIRED",
+            case.journey_id,
+            {
+                "case_id": str(case.id),
+                "reviewer": reviewer_name,
+                "requested_docs": req.requested_docs,
+            },
+        )
         await db.commit()
+        await flush_n8n_events(db)
         return await cls._to_review_case(db, updated)
 
     @classmethod
@@ -640,7 +749,18 @@ class ReviewCaseService:
             reviewer=reviewer_name,
             escalation_reason=req.escalation_reason,
         )
+        queue_event(
+            db,
+            "ESCALATED",
+            case.journey_id,
+            {
+                "case_id": str(case.id),
+                "reviewer": reviewer_name,
+                "escalation_reason": req.escalation_reason,
+            },
+        )
         await db.commit()
+        await flush_n8n_events(db)
         return await cls._to_review_case(db, updated)
 
     @classmethod
