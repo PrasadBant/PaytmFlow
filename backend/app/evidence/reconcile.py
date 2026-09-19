@@ -422,13 +422,6 @@ class EvidenceReconciliationService:
             confidence=ai_res.confidence,
             extracted_data=extracted_data,
         )
-        queue_event(
-            self.session,
-            "EVIDENCE_UPLOADED",
-            journey_id,
-            {"evidence_id": str(evidence_record.id), "doc_type": doc_type, "verified": is_verified},
-        )
-
         # 9. Customer ↔ Reviewer Handoff Loop:
         # If the customer uploads evidence while a review case is waiting for them
         # (ADDITIONAL_INFO_REQUIRED), transition it back so the reviewer sees it.
@@ -437,6 +430,24 @@ class EvidenceReconciliationService:
 
         review_repo = ReviewCaseRepository(self.session)
         open_cases = await review_repo.list_by_journey(journey_id)
+
+        # n8n's own "Valid Payload?" node requires a non-empty case_id for
+        # every event, including EVIDENCE_UPLOADED - but evidence can be
+        # uploaded with no review case involved at all (the golden path).
+        # Uses the real, existing case when this journey has one; otherwise
+        # falls back to the evidence record's own id - a genuine, unique,
+        # non-fabricated identifier for this event, never an invented case.
+        n8n_case_id = str(open_cases[0].id) if open_cases else str(evidence_record.id)
+        queue_event(
+            self.session,
+            "EVIDENCE_UPLOADED",
+            journey_id,
+            case_id=n8n_case_id,
+            customer_id=str(current_session.id),
+            message=f"{doc_type.replace('_', ' ').title()} uploaded"
+            f"{' and verified' if is_verified else ' (pending review)'}.",
+        )
+
         for case_model in open_cases:
             if case_model.status == ReviewCaseStatus.ADDITIONAL_INFO_REQUIRED.value:
                 new_status = (

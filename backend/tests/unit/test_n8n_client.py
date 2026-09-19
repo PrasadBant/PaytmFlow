@@ -2,7 +2,9 @@
 
 Covers: queue/flush semantics (never notify before commit, never flush
 twice), disabled/unconfigured no-op, dispatch failure never raises, header
-auth, and rejection of an unknown event_type.
+auth, rejection of an unknown event_type, and the real payload schema
+(event/case_id/journey_id/customer_id/customer_email/message/timestamp -
+verified directly against the live n8n workflow's own validation node).
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -31,7 +33,16 @@ def _mock_response(status_code: int = 200) -> MagicMock:
 def test_queue_event_rejects_unknown_event_type():
     db = _FakeSession()
     with pytest.raises(ValueError):
-        queue_event(db, "NOT_A_REAL_EVENT", uuid4())
+        queue_event(db, "NOT_A_REAL_EVENT", uuid4(), case_id="case-1", message="hello")
+
+
+def test_queue_event_rejects_empty_case_id():
+    """The real workflow's own "Valid Payload?" node rejects any event
+    with an empty case_id (verified live) - this must be caught before
+    ever reaching the network, not after a wasted round trip."""
+    db = _FakeSession()
+    with pytest.raises(ValueError):
+        queue_event(db, "REVIEW_REQUIRED", uuid4(), case_id="", message="hello")
 
 
 @pytest.mark.asyncio
@@ -39,7 +50,7 @@ async def test_flush_is_noop_when_disabled(monkeypatch):
     monkeypatch.setattr(settings, "N8N_ENABLED", False)
     monkeypatch.setattr(settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/x")
     db = _FakeSession()
-    queue_event(db, "REVIEW_REQUIRED", uuid4())
+    queue_event(db, "REVIEW_REQUIRED", uuid4(), case_id="case-1", message="hello")
 
     with patch(
         "httpx.AsyncClient.post", new=AsyncMock(side_effect=AssertionError("must not call"))
@@ -52,7 +63,7 @@ async def test_flush_is_noop_when_url_unconfigured(monkeypatch):
     monkeypatch.setattr(settings, "N8N_ENABLED", True)
     monkeypatch.setattr(settings, "N8N_WEBHOOK_URL", "")
     db = _FakeSession()
-    queue_event(db, "REVIEW_REQUIRED", uuid4())
+    queue_event(db, "REVIEW_REQUIRED", uuid4(), case_id="case-1", message="hello")
 
     with patch(
         "httpx.AsyncClient.post", new=AsyncMock(side_effect=AssertionError("must not call"))
@@ -61,7 +72,7 @@ async def test_flush_is_noop_when_url_unconfigured(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_flush_dispatches_queued_events_with_header_auth(monkeypatch):
+async def test_flush_dispatches_queued_events_with_header_auth_and_real_schema(monkeypatch):
     monkeypatch.setattr(settings, "N8N_ENABLED", True)
     monkeypatch.setattr(
         settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
@@ -69,7 +80,14 @@ async def test_flush_dispatches_queued_events_with_header_auth(monkeypatch):
     monkeypatch.setattr(settings, "N8N_WEBHOOK_SECRET", "top-secret")
     db = _FakeSession()
     journey_id = uuid4()
-    queue_event(db, "REVIEW_REQUIRED", journey_id, {"case_id": "abc"})
+    queue_event(
+        db,
+        "REVIEW_REQUIRED",
+        journey_id,
+        case_id="case-abc",
+        message="Bank statement credit differs from salary slip",
+        customer_id="session-xyz",
+    )
 
     mock_post = AsyncMock(return_value=_mock_response(200))
     with patch("httpx.AsyncClient.post", new=mock_post):
@@ -79,11 +97,17 @@ async def test_flush_dispatches_queued_events_with_header_auth(monkeypatch):
     _, kwargs = mock_post.call_args
     assert kwargs["headers"][settings.N8N_WEBHOOK_HEADER_NAME] == "top-secret"
     sent_json = kwargs["json"]
-    assert sent_json["event_type"] == "REVIEW_REQUIRED"
+    # Real field names verified against the live workflow's "Normalize
+    # Event"/"Valid Payload?" nodes - "event" (not "event_type"),
+    # "timestamp" (not "occurred_at").
+    assert sent_json["event"] == "REVIEW_REQUIRED"
     assert sent_json["journey_id"] == str(journey_id)
-    assert sent_json["case_id"] == "abc"
+    assert sent_json["case_id"] == "case-abc"
+    assert sent_json["customer_id"] == "session-xyz"
+    assert sent_json["customer_email"] == ""
+    assert sent_json["message"] == "Bank statement credit differs from salary slip"
     assert "event_id" in sent_json
-    assert "occurred_at" in sent_json
+    assert "timestamp" in sent_json
 
 
 @pytest.mark.asyncio
@@ -95,7 +119,7 @@ async def test_flush_only_sends_once_even_if_called_twice(monkeypatch):
         settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
     )
     db = _FakeSession()
-    queue_event(db, "ESCALATED", uuid4())
+    queue_event(db, "ESCALATED", uuid4(), case_id="case-1", message="Escalated for review")
 
     mock_post = AsyncMock(return_value=_mock_response(200))
     with patch("httpx.AsyncClient.post", new=mock_post):
@@ -113,7 +137,7 @@ async def test_flush_never_raises_on_dispatch_failure(monkeypatch):
         settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
     )
     db = _FakeSession()
-    queue_event(db, "JOURNEY_RESOLVED", uuid4())
+    queue_event(db, "JOURNEY_RESOLVED", uuid4(), case_id="case-1", message="Resolved")
 
     import httpx
 
@@ -143,13 +167,15 @@ async def test_multiple_queued_events_all_dispatched_in_order(monkeypatch):
     )
     db = _FakeSession()
     journey_id = uuid4()
-    queue_event(db, "EVIDENCE_UPLOADED", journey_id, {"doc_type": "SALARY_SLIP"})
-    queue_event(db, "REVIEW_REQUIRED", journey_id, {"case_id": "abc"})
+    queue_event(
+        db, "EVIDENCE_UPLOADED", journey_id, case_id="evidence-1", message="Salary Slip uploaded"
+    )
+    queue_event(db, "REVIEW_REQUIRED", journey_id, case_id="case-abc", message="Review required")
 
     mock_post = AsyncMock(return_value=_mock_response(200))
     with patch("httpx.AsyncClient.post", new=mock_post):
         await flush_n8n_events(db)
 
     assert mock_post.await_count == 2
-    sent_event_types = [call.kwargs["json"]["event_type"] for call in mock_post.await_args_list]
-    assert sent_event_types == ["EVIDENCE_UPLOADED", "REVIEW_REQUIRED"]
+    sent_events = [call.kwargs["json"]["event"] for call in mock_post.await_args_list]
+    assert sent_events == ["EVIDENCE_UPLOADED", "REVIEW_REQUIRED"]

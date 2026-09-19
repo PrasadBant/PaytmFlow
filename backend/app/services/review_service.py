@@ -223,11 +223,9 @@ class ReviewCaseService:
             db,
             "REVIEW_REQUIRED",
             journey.id,
-            {
-                "case_id": str(case.id),
-                "field_key": ambiguity.field,
-                "reason_code": ambiguity.ambiguity_id,
-            },
+            case_id=str(case.id),
+            customer_id=str(journey.session_id),
+            message=case.reason_title,
         )
         return case
 
@@ -640,11 +638,9 @@ class ReviewCaseService:
             db,
             "JOURNEY_RESOLVED",
             case.journey_id,
-            {
-                "case_id": str(case.id),
-                "reviewer": reviewer_name,
-                "resolution_type": req.resolution_type.value,
-            },
+            case_id=str(case.id),
+            customer_id=str(case.session_id) if case.session_id else None,
+            message=f"{req.resolution_type.value}: {req.resolution_reason}",
         )
         await db.commit()
         await flush_n8n_events(db)
@@ -700,11 +696,9 @@ class ReviewCaseService:
             db,
             "CUSTOMER_ACTION_REQUIRED",
             case.journey_id,
-            {
-                "case_id": str(case.id),
-                "reviewer": reviewer_name,
-                "requested_docs": req.requested_docs,
-            },
+            case_id=str(case.id),
+            customer_id=str(case.session_id) if case.session_id else None,
+            message=req.customer_message,
         )
         await db.commit()
         await flush_n8n_events(db)
@@ -753,11 +747,9 @@ class ReviewCaseService:
             db,
             "ESCALATED",
             case.journey_id,
-            {
-                "case_id": str(case.id),
-                "reviewer": reviewer_name,
-                "escalation_reason": req.escalation_reason,
-            },
+            case_id=str(case.id),
+            customer_id=str(case.session_id) if case.session_id else None,
+            message=req.escalation_reason,
         )
         await db.commit()
         await flush_n8n_events(db)

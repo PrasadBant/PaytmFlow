@@ -79,7 +79,20 @@ async def _claim_case_for_journey(
 
 
 def _event_types(mock_dispatch: AsyncMock) -> list[str]:
-    return [call.args[0]["event_type"] for call in mock_dispatch.await_args_list]
+    return [call.args[0]["event"] for call in mock_dispatch.await_args_list]
+
+
+def _assert_valid_payload(mock_dispatch: AsyncMock) -> None:
+    """Regression guard for the real bug found and fixed while integrating
+    with the live n8n workflow: its own "Valid Payload?" node requires
+    event/case_id/journey_id/event_id/timestamp to ALL be non-empty, and
+    rejects the request with a real 400 if any is missing - every event
+    this dispatcher ever sends must satisfy that."""
+    for call in mock_dispatch.await_args_list:
+        payload = call.args[0]
+        for required_key in ("event", "case_id", "journey_id", "event_id", "timestamp"):
+            assert payload.get(required_key), f"{required_key} must be non-empty: {payload}"
+        assert payload.get("message"), f"message must be non-empty: {payload}"
 
 
 class TestN8nNotifications:
@@ -93,6 +106,7 @@ class TestN8nNotifications:
             await _trigger_income_mismatch(client, session_headers, journey)
 
         assert "REVIEW_REQUIRED" in _event_types(mock_dispatch)
+        _assert_valid_payload(mock_dispatch)
 
     async def test_evidence_upload_fires_evidence_uploaded(
         self, client: AsyncClient, session_headers: dict, monkeypatch
@@ -112,6 +126,7 @@ class TestN8nNotifications:
             )
         assert resp.status_code == 200, resp.text
         assert "EVIDENCE_UPLOADED" in _event_types(mock_dispatch)
+        _assert_valid_payload(mock_dispatch)
 
     async def test_request_information_fires_customer_action_required(
         self, client: AsyncClient, session_headers: dict, monkeypatch
@@ -134,6 +149,7 @@ class TestN8nNotifications:
             )
         assert resp.status_code == 200, resp.text
         assert "CUSTOMER_ACTION_REQUIRED" in _event_types(mock_dispatch)
+        _assert_valid_payload(mock_dispatch)
 
     async def test_resolve_case_fires_journey_resolved(
         self, client: AsyncClient, session_headers: dict, monkeypatch
@@ -157,6 +173,7 @@ class TestN8nNotifications:
             )
         assert resp.status_code == 200, resp.text
         assert "JOURNEY_RESOLVED" in _event_types(mock_dispatch)
+        _assert_valid_payload(mock_dispatch)
 
     async def test_escalate_case_fires_escalated(
         self, client: AsyncClient, session_headers: dict, monkeypatch
@@ -178,6 +195,7 @@ class TestN8nNotifications:
             )
         assert resp.status_code == 200, resp.text
         assert "ESCALATED" in _event_types(mock_dispatch)
+        _assert_valid_payload(mock_dispatch)
 
     async def test_n8n_disabled_never_dispatches(
         self, client: AsyncClient, session_headers: dict, monkeypatch

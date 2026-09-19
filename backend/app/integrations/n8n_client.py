@@ -24,7 +24,28 @@ Two invariants enforced by design, not by convention:
 
 Duplicate protection: `flush_n8n_events()` POPS the queued list, so a given
 session's events can only ever be flushed once - calling it twice (e.g. a
-bug in a caller) sends nothing the second time.
+bug in a caller) sends nothing the second time. The receiving workflow
+ALSO deduplicates on its own side (a `dedup_key` derived from `event_id`,
+falling back to `case_id|event|timestamp`) via a lookup table, so a
+resend after a network retry is safe on both ends.
+
+Payload schema (verified directly against the real, live n8n workflow via
+its own REST API on 2026-09-19 - its "Normalize Event"/"Valid Payload?"
+nodes were inspected node-by-node, not guessed): every event sends
+`event` (one of the five type strings below), `event_id`, `case_id`,
+`journey_id`, `customer_id`, `customer_email`, `message`, `timestamp`
+(ISO 8601). `event`/`case_id`/`journey_id`/`event_id`/`timestamp` are
+enforced non-empty by the workflow's own "Valid Payload?" node - a request
+missing any of them is rejected with a real, verified `400
+{"success": false, "status": "invalid_payload"}` from its "Respond
+Invalid" node (confirmed by triggering this deliberately while fixing
+this integration). `customer_email` is sent as an empty string: this
+codebase's own SessionModel (app/db/models.py) has no email field
+anywhere - it is an intentionally anonymous, session-only identity model.
+The workflow's "Email Customer" nodes therefore have nothing to send to
+until/unless a real customer identity/email is added to the app itself;
+this is a genuine gap in the surrounding product, not something this
+dispatcher can safely paper over with a fabricated address.
 """
 
 from __future__ import annotations
@@ -59,21 +80,40 @@ def queue_event(
     db: AsyncSession,
     event_type: str,
     journey_id: UUID,
-    payload: dict[str, Any] | None = None,
+    *,
+    case_id: str,
+    message: str,
+    customer_id: str | None = None,
+    customer_email: str = "",
 ) -> None:
     """Queues an n8n notification on `db` - no I/O, always safe to call
-    even when N8N_ENABLED is false (the no-op gate lives in flush)."""
+    even when N8N_ENABLED is false (the no-op gate lives in flush).
+
+    `case_id` and `message` are required keyword args, not optional
+    extras: the receiving workflow's own "Valid Payload?" node rejects any
+    event missing a non-empty case_id (HTTP 400), and its Slack/email
+    notification nodes render `message` directly as the human-readable
+    body - an empty or missing one would silently produce a blank
+    notification. Every call site must supply a real, non-fabricated
+    value for both (e.g. the case's own reason_title, an evidence
+    upload's doc_type, or the reviewer-supplied resolution/escalation
+    reason - never invented text).
+    """
     if event_type not in VALID_EVENT_TYPES:
         raise ValueError(f"Unknown n8n event_type: {event_type!r}")
+    if not case_id:
+        raise ValueError("n8n event requires a non-empty case_id (see queue_event docstring)")
     events: list[dict[str, Any]] = db.info.setdefault(_PENDING_KEY, [])
     events.append(
         {
+            "event": event_type,
             "event_id": str(uuid.uuid4()),
-            "event_type": event_type,
+            "case_id": case_id,
             "journey_id": str(journey_id),
-            "occurred_at": datetime.now(UTC).isoformat(),
-            "environment": settings.APP_ENV,
-            **(payload or {}),
+            "customer_id": str(customer_id) if customer_id else "",
+            "customer_email": customer_email,
+            "message": message,
+            "timestamp": datetime.now(UTC).isoformat(),
         }
     )
 
@@ -95,7 +135,7 @@ async def flush_n8n_events(db: AsyncSession) -> None:
             # the httpx.HTTPError subset it already catches internally.
             logger.warning(
                 "n8n_webhook_unexpected_dispatch_error",
-                event_type=event.get("event_type"),
+                event_type=event.get("event"),
                 event_id=event.get("event_id"),
                 error=str(exc),
             )
@@ -111,7 +151,7 @@ async def _dispatch(event: dict[str, Any]) -> None:
             response = await client.post(settings.N8N_WEBHOOK_URL, headers=headers, json=event)
         logger.info(
             "n8n_webhook_dispatched",
-            event_type=event.get("event_type"),
+            event_type=event.get("event"),
             event_id=event.get("event_id"),
             status_code=response.status_code,
         )
@@ -120,7 +160,7 @@ async def _dispatch(event: dict[str, Any]) -> None:
         # must never surface as a failure of the request that triggered it.
         logger.warning(
             "n8n_webhook_dispatch_failed",
-            event_type=event.get("event_type"),
+            event_type=event.get("event"),
             event_id=event.get("event_id"),
             error=str(exc),
         )
