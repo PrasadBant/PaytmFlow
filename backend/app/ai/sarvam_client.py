@@ -17,7 +17,11 @@ here is an invented/guessed endpoint:
 - Translation (Mayura):
     POST /translate
 - Chat completions (OpenAI-compatible shape):
-    POST /chat/completions
+    POST /v1/chat/completions
+    (default model "sarvam-105b-conversations" - NOT the bare "sarvam-105b"
+    reasoning model, whose output goes to a separate `reasoning_content`
+    field first and can exhaust max_tokens before ever producing `content`;
+    verified live against both variants while building this integration)
 
 Auth: `api-subscription-key` header. This client never logs the API key,
 raw document bytes, or raw audio bytes - only operation name, status code,
@@ -296,7 +300,16 @@ class SarvamClient:
         system_prompt: str,
         user_prompt: str,
         *,
-        model: str = "sarvam-m",
+        # "sarvam-105b" is a reasoning model whose output tokens go to
+        # `reasoning_content` first and `content` stays null until the
+        # reasoning phase finishes - a bounded max_tokens budget can exhaust
+        # itself entirely on reasoning and never reach a real answer
+        # (verified live: 50 tokens -> finish_reason "length", content null).
+        # "-conversations" is Sarvam's own variant for exactly this
+        # (chat/voice-agent) workload: it answers directly, no reasoning
+        # preamble, verified live to return real content with finish_reason
+        # "stop" for the same prompt.
+        model: str = "sarvam-105b-conversations",
         temperature: float = 0.2,
         max_tokens: int = 400,
     ) -> str:
@@ -311,11 +324,20 @@ class SarvamClient:
             "max_tokens": max_tokens,
         }
         result = await self._post(
-            "/chat/completions", headers=headers, json_body=body, operation="chat_completion"
+            "/v1/chat/completions", headers=headers, json_body=body, operation="chat_completion"
         )
         try:
-            return str(result["choices"][0]["message"]["content"])
+            content = result["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise SarvamInvalidResponseError(
                 "Sarvam chat completion response missing expected fields"
             ) from exc
+        # A reasoning model can legitimately return content=null (truncated
+        # before answering) - str(None) would silently produce the literal
+        # text "None" as if it were a real reply, so this is treated as a
+        # genuine failure instead.
+        if content is None:
+            raise SarvamInvalidResponseError(
+                "Sarvam chat completion returned no content (possibly truncated reasoning output)"
+            )
+        return str(content)

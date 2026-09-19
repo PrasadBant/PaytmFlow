@@ -1,4 +1,6 @@
+import io
 import json
+import zipfile
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -25,6 +27,28 @@ def sample_manifest() -> JourneyPackManifest:
     manifest = pack_registry.get_pack("LENDING")
     assert manifest is not None
     return manifest
+
+
+def _zip_extraction(
+    values: dict,
+    field_confidence: dict | None = None,
+    no_extractable_content: bool = False,
+) -> bytes:
+    """Builds a real in-memory ZIP matching Sarvam's actual Extract job
+    result shape (verified live against a real account - see
+    app/ai/sarvam.py's module docstring): a ZIP containing extraction.json
+    with {"data", "field_confidence", "field_sources",
+    "no_extractable_content"}."""
+    payload = {
+        "data": values,
+        "field_confidence": field_confidence or {},
+        "field_sources": {},
+        "no_extractable_content": no_extractable_content,
+    }
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("extraction.json", json.dumps(payload))
+    return buf.getvalue()
 
 
 def _mock_response(
@@ -67,7 +91,9 @@ async def test_reconcile_evidence_success(sample_manifest, monkeypatch):
         }
     )
     download_url_resp = _mock_response({"url": "https://cdn.sarvam.ai/result.json"})
-    result_resp = _mock_response(content=json.dumps({"monthly_income": 66500}).encode("utf-8"))
+    result_resp = _mock_response(
+        content=_zip_extraction({"monthly_income": 66500}, {"monthly_income": 1})
+    )
 
     with (
         patch("httpx.AsyncClient.post", new=AsyncMock(return_value=post_resp)),
@@ -108,7 +134,9 @@ async def test_reconcile_evidence_partial_completion_treated_as_success(
         }
     )
     download_url_resp = _mock_response({"url": "https://cdn.sarvam.ai/result.json"})
-    result_resp = _mock_response(content=json.dumps({"monthly_income": 66500}).encode("utf-8"))
+    # No field_confidence given - overall confidence falls back to the
+    # pages_succeeded/pages_total ratio (0.5), exercising that fallback path.
+    result_resp = _mock_response(content=_zip_extraction({"monthly_income": 66500}))
 
     with (
         patch("httpx.AsyncClient.post", new=AsyncMock(return_value=post_resp)),
@@ -139,8 +167,8 @@ async def test_reconcile_evidence_invalid_response_falls_back(sample_manifest, m
     post_resp = _mock_response({"job_id": "job-3", "status": "processing"})
     status_resp = _mock_response({"job_id": "job-3", "status": "completed"})
     download_url_resp = _mock_response({"url": "https://cdn.sarvam.ai/result.json"})
-    # Not valid JSON -> SarvamInvalidResponseError -> fallback
-    bad_result_resp = _mock_response(content=b"not json at all")
+    # Not a valid ZIP archive -> SarvamInvalidResponseError -> fallback
+    bad_result_resp = _mock_response(content=b"not a zip file at all")
 
     with (
         patch("httpx.AsyncClient.post", new=AsyncMock(return_value=post_resp)),
@@ -334,6 +362,50 @@ async def test_reconcile_evidence_no_raw_file_falls_back(sample_manifest, monkey
 
 
 @pytest.mark.asyncio
+async def test_reconcile_evidence_no_extractable_content_is_not_verified(
+    sample_manifest, monkeypatch
+):
+    """A real, completed job that found nothing readable (Sarvam's own
+    no_extractable_content flag) must never be reported as verified with
+    fabricated confidence - verified live: a genuinely unreadable scan
+    still returns job status "completed", not "failed"."""
+    monkeypatch.setattr(settings, "SARVAM_ENABLED", True)
+    monkeypatch.setattr(settings, "SARVAM_API_KEY", "test-key")
+    provider = SarvamProvider(client=SarvamClient(api_key="test-key"))
+
+    post_resp = _mock_response({"job_id": "job-6", "status": "processing"})
+    status_resp = _mock_response(
+        {
+            "job_id": "job-6",
+            "status": "completed",
+            "usage": {"pages_total": 1, "pages_succeeded": 1},
+        }
+    )
+    download_url_resp = _mock_response({"url": "https://cdn.sarvam.ai/result.json"})
+    result_resp = _mock_response(content=_zip_extraction({}, no_extractable_content=True))
+
+    with (
+        patch("httpx.AsyncClient.post", new=AsyncMock(return_value=post_resp)),
+        patch(
+            "httpx.AsyncClient.get",
+            new=AsyncMock(side_effect=[status_resp, download_url_resp, result_resp]),
+        ),
+    ):
+        res = await provider.reconcile_evidence(
+            doc_type="SALARY_SLIP",
+            extracted_text="text",
+            manifest=sample_manifest,
+            raw_file=b"bytes",
+            filename="f.pdf",
+        )
+
+    assert res.provider == "sarvam"
+    assert res.verified is False
+    assert res.confidence == 0.0
+    assert res.detected == []
+
+
+@pytest.mark.asyncio
 async def test_reconcile_evidence_confidence_and_source_preserved_through_guardrails(
     sample_manifest, monkeypatch
 ):
@@ -358,7 +430,7 @@ async def test_reconcile_evidence_confidence_and_source_preserved_through_guardr
     )
     download_url_resp = _mock_response({"url": "https://cdn.sarvam.ai/result.json"})
     result_resp = _mock_response(
-        content=json.dumps({"monthly_income": {"value": 72000, "confidence": 0.91}}).encode("utf-8")
+        content=_zip_extraction({"monthly_income": 72000}, {"monthly_income": 0.91})
     )
 
     with (
@@ -399,9 +471,41 @@ async def test_sarvam_client_missing_api_key_raises_provider_error():
         client._headers()
 
 
-@pytest.mark.asyncio
-async def test_extract_result_invalid_json_raises_invalid_response_error():
+def test_extract_result_not_a_zip_raises_invalid_response_error():
     from app.ai.sarvam import _parse_extract_payload
 
     with pytest.raises(SarvamInvalidResponseError):
-        _parse_extract_payload(b"not json")
+        _parse_extract_payload(b"not a zip file at all")
+
+
+def test_extract_result_zip_with_malformed_json_raises_invalid_response_error():
+    from app.ai.sarvam import _parse_extract_payload
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("extraction.json", "{not valid json")
+
+    with pytest.raises(SarvamInvalidResponseError):
+        _parse_extract_payload(buf.getvalue())
+
+
+def test_extract_result_parses_real_verified_shape():
+    """Direct unit test of the parser against the exact shape verified
+    live against a real Sarvam account (see app/ai/sarvam.py's module
+    docstring) - a ZIP containing extraction.json with data/
+    field_confidence/field_sources/no_extractable_content."""
+    from app.ai.sarvam import _parse_extract_payload
+
+    raw = _zip_extraction({"monthly_income": 66500}, {"monthly_income": 1.0})
+    extraction = _parse_extract_payload(raw)
+    assert extraction.values == {"monthly_income": 66500}
+    assert extraction.field_confidence == {"monthly_income": 1.0}
+    assert extraction.no_extractable_content is False
+
+
+def test_extract_result_no_extractable_content_flag_parsed():
+    from app.ai.sarvam import _parse_extract_payload
+
+    raw = _zip_extraction({}, no_extractable_content=True)
+    extraction = _parse_extract_payload(raw)
+    assert extraction.no_extractable_content is True

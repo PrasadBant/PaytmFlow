@@ -26,22 +26,28 @@ wrapped by the SAME GuardrailedAIProvider every other provider goes
 through (untrusted-content wrapping, banned-word scanning, timeout,
 action-id membership checks) - none of that is touched or bypassed here.
 
-Undocumented-shape disclosure: Sarvam's public docs confirm the Extract
-job's REQUEST schema precisely (JSON Schema with type/description per
-field) but do not publish an exact worked example of the downloaded RESULT
-JSON's field-wrapping. `_parse_extract_payload`/`_extract_field_value`
-below are written defensively to accept the most likely shapes (a flat
-object matching the schema, or one nested under "fields"/"data"/
-"extracted"/"result", with each field either a bare value or a
-{"value", "confidence"} object) and must be verified/adjusted against a
-real Sarvam account's actual response before this is relied on in
-production - see docs/SARVAM_INTEGRATION.md's "Remaining limitations".
+Extract job result shape (verified live against a real Sarvam account,
+2026-09-19 - see docs/sarvam_integration.md): the downloaded result is a
+ZIP archive (not raw JSON, despite `output_format=json`), containing:
+- `extraction.json` - the schema-scoped result actually used here:
+  `{"data": {field: value}, "field_confidence": {field: 0-1},
+  "field_sources": {field: {document_id, filename, page_num}},
+  "no_extractable_content": bool}`.
+- `pages/<document_id>/page_NNN.json` - a broader, non-schema-scoped
+  per-page extraction (every label Sarvam's vision model found on that
+  page, not just the requested schema fields) - not consumed here; the
+  schema-scoped `extraction.json` already gives per-field confidence and
+  per-field page/document source traceability, which is what
+  `reconcile_evidence`/`AIInterpretationResult` need.
 """
 
 from __future__ import annotations
 
 import asyncio
+import io
 import json
+import zipfile
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
@@ -77,27 +83,45 @@ _JSON_TYPE_BY_FIELD_TYPE: dict[FieldType, str] = {
 }
 
 
-def _extract_field_value(raw_field: Any) -> tuple[Any, float | None]:
-    """Tolerates either a bare value or a {'value':..., 'confidence':...}
-    entry - see module docstring's undocumented-shape disclosure."""
-    if isinstance(raw_field, dict) and "value" in raw_field:
-        conf = raw_field.get("confidence")
-        return raw_field.get("value"), float(conf) if isinstance(conf, (int, float)) else None
-    return raw_field, None
+@dataclass
+class SarvamExtraction:
+    values: dict[str, Any]
+    field_confidence: dict[str, float]
+    field_sources: dict[str, dict[str, Any]]
+    no_extractable_content: bool
 
 
-def _parse_extract_payload(raw_bytes: bytes) -> dict[str, Any]:
+def _parse_extract_payload(raw_bytes: bytes) -> SarvamExtraction:
+    """Unzips a Document AI Extract job's downloaded result and parses its
+    `extraction.json` - see the module docstring for the verified real
+    shape."""
     try:
-        payload = json.loads(raw_bytes)
+        archive = zipfile.ZipFile(io.BytesIO(raw_bytes))
+    except zipfile.BadZipFile as exc:
+        raise SarvamInvalidResponseError(
+            "Sarvam extract result was not a valid ZIP archive"
+        ) from exc
+
+    try:
+        raw_json = archive.read("extraction.json")
+    except KeyError as exc:
+        raise SarvamInvalidResponseError(
+            "Sarvam extract result ZIP has no extraction.json"
+        ) from exc
+
+    try:
+        payload = json.loads(raw_json)
     except (ValueError, UnicodeDecodeError) as exc:
-        raise SarvamInvalidResponseError("Sarvam extract result was not valid JSON") from exc
+        raise SarvamInvalidResponseError("Sarvam extraction.json was not valid JSON") from exc
     if not isinstance(payload, dict):
-        raise SarvamInvalidResponseError("Sarvam extract result JSON was not an object")
-    for key in ("fields", "data", "extracted", "result"):
-        nested = payload.get(key)
-        if isinstance(nested, dict):
-            return nested
-    return payload
+        raise SarvamInvalidResponseError("Sarvam extraction.json was not a JSON object")
+
+    return SarvamExtraction(
+        values=payload.get("data") or {},
+        field_confidence=payload.get("field_confidence") or {},
+        field_sources=payload.get("field_sources") or {},
+        no_extractable_content=bool(payload.get("no_extractable_content", False)),
+    )
 
 
 class SarvamProvider:
@@ -306,15 +330,15 @@ class SarvamProvider:
 
             download_url = await self.client.get_download_url(job.job_id)
             result_bytes = await self.client.download_result(download_url)
-            fields = _parse_extract_payload(result_bytes)
+            extraction = _parse_extract_payload(result_bytes)
 
             detected: list[AIDetectedField] = []
             raw_values: dict[str, Any] = {}
             field_confidences: list[float] = []
             for key, label in labels.items():
-                if key not in fields:
+                if key not in extraction.values:
                     continue
-                value, field_conf = _extract_field_value(fields[key])
+                value = extraction.values[key]
                 if value is None:
                     continue
                 raw_values[key] = value
@@ -327,10 +351,13 @@ class SarvamProvider:
                 detected.append(
                     AIDetectedField(key=key, label=label, display_value=display_value, value=value)
                 )
-                if field_conf is not None:
-                    field_confidences.append(field_conf)
+                field_conf = extraction.field_confidence.get(key)
+                if isinstance(field_conf, int | float):
+                    field_confidences.append(float(field_conf))
 
-            if field_confidences:
+            if extraction.no_extractable_content:
+                overall_confidence = 0.0
+            elif field_confidences:
                 overall_confidence = sum(field_confidences) / len(field_confidences)
             elif status.pages_total:
                 overall_confidence = (status.pages_succeeded or 0) / status.pages_total
@@ -338,14 +365,27 @@ class SarvamProvider:
                 overall_confidence = 0.85 if detected else 0.0
 
             conflicts = self._detect_conflicts(raw_values, existing_fields or {}, manifest)
-            verified = bool(detected) and status.status == "completed" and not conflicts
-            doc_label = doc_type.replace("_", " ").title()
-            summary = (
-                f"Sarvam Document AI extracted {len(detected)} field(s) from this {doc_label}."
-                if detected
-                else f"Sarvam Document AI could not confidently extract fields from this "
-                f"{doc_label} document."
+            verified = (
+                bool(detected)
+                and status.status == "completed"
+                and not conflicts
+                and not extraction.no_extractable_content
             )
+            doc_label = doc_type.replace("_", " ").title()
+            if extraction.no_extractable_content:
+                summary = (
+                    f"Sarvam Document AI could not read this {doc_label} "
+                    "(poor scan quality or no legible text)."
+                )
+            elif detected:
+                summary = (
+                    f"Sarvam Document AI extracted {len(detected)} field(s) from this {doc_label}."
+                )
+            else:
+                summary = (
+                    f"Sarvam Document AI could not confidently extract fields "
+                    f"from this {doc_label} document."
+                )
 
             return AIInterpretationResult(
                 verified=verified,

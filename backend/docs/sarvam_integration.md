@@ -59,7 +59,7 @@ writes journey state.
 | Capability | Sarvam API used | Where it's wired in |
 |---|---|---|
 | Document extraction | Document AI Extract (`POST /doc-ai/v1/job/extract`, async job) | `SarvamProvider.reconcile_evidence` |
-| Reviewer AI summary | Chat completions (`POST /chat/completions`) | `ReviewCaseService.summarize_case` |
+| Reviewer AI summary | Chat completions (`POST /v1/chat/completions`, model `sarvam-105b-conversations`) | `ReviewCaseService.summarize_case` |
 | Customer assistant (voice) | Speech-to-text (`POST /speech-to-text`, Saaras) | `POST /journeys/{id}/chat/voice` |
 | Multilingual explanations | Translation (`POST /translate`, Mayura) | `POST /translate` |
 
@@ -89,19 +89,31 @@ documentation (docs.sarvam.ai) before implementation - none are invented.
    pipeline, and honestly labels the result's `provider` field
    `"local_ml"` rather than `"sarvam"`.
 
-### Remaining limitation (disclosed, not hidden)
+### Verified live against a real Sarvam account (2026-09-19)
 
-Sarvam's public docs confirm the Extract job's *request* schema precisely,
-but do not publish a worked example of the downloaded *result* JSON's
-field-wrapping. `app/ai/sarvam.py`'s `_parse_extract_payload`/
-`_extract_field_value` are written defensively to accept the most likely
-shapes (a flat object matching the schema, or one nested under
-`fields`/`data`/`extracted`/`result`, each field either a bare value or a
-`{"value", "confidence"}` object) - **this should be verified against a
-real Sarvam account's actual response** before being relied on in
-production. All 15 unit tests in `tests/unit/test_ai_sarvam.py` mock the
-HTTP boundary and therefore validate the provider's own logic, not
-Sarvam's real response shape.
+The Extract job's downloaded result is a **ZIP archive** (not raw JSON,
+despite requesting `output_format=json`), containing `extraction.json` -
+`{"data": {field: value}, "field_confidence": {field: 0-1},
+"field_sources": {field: {document_id, filename, page_num}},
+"no_extractable_content": bool}` - plus one `pages/<doc_id>/page_NNN.json`
+per page with a broader, non-schema-scoped extraction (not used here).
+`app/ai/sarvam.py`'s `_parse_extract_payload` unzips this and reads
+`extraction.json` directly; this was not documented anywhere publicly and
+was determined by inspecting a real job's real output.
+
+Also verified live: the chat-completions endpoint is `POST
+/v1/chat/completions` (not `/chat/completions`), and the default model must
+be `sarvam-105b-conversations`, not the bare `sarvam-105b` reasoning model -
+the reasoning variant emits its answer into a separate `reasoning_content`
+field first and can exhaust the entire `max_tokens` budget on reasoning
+before ever producing real `content` (observed directly: a 50-token budget
+returned `content: null`, `finish_reason: "length"`).
+
+Both a real salary-slip PDF (Document AI Extract -> `monthly_income`
+correctly extracted, `confidence: 1.0`, `verified: true`) and a real chat
+completion were run against the live Sarvam API while fixing this, using a
+real `SARVAM_API_KEY` - not mocked. `tests/unit/test_ai_sarvam.py`'s HTTP
+mocks were updated to match this real, now-verified shape.
 
 ## Source traceability / provider metadata
 
@@ -191,8 +203,9 @@ disables Sarvam entirely - the rest of PaytmFlow is unaffected either way.
 
 ## Testing
 
-- `tests/unit/test_ai_sarvam.py` - 15 tests: successful/partial/failed
-  extraction, invalid response, timeout, rate limit, provider error,
+- `tests/unit/test_ai_sarvam.py` - 20 tests: successful/partial/failed
+  extraction (against the real, verified ZIP+extraction.json shape),
+  invalid response, timeout, rate limit, provider error,
   disabled/unconfigured/no-file fallback, confidence/source preservation
   through `GuardrailedAIProvider`, API-key protection.
 - `tests/integration/test_review_ai_summary.py` - 3 tests: advisory summary
