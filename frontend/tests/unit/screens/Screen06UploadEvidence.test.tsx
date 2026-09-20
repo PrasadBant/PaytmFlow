@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -208,6 +208,123 @@ describe('Screen06UploadEvidence (F19)', () => {
     expect(html).not.toMatch(/\bprobability\b/i);
     expect(html).not.toMatch(/\beligibility\b/i);
     expect(html).not.toMatch(/\bguaranteed\b/i);
+  });
+
+  describe('synthetic demo document (judge test experience)', () => {
+    it('offers the demo document panel for an action whose accepted types have a real sample', async () => {
+      renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/UPLOAD_INCOME_PROOF', {
+        action: {
+          action_id: 'UPLOAD_INCOME_PROOF',
+          title: 'Upload Salary Slip',
+          kind: 'EVIDENCE',
+          why: 'Verifying income unlocks the loan offer.',
+          unlocks: ['monthly_income'],
+          accepts: ['SALARY_SLIP', 'BANK_STATEMENT'],
+        },
+        snapshotId: '11111111-1111-4111-8111-111111111111',
+      });
+
+      await screen.findByRole('heading', { level: 1 });
+
+      expect(screen.getByTestId('demo-document-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('use-demo-document-btn')).toHaveTextContent('Use Sample Salary Slip');
+      expect(screen.getByTestId('download-demo-document-link')).toHaveAttribute(
+        'href',
+        '/demo-documents/sample-salary-slip.pdf'
+      );
+      expect(screen.getByText(/Synthetic demo document/i)).toBeInTheDocument();
+    });
+
+    it(
+      '"Use Sample" fetches the real committed static file and feeds it into the SAME selectedFile/doc_type state a manual upload uses (no bypass)',
+      async () => {
+        let evidencePostReceived = false;
+        server.use(
+          // The demo document's own static-asset GET, intercepted by MSW
+          // exactly like the real POST below - not a raw fetch stub - so
+          // this test exercises the same request pipeline a real browser
+          // fetch to a public static file would use.
+          http.get('*/demo-documents/sample-salary-slip.pdf', () => {
+            return HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3]).buffer, {
+              headers: { 'Content-Type': 'application/pdf' },
+            });
+          }),
+          http.post('*/api/v1/journeys/:journey_id/evidence', async () => {
+            evidencePostReceived = true;
+            return HttpResponse.json({
+              evidence_id: 'evi-demo-doc-test',
+              filename: 'sample-salary-slip.pdf',
+              uploaded_at: new Date().toISOString(),
+              size_bytes: 100,
+              interpretation: {
+                verified: true,
+                confidence: 0.95,
+                detected: [],
+                summary: 'Salary slip verified',
+                conflicts: [],
+              },
+              proposed_action_id: 'UPLOAD_INCOME_PROOF',
+              consequence_preview: null,
+              diff_preview: null,
+              requires_review: false,
+            });
+          })
+        );
+
+        const user = userEvent.setup();
+        renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/UPLOAD_INCOME_PROOF', {
+          action: {
+            action_id: 'UPLOAD_INCOME_PROOF',
+            title: 'Upload Salary Slip',
+            kind: 'EVIDENCE',
+            why: 'Verifying income unlocks the loan offer.',
+            unlocks: ['monthly_income'],
+            accepts: ['SALARY_SLIP', 'BANK_STATEMENT'],
+          },
+          snapshotId: '11111111-1111-4111-8111-111111111111',
+        });
+
+        await screen.findByRole('heading', { level: 1 });
+
+        await user.click(screen.getByTestId('use-demo-document-btn'));
+
+        // The dropzone now shows the fetched sample as a real selected File -
+        // the exact same selectedFile state a manual file pick would set -
+        // and the doc_type select was auto-set to the demo doc's real type.
+        expect(
+          await screen.findByText('sample-salary-slip.pdf', {}, { timeout: 3000 })
+        ).toBeInTheDocument();
+        expect(screen.getByTestId('doc-type-select')).toHaveValue('SALARY_SLIP');
+
+        const submitBtn = screen.getByTestId('upload-submit-btn');
+        expect(submitBtn).toBeEnabled();
+
+        await user.click(submitBtn);
+
+        // Submits through the real POST /evidence endpoint - the exact
+        // same mutation a manually-picked file uses (already proven to
+        // send a correct multipart file+doc_type body by the "uploads a
+        // file from Tab 1" test above) - not a fake success shortcut.
+        await waitFor(() => expect(evidencePostReceived).toBe(true));
+      }
+    );
+
+    it('does not render the demo panel for an action with no committed demo document', async () => {
+      renderScreen6('/j/11111111-1111-1111-1111-111111111111/act/UPLOAD_WORK_ID', {
+        action: {
+          action_id: 'UPLOAD_WORK_ID',
+          title: 'Upload Work Identity Document',
+          kind: 'EVIDENCE',
+          why: 'Verify employer.',
+          unlocks: ['employer_name'],
+          accepts: ['SOME_UNSUPPORTED_DOC_TYPE'],
+        },
+        snapshotId: '11111111-1111-4111-8111-111111111111',
+      });
+
+      await screen.findByRole('heading', { level: 1 });
+      expect(screen.queryByTestId('demo-document-panel')).not.toBeInTheDocument();
+    });
   });
 
   describe('action-kind-aware rendering (regression)', () => {
@@ -591,8 +708,8 @@ describe('Screen06UploadEvidence (F19)', () => {
       // Selector is shown, offering both accepted types.
       const select = await screen.findByTestId('doc-type-select');
       expect(select).toBeInTheDocument();
-      expect(screen.getByText(/Salary Slip/)).toBeInTheDocument();
-      expect(screen.getByText(/Bank Statement/)).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Salary Slip' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Bank Statement' })).toBeInTheDocument();
 
       const fileInput = screen.getByTestId('evidence-file-input');
       fireEvent.change(fileInput, {

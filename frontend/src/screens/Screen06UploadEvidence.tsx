@@ -6,6 +6,8 @@ import { useRecommendation } from '@/api/hooks/useRecommendation';
 import { useUploadEvidence } from '@/api/hooks/useUploadEvidence';
 import { useApplyAction } from '@/api/hooks/useApplyAction';
 import { EvidenceDropzone } from '@/components/EvidenceDropzone';
+import { DemoDocumentPanel } from '@/components/DemoDocumentPanel';
+import { getDemoDocumentForAcceptedTypes } from '@/lib/demoDocuments';
 import { SchemaForm } from '@/components/SchemaForm/SchemaForm';
 import { SchedulingPicker } from '@/components/interactions/SchedulingPicker';
 import { ConsentPanel } from '@/components/interactions/ConsentPanel';
@@ -119,6 +121,7 @@ export const Screen06UploadEvidence: React.FC = () => {
     ? selectedDocType
     : acceptedDocTypes[0] || fallbackDocType;
   const docTypeOptions = acceptedDocTypes.map((dt) => ({ value: dt, label: humanizeDocType(dt) }));
+  const demoDoc = getDemoDocumentForAcceptedTypes(acceptedDocTypes);
 
   // This route serves every resolve_action_id on Screen 4/5, for every action kind,
   // across all six packs - not just LENDING's income-proof upload. The screen must
@@ -411,6 +414,20 @@ export const Screen06UploadEvidence: React.FC = () => {
           className="space-y-6"
         >
           <Card className="p-6 md:p-8 space-y-6 bg-white border border-surface-border shadow-xs rounded-card">
+            {demoDoc && (
+              <DemoDocumentPanel
+                demoDoc={demoDoc}
+                disabled={uploadEvidence.isPending}
+                onUseSample={(file) => {
+                  setSelectedFile(file);
+                  setSubmitError(null);
+                  if (requiresDocTypeChoice) {
+                    setSelectedDocType(demoDoc.docType);
+                  }
+                }}
+              />
+            )}
+
             {requiresDocTypeChoice && (
               <Select
                 label="Which document are you uploading?"

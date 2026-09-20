@@ -151,6 +151,7 @@ describe('Screen03GoalBasicInfo', () => {
       expect(screen.getByLabelText(/Aadhaar Number/i)).toBeInTheDocument();
     });
 
+    await user.type(screen.getByLabelText(/Email for updates/i), 'customer@example.com');
     await user.type(screen.getByLabelText(/Aadhaar Number/i), '1234 5678 9012');
     await user.selectOptions(screen.getByLabelText(/Verification Purpose/i), 'Wallet Upgrade');
 
@@ -206,7 +207,7 @@ describe('Screen03GoalBasicInfo', () => {
     expect(requestReceived).toBe(false);
   });
 
-  it('sends a valid customer_email with the create-journey request, and blank leaves it out', async () => {
+  it('sends the required customer_email with the create-journey request', async () => {
     const user = userEvent.setup();
     let capturedBody: Record<string, unknown> | undefined;
     server.use(
@@ -233,6 +234,30 @@ describe('Screen03GoalBasicInfo', () => {
     await waitFor(() => {
       expect(capturedBody?.customer_email).toBe('customer@example.com');
     });
+  });
+
+  it('requires an email and blocks submission when left blank', async () => {
+    const user = userEvent.setup();
+    let requestReceived = false;
+    server.use(
+      http.post('*/api/v1/journeys', async () => {
+        requestReceived = true;
+        return HttpResponse.json({}, { status: 201 });
+      })
+    );
+
+    renderWithProviders('/start/kyc');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Aadhaar Number/i)).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByLabelText(/Aadhaar Number/i), '1234 5678 9012');
+    await user.selectOptions(screen.getByLabelText(/Verification Purpose/i), 'Wallet Upgrade');
+    await user.click(screen.getByRole('button', { name: /Continue →/i }));
+
+    expect(await screen.findByText(/Email is required/i)).toBeInTheDocument();
+    expect(requestReceived).toBe(false);
   });
 
   it('contains no prohibited words or claims', async () => {

@@ -333,6 +333,36 @@ Run both of the above concurrently, then set `VITE_API_MODE=live` in
    dedicated Review Center queue, can claim it, request more information,
    escalate it, or resolve it.
 
+## Try the Demo
+
+You don't need a real bank statement, salary slip, or ID to test the actual
+product. The flagship **Personal Loan (LENDING)** journey ships with two
+committed **synthetic demo documents** so anyone — a judge, a reviewer, you —
+can walk the real evidence pipeline end to end with fictional data:
+
+1. Open the application and select **Personal Loan**.
+2. Enter an email (required — this is what lets you actually receive the
+   real n8n customer-notification email described below) and the requested
+   loan details.
+3. On the document upload step, if you don't have a compatible salary slip
+   or offer letter, use the **"Testing PaytmFlow?"** panel: click **Use
+   Sample** (or **Download instead** and upload it yourself) to feed a
+   synthetic salary slip / offer letter straight into the exact same
+   upload → OCR → AI classification/extraction → deterministic validation
+   pipeline a real document goes through. Nothing about the result is
+   faked or hardcoded — see `frontend/public/demo-documents/` and
+   `backend/tests/integration/test_demo_documents.py`, which submits these
+   same committed files through the real HTTP evidence endpoint and drives
+   the journey to `READY`.
+4. Continue through the journey to see the deterministic engine's decision
+   and, if applicable, the Review Center flow.
+5. Watch for the real n8n-driven notification email at the address you
+   entered as the journey progresses.
+
+**All provided documents contain synthetic/demo data only — do not upload
+real financial or identity documents.** Every generated file carries a
+visible "SYNTHETIC DEMO DOCUMENT — NOT A REAL FINANCIAL RECORD" banner.
+
 ## API
 
 Full, authoritative surface: `contract/openapi.yaml`; interactive Swagger
@@ -378,8 +408,8 @@ document.
 
 | Suite | Command | Result (most recent full run) |
 |---|---|---|
-| Backend pytest | `cd backend && uv run pytest` | 660/660 passed |
-| Frontend unit tests (Vitest) | `cd frontend && npm run test` | 376/376 passed |
+| Backend pytest | `cd backend && uv run pytest` | 660/660 passed as of the last full run; 3 new tests added since (`tests/integration/test_demo_documents.py`) independently verified passing, full suite not yet reconfirmed together — see note below |
+| Frontend unit tests (Vitest) | `cd frontend && npm run test` | 383/383 passed |
 | Ruff (lint + format) | `uv run ruff check . && uv run ruff format --check .` | Clean |
 | mypy (whole app) | `uv run mypy app` | Clean except pre-existing, unrelated missing-stub warnings in offline dataset-generation/benchmarking scripts, not part of the deployed application |
 | import-linter | `uv run lint-imports` | Clean — deterministic engine boundary intact |
@@ -391,6 +421,16 @@ A Playwright end-to-end suite also exists under `frontend/tests/e2e/`,
 exercising real-browser flows against a live backend; no specific pass
 count is quoted here to avoid citing a stale number — run
 `npm run test:e2e` for a current result.
+
+The backend's full suite was last run in its entirety without the 3
+newly-added demo-document tests. In an environment without a locally
+running PostgreSQL instance, targeted verification was run instead: all
+359 DB-independent unit tests, plus 72 targeted integration/contract/
+safety tests covering every area the demo-document/email change touches
+(evidence endpoints, full journey flow, evidence-action integrity, system
+endpoints, n8n notifications, and the new demo-document tests
+themselves) — all passing. Run `uv run pytest` yourself against a real
+PostgreSQL instance for a current full-suite count.
 
 ## Security
 

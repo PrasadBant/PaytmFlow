@@ -136,8 +136,12 @@ export function Screen03GoalBasicInfo(): ReactElement {
     setEmailError(null);
 
     const trimmedEmail = customerEmail.trim();
-    if (trimmedEmail && !EMAIL_PATTERN.test(trimmedEmail)) {
-      setEmailError('Enter a valid email address, or leave this field blank.');
+    if (!trimmedEmail) {
+      setEmailError('Email is required so we can send you updates about this case.');
+      return;
+    }
+    if (!EMAIL_PATTERN.test(trimmedEmail)) {
+      setEmailError('Enter a valid email address.');
       return;
     }
 
@@ -146,7 +150,7 @@ export function Screen03GoalBasicInfo(): ReactElement {
         journey_type: pack.journey_type,
         goal: values,
         natural_language: naturalLanguage.trim() ? naturalLanguage.trim() : undefined,
-        customer_email: trimmedEmail || undefined,
+        customer_email: trimmedEmail,
       });
 
       navigate(`/j/${result.journey_id}`);
@@ -292,22 +296,25 @@ export function Screen03GoalBasicInfo(): ReactElement {
             className="flex items-center gap-1.5 text-sm font-semibold text-content-primary"
           >
             <Mail className="w-4 h-4 text-paytm-blue" />
-            Email for updates (Optional)
+            Email for updates
+            <span className="text-paytm-red" aria-hidden="true">*</span>
           </label>
           <p className="text-xs text-content-secondary">
-            We&apos;ll only use this to send you updates about this case. Leave blank to skip.
+            Required — we&apos;ll send you real updates about this case as it progresses.
           </p>
           <input
             id="customer-email-input"
             type="email"
             inputMode="email"
             autoComplete="email"
+            required
             value={customerEmail}
             onChange={(e) => {
               setCustomerEmail(e.target.value);
               if (emailError) setEmailError(null);
             }}
             placeholder="you@example.com"
+            aria-required="true"
             aria-invalid={emailError ? true : undefined}
             aria-describedby={emailError ? 'customer-email-error' : undefined}
             className="w-full rounded-button bg-surface border border-surface-border p-3 text-sm text-content-primary placeholder:text-content-tertiary focus-visible:ring-2 focus-visible:ring-paytm-cyan focus-visible:border-paytm-cyan focus-visible:outline-none transition-colors duration-150"
