@@ -50,6 +50,27 @@ def test_upload_validation_magic_bytes_and_disallowed_extensions():
     assert "empty" in str(exc_info.value)
 
 
+def test_store_evidence_file_ignores_malicious_filename_path_components():
+    """Security audit regression guard: a filename is never used to build
+    the on-disk path - only the server-generated sha256 hash + an
+    allowlisted extension are. A path-traversal filename must not let a
+    file land anywhere outside <storage_dir>/<journey_id>/."""
+    journey_id = uuid4()
+    content = b"%PDF-1.4\n%fake pdf content for the traversal test"
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        file_path, sha256_hash, _, _ = store_evidence_file(
+            journey_id=journey_id,
+            filename="../../../../etc/passwd.pdf",
+            content=content,
+            storage_dir=tmp_dir,
+        )
+        resolved = Path(file_path).resolve()
+        expected_dir = (Path(tmp_dir) / str(journey_id)).resolve()
+        assert resolved.parent == expected_dir
+        assert resolved.name == f"{sha256_hash}.pdf"
+        assert ".." not in resolved.parts
+
+
 def test_upload_validation_valid_formats():
     # PDF
     mime, ext = validate_upload(b"%PDF-1.4\n%header", filename="doc.pdf")

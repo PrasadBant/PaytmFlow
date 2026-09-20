@@ -99,6 +99,19 @@ async def test_create_journey_without_customer_email_is_unaffected(client: Async
 
 
 @pytest.mark.asyncio
+async def test_responses_carry_hardening_security_headers(client: AsyncClient):
+    """Security audit regression guard: every API response (JSON-only, never
+    HTML) must never be framed, MIME-sniffed, cached by a shared cache, or
+    leak geolocation/mic/camera to an embedding page."""
+    resp = await client.get("/api/v1/health")
+    assert resp.headers["x-content-type-options"] == "nosniff"
+    assert resp.headers["x-frame-options"] == "DENY"
+    assert resp.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert resp.headers["cache-control"] == "no-store"
+    assert "microphone=()" in resp.headers["permissions-policy"]
+
+
+@pytest.mark.asyncio
 async def test_demo_reset_endpoint(client: AsyncClient):
     # Without secret header -> 401
     resp_unauth = await client.post("/api/v1/demo/reset")

@@ -36,6 +36,15 @@ RUN chmod +x docker-entrypoint.sh
 # Create storage directory for evidence uploads
 RUN mkdir -p storage/evidence
 
+# Security audit hardening: the image previously ran as root with no USER
+# directive - a container-escape or dependency RCE would then have root
+# inside the container. Everything above (apt-get, uv system install) needs
+# root; nothing below does, so switch before the process actually starts.
+RUN groupadd --system paytmflow && \
+    useradd --system --gid paytmflow --home-dir /app --shell /usr/sbin/nologin paytmflow && \
+    chown -R paytmflow:paytmflow /app
+USER paytmflow
+
 EXPOSE 8000
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
