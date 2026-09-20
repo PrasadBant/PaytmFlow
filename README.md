@@ -1,439 +1,303 @@
 # PaytmFlow
 
-A deterministic financial journey recovery platform with local Document AI.
+> A deterministic financial-journey recovery platform: guided document/form workflows across six financial products, backed by a local-or-cloud Document AI pipeline, a human review queue, and event-driven notifications.
 
-PaytmFlow turns fragmented document and form requirements into a guided,
-state-aware workflow. A user picks a financial goal, and the system tracks
-exactly which requirements are outstanding, recommends the single next
-action that unblocks progress, interprets uploaded documents through a
-locally-run OCR and classification pipeline, and advances a versioned
-journey state only when that evidence has actually been verified.
+**Status:** Hackathon/demo prototype, actively deployed.
+**Live frontend:** https://paytmflow-frontend.vercel.app
+**Live backend health:** https://paytmflow-backend.onrender.com/api/v1/health
+**API docs:** https://paytmflow-backend.onrender.com/docs
+**License:** Not currently specified in this repository.
 
-The pipeline behind every step is:
+---
 
-```
-Document ingestion → OCR → classification → field extraction
-  → evidence validation → deterministic workflow evaluation
-  → next-action recommendation → user action → updated state → handoff
-```
+## Overview
 
-**This is a prototype.** It demonstrates the end-to-end workflow and the
-technical architecture behind it — deterministic state management, a
-manifest-driven journey engine, and a self-contained Document AI pipeline —
-running against a real PostgreSQL database. It is not a production
-financial-services platform, and nothing in this repository should be
-treated as one.
+PaytmFlow is a guided workflow engine for financial products — a personal
+loan, a health insurance enrollment, periodic KYC re-verification, a
+co-branded credit card, a savings account, or a mutual fund investment. A
+user picks one of six journeys, and the system tracks exactly which
+requirements are still outstanding, explains why each one is blocked,
+recommends a single next action, and interprets any document the user
+uploads through a real document-intelligence pipeline before deciding
+whether that document actually satisfies the requirement.
 
-## Why this exists
+It solves this by keeping two concerns strictly separate: an AI/OCR layer
+that *interprets* evidence (what kind of document is this, what does it
+say, how confident is that reading), and a deterministic engine, driven
+entirely by per-journey YAML configuration, that *decides* whether a
+requirement is satisfied and *writes* the resulting state. The AI layer
+never has write access to journey state — it can only produce a proposal
+that the deterministic engine independently validates.
 
-Financial workflows — applying for a loan, re-verifying KYC, opening an
-account — usually fail the user in the same way: it's unclear what's
-missing, unclear why, and unclear what happens after a document is
-submitted. PaytmFlow addresses this directly. Every blocked requirement
-carries a plain-language reason. Every recommended action is derived from
-the journey's actual current state, not a static checklist. And every piece
-of uploaded evidence goes through a real, local document-understanding
-pipeline rather than a rubber stamp — a document that doesn't match what
-was asked for is rejected, not silently accepted.
+When something can't be resolved deterministically — two documents that
+disagree on an amount, evidence that's plausible but under the confidence
+threshold — the case is routed to a lightweight Human Review Center rather
+than guessed at by a model, and outbound events (Slack for reviewers,
+email for customers) are dispatched through a real n8n Cloud workflow at
+each meaningful lifecycle point.
 
-The part of the implementation most worth reading is the separation between
-interpretation and decision: an evidence pipeline extracts and scores what a
-document contains, but it never writes state directly. A separate,
-deterministic engine — driven entirely by per-journey YAML configuration —
-is the only thing that can decide a requirement is satisfied and advance the
-journey. That boundary is enforced in code, not just in convention (see
-[Document integrity](#document-integrity) below).
+It's built for two overlapping audiences: an applicant moving through a
+financial workflow who needs to know what's missing and why, and a
+reviewer who needs a queue of exactly the cases that genuinely require a
+human decision — not every case.
 
-## Key capabilities
+## Problem
 
-- **Six independent financial journeys** sharing one frontend and one
-  backend engine, entirely configuration-driven — no journey-specific
-  branching in application code.
-- **Deterministic workflow engine**: journey state is a set of typed
-  fields connected by an explicit dependency graph; state only changes
-  through one audited mutation path.
-- **Local Document AI**: OCR, document-type classification, and structured
-  field extraction all run locally, with no external API dependency.
-- **Cross-document consistency checks**: a second document that
-  contradicts an already-applied value (a different income figure, a
-  mismatched identifier) is flagged for review rather than silently
-  overwriting the first.
-- **Evidence integrity controls**: uploaded documents are untrusted input.
-  Client-declared document types and client-supplied extracted values are
-  never taken at face value — the server independently resolves and
-  classifies evidence.
-- **Explicit "Needs Review" handling** for evidence that is genuine but
-  falls short of the confidence needed for automatic verification, instead
-  of a binary accept/reject.
-- **Snapshot-based, append-only state transitions**, each requiring the
-  caller's expected snapshot version — stale or conflicting mutations are
-  rejected, never silently applied.
-- **Session isolation**: a signed, anonymous session cookie scopes every
-  journey, and one session cannot read or mutate another's data.
-- **Idempotent mutations** on the sole state-changing endpoint, keyed by a
-  client-supplied idempotency key, so a retried or double-submitted request
-  cannot double-apply.
-- **Responsive, accessible web UI** covering the full journey lifecycle
-  from goal selection through handoff.
-- **Real PostgreSQL persistence** with append-only, trigger-enforced
-  snapshot immutability.
-- **API-first design**: the frontend and backend communicate over a single
-  documented REST contract (`contract/openapi.yaml`).
-- **A substantial automated test suite** spanning unit, integration,
-  contract, and end-to-end browser coverage (see [Testing & quality](#testing--quality)).
+Financial workflows built around document collection tend to fail users in
+the same three ways:
 
-## The six journeys
+- **It's unclear what's missing.** A rejected or pending application
+  rarely explains, in plain language, which specific requirement is
+  blocking progress.
+- **It's unclear why.** A generic "verification failed" message gives no
+  actionable next step.
+- **It's unclear what happens after submission.** A document goes into a
+  queue with no visibility into whether it was even the right kind of
+  document, or whether a conflicting earlier submission is quietly
+  overriding it.
 
-| Journey | Purpose |
-|---|---|
-| Lending | Instant unsecured personal loan application, up to ₹5,00,000 |
-| Insurance | Health insurance enrollment with cashless hospitalization cover |
-| KYC | RBI-mandated periodic identity re-verification for existing customers |
-| Credit Card | Co-branded cashback credit card application with zero annual fee |
-| Account Opening | Digital zero-balance savings account opening |
-| Investment | Mutual fund SIP and lump-sum investment portfolio setup |
+The common underlying cause is that document interpretation and workflow
+decision-making are usually the same step, often behind an opaque or
+fully-manual process, so there's no way to trust a decision or to reproduce
+it later.
 
-Each journey is defined entirely by a YAML manifest under
-`backend/app/packs/manifests/` — its required fields, its dependency graph,
-its available actions, and which document types satisfy which fields. The
-frontend and the deterministic engine are both journey-agnostic; adding or
-changing a journey is a configuration change, not a code change.
+## Solution
 
-## How the system works
+PaytmFlow separates interpretation from decision at the architecture level,
+not just as a convention:
 
-```
-Browser
-   │
-   ▼
-React Frontend  (Vite dev server / static build)
-   │
-   │ REST / JSON, single documented contract
-   ▼
-FastAPI API
-   │
-   ├── Journey Service           orchestrates requests, loads manifests
-   ├── Deterministic Engine      pure state evaluation, no I/O
-   ├── Recommendation Planner    derives the next action from current state
-   ├── Evidence Pipeline         resolves, stores, and reconciles uploads
-   ├── Local Document AI
-   │      ├── OCR                 PyMuPDF (native PDF text) + Tesseract (images/scans)
-   │      ├── Classification      TF-IDF + logistic regression, one model per journey
-   │      └── Field Extraction    rule/regex-based, with OCR-noise normalization
-   │
-   ▼
-PostgreSQL  (append-only snapshots, trigger-enforced immutability)
-```
+1. A document is ingested and validated by content (magic bytes), not by
+   its declared name or extension.
+2. It's run through a Document AI pipeline — either a from-scratch local
+   pipeline (OCR + trained classifier + rule-based extraction) or an
+   optional real cloud provider (Sarvam AI) — which produces a
+   classification, extracted field values, and a confidence score.
+3. That output is handed to a **deterministic engine** as a proposal only.
+   The engine — pure, I/O-free, and enforced as such by an import-linter
+   contract — evaluates it against the journey's YAML-defined dependency
+   graph and confidence thresholds, and is the *only* code path allowed to
+   advance journey state.
+4. If the engine can't resolve something on its own (a conflict, a
+   borderline confidence score), the case goes to a **Human Review
+   Center** instead of being decided automatically.
+5. Real lifecycle events (evidence uploaded, review needed, case resolved,
+   journey completed) are dispatched to an **n8n Cloud** workflow, which
+   notifies reviewers on Slack and customers by email — asynchronously,
+   and never in a way that can block or fail the request that triggered
+   it.
 
-- **React Frontend** renders the ten-screen journey flow (Home, journey
-  selection, goal, status, recommendation, evidence/form action, AI
-  analysis, updated state, handoff, and journey list) from server-supplied
-  data only — labels, values, and explanations are never computed
-  client-side.
-- **FastAPI API** exposes a single REST surface documented in
-  `contract/openapi.yaml`; every mutating request goes through one endpoint.
-- **Journey Service** is the orchestration layer: it loads the relevant
-  journey manifest, calls the deterministic engine to evaluate state, and
-  calls the evidence pipeline when a document is involved.
-- **Deterministic Engine** (`backend/app/core`) is intentionally pure — no
-  database access, no AI calls, no randomness. It evaluates the current
-  snapshot's fields against the manifest's dependency graph and produces
-  the next valid state. This boundary is enforced by an import-linter
-  contract, not just convention.
-- **Evidence Pipeline** resolves an uploaded document through OCR,
-  classification, and extraction, then reconciles the result against the
-  manifest's evidence mappings — but it can only *propose* a resulting
-  state; only the deterministic engine can commit one.
-- **PostgreSQL** stores every journey as an append-only sequence of
-  immutable snapshots, with database triggers (not just application code)
-  preventing an existing snapshot row from being modified.
+## Key Features
 
-## Document AI
+### Six configuration-driven journeys
+Lending, Insurance, KYC, Credit Card, Account Opening, and Investment all
+share one frontend and one backend engine. Each journey's required fields,
+dependency graph, available actions, and evidence mappings live in a YAML
+manifest (`backend/app/packs/manifests/`) — there is no
+`if journey_type == "LENDING"` branching anywhere in the engine or the UI.
 
-The Document AI pipeline (`backend/app/docai/`) is a from-scratch, locally
-run implementation — no external AI API, no hosted model. It exists to turn
-an uploaded file into structured, validated field values, in six stages:
+### Deterministic workflow engine
+Journey state is a set of typed fields (`SATISFIED`, `BLOCKED`,
+`AMBIGUOUS`, ...) connected by an explicit dependency graph. Every mutation
+must supply the snapshot version it expects; a stale or conflicting
+mutation is rejected outright. Snapshots are immutable and append-only,
+enforced by database triggers, not just application code.
 
-1. **Ingestion** — the uploaded file's magic bytes are validated against an
-   allow-list before anything else touches it; its declared MIME type is
-   never trusted on its own.
-2. **OCR** — native PDF text is extracted with PyMuPDF; scanned PDFs and
-   images fall back to Tesseract OCR via `pytesseract`, with layout and
-   confidence metadata (bounding boxes, per-line confidence) carried
-   forward rather than discarded.
-3. **Document-type classification** — a TF-IDF (1–2 gram) vectorizer feeding
-   a logistic-regression classifier, trained separately per journey
-   (`backend/app/docai/train_classifier.py`), predicts what kind of
-   document was actually uploaded — independent of what the client
-   declared when submitting it.
-4. **Field extraction** — rule- and regex-based extraction pulls the
-   fields a given document type is expected to contain (amounts, dates,
-   identifiers, names), with normalization logic that corrects common OCR
-   character confusion (e.g. `O`/`0`, `l`/`1`) before a value is accepted.
-5. **Validation** — extracted values are checked for internal consistency
-   and, where a second document overlaps with an already-applied one,
-   cross-document consistency (see [Document integrity](#document-integrity)).
-6. **Deterministic workflow decision** — the pipeline's output (a
-   classification, a confidence score, and extracted values) is handed to
-   the deterministic engine as a *proposal*. Whether that proposal actually
-   satisfies a requirement and advances the journey is decided by
-   deterministic logic evaluating it against the manifest's configured
-   confidence threshold — never by the AI pipeline itself.
+### Dual Document AI providers
+A local, from-scratch pipeline (PyMuPDF + Tesseract OCR, a TF-IDF/logistic-
+regression classifier trained per journey, rule-based field extraction with
+OCR-noise correction) runs with no external API. An optional cloud
+provider, Sarvam AI, can be swapped in by configuration for Document AI,
+speech-to-text, translation, and chat — with automatic, logged fallback to
+the local pipeline on any failure.
 
-That last distinction is the core design decision in this codebase:
+### Human Review / Exception Resolution Center
+Cases the deterministic engine can't resolve on its own are queued,
+claimable (with optimistic-lock protection against two reviewers grabbing
+the same case), and resolvable — resolution re-enters the *same*
+deterministic mutation path a customer's own action would use, never a
+separate write path. An optional AI-generated case summary is available as
+an advisory aid, always labeled as such.
 
-> **AI proposes and interprets; deterministic application logic decides and
-> writes state.**
+### Event-driven notifications (n8n Cloud)
+Six real lifecycle events — review required, evidence uploaded, customer
+action required, journey resolved, escalated, and journey completed — are
+dispatched to a production n8n workflow with header-secret auth, an event
+allowlist, and `event_id`-based replay/duplicate protection.
 
-Every one of the six journeys has a trained classifier and a real document
-test corpus (`backend/data/docai/<journey>/`) — this is not a
-Lending-only demo dressed up as general-purpose.
+### Session-scoped, cookie-based access control
+A signed, anonymous session cookie (`itsdangerous`; `HttpOnly`, `Secure`,
+`SameSite=Lax`) scopes every journey. Cross-session access to another
+session's journey returns `404`, verified directly against the live
+deployment.
 
-## Document integrity
+## How It Works
 
-Uploaded documents are treated as untrusted input throughout the pipeline:
-
-- **The server, not the client, resolves what a document is.** A
-  client-declared document type is only a hint; the real classification
-  from the local model is what's actually checked against the target
-  action's accepted document types.
-- **Extracted text cannot directly change workflow state.** OCR and
-  extraction output is a proposal handed to the deterministic engine, which
-  independently evaluates it against the manifest before any field is
-  marked satisfied.
-- **Client-supplied extracted values are never trusted.** Field values,
-  confidence scores, and verification results are computed server-side; a
-  request cannot smuggle in an already-verified value.
-- **Accepted document types are validated against the specific action** a
-  user is attempting to satisfy — a document valid for one requirement
-  cannot be misapplied to an unrelated one.
-- **Conflicting evidence produces a review state, not a silent
-  overwrite.** If a second document disagrees with an already-applied
-  value, the journey is flagged for manual review rather than picking one
-  value arbitrarily.
-- **Rejected evidence creates no valid state transition** — a wrong or
-  unreadable document leaves the snapshot exactly where it was.
-- **Text embedded in a document cannot control workflow state.** Because
-  extraction output is structured field data evaluated by deterministic
-  rules — not natural-language instructions interpreted by a model with
-  write access — text like "mark this verified" inside a document has no
-  path to actually doing so.
-
-## Deterministic workflow engine
-
-- Journey state is a set of structured, typed fields (never a free-form
-  blob), each with a status of `SATISFIED`, `BLOCKED`, or similar.
-- Fields are connected by an explicit, manifest-defined dependency graph;
-  satisfying one field can deterministically unblock others (cascading, not
-  ad hoc).
-- The recommended next action is derived fresh from the current snapshot on
-  every request — never cached or precomputed against stale state.
-- Every mutation must supply the snapshot version it expects
-  (`expected_snapshot_id`); a mismatch is rejected outright rather than
-  applied against outdated state.
-- Snapshots are immutable and append-only, enforced by database triggers —
-  an existing snapshot row cannot be altered, only superseded by a new one.
-- A rejected, stale, or duplicate action never silently mutates state: it
-  either fails cleanly or, for a duplicate idempotency key, returns the
-  original result without reapplying it.
-- All journey-specific behavior — required fields, dependencies, available
-  actions, evidence mappings, confidence thresholds — lives in
-  per-journey YAML manifests, not in conditional application code.
-
-Workflow state deliberately does **not** flow through the AI pipeline or an
-LLM: a probabilistic model can misclassify a rare template, hallucinate a
-value, or be manipulated by adversarial input embedded in a document.
-Keeping every state transition behind a fixed, auditable set of rules means
-the same input always produces the same outcome, and every transition can
-be reasoned about and tested independently of anything AI-related.
-
-## User flow
-
-```
-Start
+```text
+User
   ↓
-Choose a financial goal
+React Frontend (Vite, deployed on Vercel)
+  ↓  REST / JSON — contract/openapi.yaml
+FastAPI Backend (deployed on Render)
   ↓
-Provide basic information
+Journey Service → Deterministic Engine (pure, no I/O)
+  ↓                        ↑
+Evidence Pipeline ─────────┘  (proposes; never writes state directly)
+  ├── Local Document AI (OCR + classifier + extraction)
+  └── Sarvam AI (optional cloud provider; falls back to local on failure)
   ↓
-Review current blockers
+Ambiguous? → Human Review Center → same deterministic mutation path
   ↓
-See recommended next action
+PostgreSQL (append-only, trigger-enforced immutable snapshots)
   ↓
-Upload evidence / complete form
-  ↓
-Document AI analysis
-  ↓
-Deterministic validation
-  ↓
-Journey state update
-  ↓
-Review remaining blockers
-  ↓
-Handoff
+n8n Cloud (Slack for reviewers, email for customers) — fired only after commit
 ```
 
-A document that is genuinely correct but falls below the manifest's
-confidence threshold for automatic verification produces an honest **Needs
-Review** state — the extracted value isn't in question, but it's routed for
-manual confirmation instead of being applied immediately. The UI never
-represents an unverified or under-review result as complete, and never
-surfaces a score, probability, or eligibility figure of any kind.
+## Architecture
 
-## Technology stack
+```mermaid
+flowchart TD
+    User["User (Browser)"]
+    FE["React + TypeScript SPA<br/>(Vercel)"]
+    API["FastAPI Backend<br/>(Render)"]
+    JS["Journey Service"]
+    ENG["Deterministic Engine<br/>(app/core — pure, no I/O)"]
+    EVID["Evidence Pipeline"]
+    LOCAL["Local Document AI<br/>PyMuPDF + Tesseract + scikit-learn"]
+    SARVAM["Sarvam AI<br/>(optional cloud provider)"]
+    RCS["Review Case Service"]
+    DB[("PostgreSQL<br/>append-only snapshots")]
+    N8N["n8n Cloud workflow"]
+    SLACK["Slack (reviewers)"]
+    EMAIL["Email (customers)"]
 
-**Frontend**
-
-| Technology | Role |
-|---|---|
-| React 18 + TypeScript | UI framework |
-| Vite | Dev server and build |
-| React Router | Client-side routing |
-| TanStack Query | Server-state management |
-| Zustand | Local UI state |
-| React Hook Form + Zod | Form handling and validation |
-| Tailwind CSS | Styling |
-| MSW | Mock API layer for offline frontend development |
-| Vitest + Testing Library | Unit tests |
-| Playwright | End-to-end browser tests |
-
-**Backend**
-
-| Technology | Role |
-|---|---|
-| Python 3.12+ | Runtime |
-| FastAPI | API framework |
-| Pydantic v2 | Schema validation |
-| SQLAlchemy 2 (async) | ORM / database access |
-| Alembic | Database migrations |
-| PostgreSQL 16 | Persistence |
-| itsdangerous | Signed session cookies |
-| uv | Dependency management |
-
-**Document AI**
-
-| Technology | Role |
-|---|---|
-| PyMuPDF | Native PDF text extraction |
-| Tesseract OCR (via `pytesseract`) | OCR for scanned documents and images |
-| Pillow | Image preprocessing |
-| scikit-learn (TF-IDF + logistic regression) | Per-journey document classification |
-| Custom rule/regex extraction | Structured field extraction and OCR-noise normalization |
-| joblib | Trained model serialization |
-
-**Quality tooling**
-
-| Tool | Scope |
-|---|---|
-| pytest + HTTPX | Backend unit, integration, and contract tests |
-| ruff | Python linting |
-| mypy | Python type checking |
-| import-linter | Enforces the deterministic engine's dependency boundary |
-| Playwright | Browser end-to-end tests |
-| ESLint + `tsc` | Frontend linting and type checking |
-
-## Project structure
-
+    User --> FE
+    FE -- "REST / JSON" --> API
+    API --> JS
+    JS --> ENG
+    JS --> EVID
+    EVID --> LOCAL
+    EVID -. optional .-> SARVAM
+    SARVAM -. fallback on failure .-> LOCAL
+    EVID -- proposal only --> ENG
+    ENG -- ambiguous field --> RCS
+    RCS -- resolution re-enters --> ENG
+    ENG --> DB
+    ENG -- event queued on commit --> N8N
+    N8N --> SLACK
+    N8N --> EMAIL
 ```
+
+Only the deterministic engine writes to PostgreSQL. The evidence pipeline
+and the review service can only produce proposals or re-enter the engine's
+own mutation path — neither has an independent write route to journey
+state.
+
+## Technology Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| Frontend | React 18 + TypeScript, Vite | UI framework, dev server/build |
+| Frontend | React Router, TanStack Query, Zustand | Routing, server state, local UI state |
+| Frontend | React Hook Form + Zod, Tailwind CSS | Forms/validation, styling |
+| Frontend | MSW, Vitest + Testing Library, Playwright | Mock API layer, unit tests, e2e tests |
+| Backend | Python 3.12+, FastAPI, Pydantic v2 | Runtime, API framework, schema validation |
+| Backend | SQLAlchemy 2 (async), Alembic, PostgreSQL 16 | ORM, migrations, persistence |
+| Backend | itsdangerous, uv | Signed session cookies, dependency management |
+| AI / Document processing | PyMuPDF, Tesseract (`pytesseract`), Pillow | PDF text extraction, OCR, image preprocessing |
+| AI / Document processing | scikit-learn, joblib | Per-journey document classification, model serialization |
+| AI / Document processing | Sarvam AI (`api.sarvam.ai`) | Optional cloud Document AI, speech-to-text, translation, chat |
+| Integrations | n8n Cloud | Outbound event notifications (Slack + email) |
+| Infrastructure | Render, Vercel | Backend + Postgres hosting, frontend hosting + API proxy |
+| Quality | pytest, ruff, mypy, import-linter | Backend testing, linting, typing, architecture-boundary enforcement |
+| Quality | ESLint, `tsc`, pip-audit / npm audit | Frontend linting/typing, dependency vulnerability scanning |
+
+## Project Structure
+
+```text
 paytmflow/
-├── frontend/                  React + TypeScript SPA
-│   ├── src/screens/           The ten journey-flow screens + Help
-│   ├── src/components/        Shared UI and primitives
-│   ├── src/mocks/              MSW fixtures for offline (mock-mode) development
-│   └── tests/                 Unit and end-to-end tests
-├── backend/                    FastAPI service
-│   ├── app/core/               Pure deterministic engine (no I/O)
-│   ├── app/api/                REST endpoints
-│   ├── app/services/           Orchestration layer
-│   ├── app/evidence/           Evidence resolution, storage, reconciliation
-│   ├── app/docai/               OCR, classification, extraction, trained models
-│   ├── app/packs/manifests/    Per-journey YAML configuration
-│   └── tests/                  Unit, integration, contract, and safety tests
+├── frontend/                   React + TypeScript SPA
+│   ├── src/screens/             Ten journey-flow screens + Help
+│   ├── src/screens/review/      Review Center screens
+│   ├── src/components/          Shared UI and primitives
+│   ├── src/mocks/                MSW fixtures for offline (mock-mode) development
+│   └── tests/                   Unit and end-to-end tests
+├── backend/                     FastAPI service
+│   ├── app/core/                 Pure deterministic engine (no I/O) — import-linter enforced
+│   ├── app/api/                  REST endpoints
+│   ├── app/services/             Orchestration layer (journeys, review cases)
+│   ├── app/evidence/              Evidence resolution, storage, reconciliation
+│   ├── app/docai/                 OCR, classification, extraction, trained models
+│   ├── app/ai/                     AIProvider implementations (mock, local_ml, llm, Sarvam) + guardrails
+│   ├── app/integrations/           Outbound n8n webhook dispatcher
+│   ├── app/security/                Session signing, reviewer-role authorization
+│   ├── app/packs/manifests/        Per-journey YAML configuration
+│   ├── Dockerfile                  Production image (non-root user)
+│   ├── docker-compose.yml          Local Postgres for development
+│   └── tests/                      Unit, integration, contract, and safety tests
 ├── contract/
-│   └── openapi.yaml             The single source of truth for the API surface
+│   └── openapi.yaml                 Single source of truth for the API surface
 └── README.md
 ```
 
-## Getting started
-
-### Prerequisites
-
-| Requirement | Notes |
-|---|---|
-| Python 3.12+ | Backend runtime |
-| [uv](https://docs.astral.sh/uv/) | Backend dependency and virtualenv management |
-| Node.js (recent LTS) and npm | Frontend tooling — no exact version is pinned in this repository; Vite 5 and TypeScript 5.6 require a reasonably current Node release |
-| PostgreSQL 16 | Via Docker (recommended) or a local install |
-| Docker (recommended) | Runs PostgreSQL via `backend/docker-compose.yml` |
-
-### 1. Clone
+## Installation
 
 ```bash
 git clone <repository-url>
 cd paytmflow
 ```
 
-### 2. Configure environment
+### Prerequisites
 
-Backend configuration lives in `backend/.env` (copy from
-`backend/.env.example`); frontend configuration lives in `frontend/.env`
-(copy from `frontend/.env.example`). **Never commit real secrets** — the
-values below are the safe local-development placeholders already shipped
-in the example files.
+| Requirement | Needed for |
+|---|---|
+| Python 3.12+ | Backend runtime |
+| [uv](https://docs.astral.sh/uv/) | Backend dependency/virtualenv management |
+| Node.js (recent LTS) + npm | Frontend tooling |
+| PostgreSQL 16 (via Docker, recommended) | Persistence |
+| Docker | Local Postgres via `backend/docker-compose.yml`, and the production Dockerfile |
+| Tesseract OCR on `PATH` | Local Document AI pipeline (`AI_PROVIDER=local_ml`) |
+| A Sarvam AI API key (optional) | Only if you set `AI_PROVIDER=sarvam` |
+| An n8n Cloud webhook URL + secret (optional) | Only if you set `N8N_ENABLED=true` |
 
-`backend/.env`:
+### Environment Variables
 
-```env
-DATABASE_URL=postgresql+psycopg://paytmflow:paytmflow@localhost:5432/paytmflow
-APP_ENV=local
-SESSION_COOKIE_NAME=pf_session
-SESSION_SECRET=change-me-32-bytes-minimum-session-secret-key
-SESSION_TTL_DAYS=30
-CORS_ORIGINS=http://localhost:5173
-AI_PROVIDER=mock          # mock | llm | local_ml — see "Local Document AI" below
-AI_TIMEOUT_SECONDS=4
-AI_API_KEY=
-AI_MODEL=
-EVIDENCE_STORAGE_DIR=./storage/evidence
-EVIDENCE_MAX_BYTES=10485760
-DEMO_RESET_SECRET=change-me-demo-reset-secret
-LOG_LEVEL=INFO
-```
+Copy `backend/.env.example` to `backend/.env` and `frontend/.env.example`
+to `frontend/.env`. **Never commit real secrets.** The full, commented list
+lives in the `.example` files; the variables that matter most:
 
-The application deliberately refuses to start with these placeholder
-`SESSION_SECRET` / `DEMO_RESET_SECRET` values outside `APP_ENV=local` or
-`ci` — supply real, unique values before running with any other
-`APP_ENV`.
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `APP_ENV` | Yes | `local` \| `ci` \| any other value (e.g. `production`) — see [Security](#security) |
+| `SESSION_SECRET` | Yes (outside local/ci) | Signs session cookies; app refuses to start with the placeholder value outside local/ci |
+| `DEMO_RESET_SECRET` | Yes (outside local/ci) | Gates the destructive `/demo/reset` endpoint |
+| `CORS_ORIGINS` | Yes | Comma-separated list of allowed frontend origins |
+| `AI_PROVIDER` | Yes | `mock` \| `llm` \| `local_ml` \| `sarvam` |
+| `SARVAM_ENABLED` / `SARVAM_API_KEY` | No | Enables the real Sarvam AI cloud provider |
+| `N8N_ENABLED` / `N8N_WEBHOOK_URL` / `N8N_WEBHOOK_SECRET` | No | Enables real outbound event notifications |
+| `EVIDENCE_STORAGE_DIR` / `EVIDENCE_MAX_BYTES` | No | Upload storage path and size limit (default 10 MB) |
+| `VITE_API_MODE` (frontend) | Yes | `mock` (MSW, no backend needed) \| `live` (real backend) |
+| `VITE_API_BASE` (frontend) | Yes | API base path, default `/api/v1` |
 
-`frontend/.env`:
+Use placeholders like `DATABASE_URL=your_database_url` when sharing your
+own configuration — never copy real values from `.env`, logs, or a
+deployment dashboard into documentation or version control.
 
-```env
-VITE_API_MODE=mock        # mock (MSW, no backend needed) | live (real backend)
-VITE_API_BASE=/api/v1
-VITE_SHOW_DEV_BADGES=true
-```
+## Running Locally
 
-## Running the application
-
-### Start the database
+### Backend
 
 ```bash
 cd backend
-docker compose up -d postgres
-```
-
-### Start the backend
-
-```bash
-cd backend
+docker compose up -d postgres     # starts PostgreSQL 16
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --port 8000 --loop none
 ```
 
-The API is now at `http://localhost:8000` (interactive docs at
-`http://localhost:8000/docs`).
+API: `http://localhost:8000` — interactive docs at `http://localhost:8000/docs`.
 
-### Start the frontend
+### Frontend
 
 ```bash
 cd frontend
@@ -441,200 +305,217 @@ npm install
 npm run dev
 ```
 
-The frontend is now at `http://localhost:5173`, proxying `/api/v1/*` to the
-backend above.
+Frontend: `http://localhost:5173`, proxying `/api/v1/*` to the backend.
+With the default `VITE_API_MODE=mock`, the frontend runs entirely against
+MSW-mocked responses and needs no backend at all.
 
-### Open the application
+### Full application
 
-Visit `http://localhost:5173`. With `VITE_API_MODE=mock` (the default), the
-frontend runs entirely against MSW-mocked responses and needs no backend at
-all — useful for frontend-only development. Set `VITE_API_MODE=live` to
-talk to the real backend and PostgreSQL started above.
+Run both of the above concurrently, then set `VITE_API_MODE=live` in
+`frontend/.env` to point the frontend at the real backend and database.
 
-## Local Document AI
+## Usage
 
-Setting `AI_PROVIDER=local_ml` in `backend/.env` switches evidence
-processing from the deterministic mock provider to the real local pipeline
-described in [Document AI](#document-ai) above.
-
-- **No API key is required** — `local_ml` performs OCR, classification, and
-  extraction entirely on the machine running the backend.
-- **Trained models are already committed to the repository** under
-  `backend/app/docai/models/` (one `.joblib` classifier plus metadata per
-  journey) — no separate download or training step is needed to run the
-  application.
-- **Tesseract OCR must be installed and on `PATH`** on the host machine
-  (`pytesseract` calls out to the `tesseract` binary); everything else is a
-  standard Python dependency installed via `uv sync`.
-- Model training scripts (`backend/app/docai/train_classifier*.py`) and the
-  underlying labeled datasets (`backend/data/docai/`) are included for
-  anyone who wants to retrain or inspect them, but are not required for
-  normal operation.
+1. Open the frontend and choose one of the six financial journeys.
+2. Provide the basic goal information the journey asks for.
+3. The status screen shows exactly which requirements are outstanding and
+   why, and recommends one next action.
+4. Upload the requested document (or complete the requested form). The
+   Document AI pipeline (local or Sarvam) classifies it, extracts fields,
+   and scores its confidence.
+5. The deterministic engine decides whether that evidence actually
+   satisfies the requirement — a wrong document is rejected outright; a
+   correct-but-conflicting or low-confidence one is routed to the Human
+   Review Center instead of being silently accepted.
+6. Once every mandatory requirement is satisfied, the journey reaches a
+   handoff screen — never phrased as an approval or guarantee.
+7. A reviewer, in parallel, sees any case that needed a human in a
+   dedicated Review Center queue, can claim it, request more information,
+   escalate it, or resolve it.
 
 ## API
 
-The full, authoritative API surface is documented in
-`contract/openapi.yaml`; the backend also serves interactive Swagger docs
-at `/docs` once running. Major endpoints, grouped by purpose:
+Full, authoritative surface: `contract/openapi.yaml`; interactive Swagger
+UI at `/docs`. Verified from the actual routers in `backend/app/api/v1/`:
 
-**System**
-- `GET /api/v1/health`
-- `GET /api/v1/session`
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/v1/health` | Service/DB health check |
+| GET | `/api/v1/session` | Resolve or create the caller's session |
+| GET | `/api/v1/journey-packs` | List available journey types |
+| GET | `/api/v1/journey-packs/{journey_type}` | Journey pack detail |
+| GET | `/api/v1/journeys` | List the caller's journeys |
+| POST | `/api/v1/journeys` | Create a journey |
+| GET | `/api/v1/journeys/{journey_id}` | Journey state |
+| GET | `/api/v1/journeys/{journey_id}/recommendation` | Next recommended action |
+| GET | `/api/v1/journeys/{journey_id}/diff` | Diff between two snapshot versions |
+| GET | `/api/v1/journeys/{journey_id}/review-status` | Whether the journey has an open review case |
+| POST | `/api/v1/journeys/{journey_id}/evidence` | Upload/preview evidence (no state transition) |
+| POST | `/api/v1/journeys/{journey_id}/actions` | The sole state-mutating endpoint |
+| POST | `/api/v1/journeys/{journey_id}/clarifications` | Answer a pending ambiguity |
+| POST | `/api/v1/journeys/{journey_id}/chat` | Grounded assistant chat |
+| POST | `/api/v1/journeys/{journey_id}/chat/voice` | Voice input (Sarvam speech-to-text) → same chat path |
+| POST | `/api/v1/translate` | Translate an explanation/chat string (Sarvam Mayura) |
+| POST | `/api/v1/review/role` | Self-switch the caller's session into the reviewer role |
+| GET | `/api/v1/review/dashboard` | Reviewer-only case queue summary |
+| GET | `/api/v1/review/cases` / `/{case_id}` | Reviewer-only case list / detail |
+| POST | `/api/v1/review/cases/{case_id}/claim` | Claim a case |
+| POST | `/api/v1/review/cases/{case_id}/resolve` | Resolve a case (re-enters the deterministic engine) |
+| POST | `/api/v1/review/cases/{case_id}/request-information` | Ask the customer for more evidence |
+| POST | `/api/v1/review/cases/{case_id}/escalate` | Escalate for specialist review |
+| GET | `/api/v1/review/cases/{case_id}/customer-view` | Read-only mirror of what the customer sees |
+| GET | `/api/v1/review/cases/{case_id}/audit` | Case audit trail |
+| POST | `/api/v1/review/cases/{case_id}/ai-summary` | Optional AI-generated case summary |
+| POST | `/api/v1/demo/reset` | Destructive demo-data reset (requires `X-Demo-Secret`) |
 
-**Journey packs**
-- `GET /api/v1/journey-packs`
-- `GET /api/v1/journey-packs/{journey_type}`
+## Screenshots / Demo
 
-**Journeys**
-- `GET /api/v1/journeys`
-- `POST /api/v1/journeys`
-- `GET /api/v1/journeys/{journey_id}`
-- `GET /api/v1/journeys/{journey_id}/recommendation`
-- `GET /api/v1/journeys/{journey_id}/diff`
+No screenshots or demo media are committed to this repository. The live,
+working deployment is the demo — see the links at the top of this
+document.
 
-**Evidence and actions**
-- `POST /api/v1/journeys/{journey_id}/evidence` — preview-only; creates no state transition
-- `POST /api/v1/journeys/{journey_id}/actions` — the sole state-mutating endpoint
-- `POST /api/v1/journeys/{journey_id}/clarifications`
+## Testing
 
-**Demo**
-- `POST /api/v1/demo/reset`
+| Suite | Command | Result (most recent full run) |
+|---|---|---|
+| Backend pytest | `cd backend && uv run pytest` | 660/660 passed |
+| Frontend unit tests (Vitest) | `cd frontend && npm run test` | 376/376 passed |
+| Ruff (lint + format) | `uv run ruff check . && uv run ruff format --check .` | Clean |
+| mypy (whole app) | `uv run mypy app` | Clean except pre-existing, unrelated missing-stub warnings in offline dataset-generation/benchmarking scripts, not part of the deployed application |
+| import-linter | `uv run lint-imports` | Clean — deterministic engine boundary intact |
+| ESLint + TypeScript | `npm run lint && npm run typecheck` | Clean |
+| Frontend production build | `npm run build` | Clean |
+| pip-audit (production dependency set) | `uv export --no-dev \| pip-audit -r -` | 0 known vulnerabilities |
+
+A Playwright end-to-end suite also exists under `frontend/tests/e2e/`,
+exercising real-browser flows against a live backend; no specific pass
+count is quoted here to avoid citing a stale number — run
+`npm run test:e2e` for a current result.
 
 ## Security
 
-- **Signed, anonymous session cookies** (`itsdangerous`) scope every
-  journey to the session that created it — no username/password account
-  system.
-- **Cross-session isolation is enforced server-side**: a request for a
-  journey belonging to a different session is rejected, not merely hidden
-  by the UI.
+Documented only where actually implemented and, where noted, verified
+directly against the live deployment this session:
+
+- **Signed, anonymous session cookies** (`itsdangerous`; `HttpOnly`,
+  `Secure`, `SameSite=Lax`) — no username/password account system.
+- **Cross-session isolation, server-enforced**: a request for another
+  session's journey returns `404` (not `403`, to avoid confirming
+  existence) — *verified live*.
+- **`X-Session-Id` header bypass restricted to `local`/`ci`** — any other
+  `APP_ENV` ignores it and requires the signed cookie — *verified live*.
 - **Stale-snapshot protection**: every mutation must supply the snapshot
-  version it expects; a mismatch is rejected before anything is written.
-- **Idempotent mutation handling** on the state-changing endpoint via a
-  client-supplied idempotency key.
-- **Evidence size limits** (`EVIDENCE_MAX_BYTES`, 10 MB by default) and
-  **magic-byte file validation** — a file's actual content, not its
-  declared extension or MIME type, determines whether it's accepted.
-- **Untrusted document handling** throughout the evidence pipeline (see
-  [Document integrity](#document-integrity)).
-- **No client-side trust for critical evidence values** — verification
-  results, extracted values, and confidence scores are computed and owned
-  server-side.
-- **Secret/config separation**: backend secrets never reach the frontend
-  bundle; the application refuses to start with known placeholder secrets
-  outside local/CI environments.
+  version it expects.
+- **Idempotent mutations** via a client-supplied idempotency key.
+- **File upload validation**: magic-byte content checks (not
+  extension/MIME trust), a 10 MB default size limit, and a stored filename
+  derived from a content hash plus an allow-listed extension — never from
+  the client-supplied filename, which closes the path-traversal-via-
+  filename vector entirely.
+- **AI guardrails**: untrusted document text is wrapped in explicit
+  boundary tags and length-bounded before reaching any model; an
+  AI-selected action is membership-checked against a server-computed
+  candidate list (a model cannot invent an action ID); AI output is
+  scanned against a banned-word list.
+- **n8n webhook authentication**: header-secret auth, an event allowlist,
+  and `event_id`-based deduplication — *verified live*: missing/wrong
+  secret → `403`, unknown event or missing required field → `400`,
+  replayed `event_id` → no duplicate notification.
+- **Security response headers** on every API response
+  (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+  `Permissions-Policy`, `Cache-Control: no-store`).
+- **Constant-time secret comparison** (`secrets.compare_digest`) for the
+  destructive demo-reset endpoint.
+- **Non-root container execution** in the production Docker image.
+- **Secret/config separation**: no backend secret (Sarvam key, n8n
+  secret, session secret, database URL) ever reaches the frontend bundle;
+  the app refuses to start with placeholder secrets outside local/CI.
 
-This describes the controls actually implemented in this codebase — it is
-not a claim of formal security certification or a completed audit for
-production use.
+This is not a claim of formal certification, a completed third-party
+audit, or production-grade authentication — see
+[Limitations](#limitations) for the specific reviewer-identity caveat.
 
-## Testing & quality
+## Deployment
 
-The most recent full verification pass (see
-`backend/docs/paytmflow_ultimate_qa_report.md` for the complete history):
+- **Backend**: containerized (`backend/Dockerfile`, non-root user, binds
+  to the platform-injected `$PORT`, runs migrations on startup), deployed
+  on Render.
+- **Frontend**: built with Vite, deployed on Vercel; `frontend/vercel.json`
+  proxies `/api/*` to the Render backend so both appear same-origin to the
+  browser — the reason the `SameSite=Lax` session cookie works across two
+  separate hosting providers with no backend changes.
+- **Database**: PostgreSQL, provisioned independently of the local
+  `docker-compose.yml` development setup.
+- **n8n**: a separately hosted n8n Cloud instance that PaytmFlow only ever
+  calls outbound to; it never calls back into PaytmFlow.
 
-| Suite | Result |
-|---|---|
-| Backend pytest | 501/501 passed |
-| Frontend unit tests (Vitest) | 339/339 passed |
-| Playwright end-to-end | 52/52 passed |
-| Ruff (backend lint) | Clean |
-| ESLint + TypeScript (frontend) | Clean |
-| import-linter | Clean — deterministic engine boundary intact |
-| mypy (whole-app) | 126 pre-existing errors across 23 files, unrelated to and unaffected by this project's changes (zero delta) |
+This is a hackathon/demo deployment, not a production financial-services
+environment.
 
-Beyond the automated suites, the application was verified with real
-Chromium browser sessions against the real backend and a real PostgreSQL
-database (not just mocked fixtures), covering:
+## Limitations
 
-- End-to-end walkthroughs of all six journeys through to handoff
-- Deliberate wrong-document uploads, confirming rejection without state
-  advancement
-- A reproduced cross-document value conflict, confirming it triggers review
-  rather than a silent overwrite
-- XSS and injection payloads through form inputs, clarification responses,
-  and document text
-- Accessibility-tree inspection (landmarks, heading structure, labeled
-  controls, dialog semantics) across key screens
-- Responsive behavior at 375px, 768px, 1024px, and 1440px viewports
-
-**Limitations of this testing, stated plainly**: the mypy result reflects
-pre-existing, unrelated typing debt outside the deterministic engine's
-`app/core` package (which itself type-checks cleanly under `mypy --strict`);
-accessibility verification used the browser's accessibility tree and manual
-keyboard testing, not certification against a real screen reader (NVDA,
-JAWS, VoiceOver). Nothing here should be read as "bug-free," "fully
-secure," or "production-ready" — it reflects what was actually tested and
-what passed.
-
-## Design and UX
-
-The interface follows a single, consistent flow regardless of which
-journey is active: a blocker-first status view surfaces exactly what's
-outstanding and why, a recommendation view presents one primary next
-action, and the same evidence/form interaction pattern handles every
-document upload or field submission across all six journeys. An AI
-analysis screen shows what the document pipeline actually found — including
-an honest "Needs Review" state — before an updated-status screen confirms
-what changed. A handoff screen closes out a completed journey without
-implying an approval or guarantee, and a journeys list lets a user resume
-any in-progress journey. A Help section provides searchable guidance
-independent of any specific journey. The layout is responsive across
-mobile, tablet, and desktop widths.
-
-## Prototype limitations
-
-- **Anonymous, cookie-based sessions rather than full user authentication**
-  — there is no account system, password, or multi-device login.
-- **Local, single-machine deployment assumptions** — the setup here targets
-  a developer's machine or a demo environment, not a scaled production
-  deployment.
-- **Pre-existing mypy debt** outside the deterministic engine's `app/core`
-  package (126 errors across 23 files), tracked but not yet resolved.
-- **A small number of manifest-level configuration decisions remain
-  deferred** (documented in the QA report) where the correct behavior
-  depends on a product decision rather than an engineering fix.
+- **Reviewer identity is a known prototype limitation, not real staff
+  authentication.** Any session can self-switch into the reviewer role via
+  `POST /review/role`; there is no separate employee/staff account system.
+  A real deployment would need an authenticated staff identity and
+  role-management system.
+- **Anonymous, cookie-based customer sessions** — no customer account
+  system, password, or multi-device login.
+- **Sarvam and n8n are optional, feature-flagged integrations** — the
+  application is fully functional with both disabled, using the
+  mock/local providers and no outbound notifications.
+- **Tesseract OCR must be available on the host** for the local Document
+  AI pipeline; there is no bundled or containerized OCR runtime.
 - **No formal assistive-technology certification** — accessibility was
-  verified via the browser's accessibility tree and manual testing, not a
-  certified audit with a real screen reader.
-- **Tesseract OCR must be available on the host** for the local Document AI
-  pipeline to function; there is no bundled or containerized OCR runtime.
+  verified via the browser's accessibility tree and manual keyboard
+  testing, not a certified audit with a real screen reader.
+- **No CI pipeline is configured in this repository** — the test/lint/
+  type commands above are run manually, not automatically on every push.
+- **Six journeys' worth of synthetic training/test documents** back the
+  local Document AI classifiers (`backend/data/docai/`) — not real
+  customer documents.
 
-## Design principles
+## Roadmap
 
-1. **Deterministic state over probabilistic workflow decisions** — the same
-   input always produces the same journey outcome.
-2. **Configuration-driven journeys** — journey behavior lives in YAML
-   manifests, not conditional code.
-3. **Server-authoritative evidence** — the client can propose; only the
-   server decides what a document is and what it proves.
-4. **Immutable, append-only state transitions** — history is never
-   rewritten, only extended.
-5. **AI as an interpreter, not the state authority** — the Document AI
-   pipeline informs a decision; it never makes one.
-6. **Explicit review paths for uncertainty** — evidence that doesn't clear
-   a confidence threshold is routed for review, never silently accepted or
-   rejected.
-7. **Secure-by-default input handling** — uploaded files, extracted text,
-   and client-declared values are all treated as untrusted until
-   independently validated.
+**Current (implemented today):**
+- All six journeys, the deterministic engine, the local Document AI
+  pipeline, the Sarvam AI cloud alternative, the Human Review Center, and
+  n8n event notifications, all deployed and verified.
 
-## License
-
-License: Not currently specified.
+**Future (not implemented, realistic next steps):**
+- Real staff authentication for the Review Center, replacing the
+  self-switch prototype mechanism.
+- A configured CI pipeline running the existing test/lint/type checks on
+  every push.
+- Certified assistive-technology testing with a real screen reader.
+- Expanding the Sarvam Document AI integration's training/evaluation
+  coverage to match the local pipeline's per-journey classifiers.
 
 ## Contributing
 
 1. Create a focused branch for your change.
-2. Keep changes scoped — avoid mixing unrelated fixes or refactors in one
-   branch.
+2. Keep changes scoped — avoid mixing unrelated fixes or refactors.
 3. Add or update tests covering the change.
-4. Run the relevant checks before opening a pull request:
+4. Run the checks before opening a pull request:
    ```bash
    # Backend
-   cd backend && uv run pytest && uv run ruff check . && uv run mypy --strict app/core
+   cd backend && uv run pytest && uv run ruff check . && uv run ruff format --check . && uv run mypy --strict app/core && uv run lint-imports
 
    # Frontend
-   cd frontend && npm run typecheck && npm run lint && npm run test
+   cd frontend && npm run typecheck && npm run lint && npm run test && npm run build
    ```
 5. Open a pull request describing the change and its motivation.
+
+## License
+
+Not currently specified in this repository.
+
+## Acknowledgements
+
+- [Sarvam AI](https://docs.sarvam.ai) — optional cloud Document AI,
+  speech-to-text, translation, and chat provider.
+- [n8n](https://n8n.io) — outbound event notification workflow engine.
+- PyMuPDF, Tesseract OCR, and scikit-learn — the local Document AI
+  pipeline.
+- FastAPI, SQLAlchemy, React, Vite, and the rest of the open-source
+  libraries listed in `backend/pyproject.toml` and `frontend/package.json`.
