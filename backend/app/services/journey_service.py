@@ -33,7 +33,7 @@ from app.db.repositories.evidence import EvidenceRepository
 from app.db.repositories.idempotency import IdempotencyRepository
 from app.db.repositories.journeys import JourneyRepository
 from app.db.repositories.snapshots import SnapshotRepository
-from app.integrations.n8n_client import flush_n8n_events
+from app.integrations.n8n_client import flush_n8n_events, queue_event
 from app.packs.contract import ActionSpec, JourneyPackManifest
 from app.packs.registry import pack_registry
 from app.schemas.enums import (
@@ -993,6 +993,13 @@ class JourneyService:
         locked_journey = await journey_repo.get_by_id_for_update(journey.id)
         if locked_journey:
             journey = locked_journey
+        # Captured before any mutation below - the durable, pre-write readiness
+        # this same row already had. Comparing it to the newly computed
+        # readiness at step 9 is the JOURNEY_COMPLETED idempotency mechanism:
+        # it only fires on the actual NOT_READY/NEEDS_REVIEW/DEAD_END -> READY
+        # transition edge, never on a later no-op recalculation that leaves a
+        # journey already READY untouched (see queue_event call below).
+        previous_readiness = journey.readiness
 
         # 3. Get pack manifest
         manifest = pack_registry.get_pack(journey.journey_type)
@@ -1238,6 +1245,24 @@ class JourneyService:
             updated_journey.readiness = new_readiness.value
             updated_journey.status = new_journey_status.value
 
+        # 9b. Customer-facing completion notification via n8n - fires exactly
+        # once per real transition into READY (see previous_readiness capture
+        # in step 2), never on a later action that leaves an already-READY
+        # journey READY. Queued now, flushed after commit at the end of this
+        # method (step 14) alongside any other event queued above - never
+        # notifies for a write that could still roll back.
+        if previous_readiness != CoreReadiness.READY.value and new_readiness == CoreReadiness.READY:
+            customer_email = (session.meta or {}).get("customer_email") or ""
+            queue_event(
+                db,
+                "JOURNEY_COMPLETED",
+                journey.id,
+                case_id=str(journey.id),
+                customer_id=str(session.id),
+                customer_email=customer_email,
+                message=f"Your {journey.journey_type} journey is complete and ready.",
+            )
+
         # 10. Record audit events
         await audit_writer.record_action_executed(
             journey_id=journey.id,
@@ -1432,6 +1457,10 @@ class JourneyService:
         locked_journey = await journey_repo.get_by_id_for_update(journey.id)
         if locked_journey:
             journey = locked_journey
+        # See apply_action's identical capture for why: the JOURNEY_COMPLETED
+        # idempotency mechanism is comparing this durable pre-write value
+        # against the readiness this clarification computes below.
+        previous_readiness = journey.readiness
 
         # 3. Get pack manifest
         manifest = pack_registry.get_pack(journey.journey_type)
@@ -1710,6 +1739,20 @@ class JourneyService:
                 )
             )
 
+        # 10b. Customer-facing completion notification via n8n - same
+        # transition-edge guard as apply_action's step 9b (see its comment).
+        if previous_readiness != CoreReadiness.READY.value and readiness_res == CoreReadiness.READY:
+            customer_email = (session.meta or {}).get("customer_email") or ""
+            queue_event(
+                db,
+                "JOURNEY_COMPLETED",
+                journey.id,
+                case_id=str(journey.id),
+                customer_id=str(session.id),
+                customer_email=customer_email,
+                message=f"Your {journey.journey_type} journey is complete and ready.",
+            )
+
         # 11. Record Clarification & Audit events
         clarification_repo = ClarificationRepository(db)
         await clarification_repo.create(
@@ -1742,6 +1785,10 @@ class JourneyService:
                 question=next_pending_ambiguity.question,
             )
         await db.commit()
+        # Flushes any n8n event queued above (step 10b) - only now, since the
+        # transaction that made it durable just committed. See apply_action's
+        # identical call for the same invariant.
+        await flush_n8n_events(db)
 
         # 12. Compute diff
         new_core_snapshot = CoreSnapshot(

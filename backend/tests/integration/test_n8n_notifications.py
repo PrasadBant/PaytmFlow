@@ -79,6 +79,82 @@ async def _claim_case_for_journey(
     return claim_resp.json()
 
 
+async def _drive_journey_to_ready(
+    client: AsyncClient, headers: dict[str, str], journey: dict
+) -> dict:
+    """Runs the real LENDING golden path (verified against
+    tests/integration/test_full_journey_flow.py) through to READY via four
+    real apply_action calls - never a shortcut that writes journey state
+    directly. Returns the final action response's `journey` dict."""
+    snap_id = journey["snapshot_id"]
+
+    ev_resp = await client.post(
+        f"/api/v1/journeys/{journey['journey_id']}/evidence",
+        data={
+            "doc_type": "SALARY_SLIP",
+            "expected_snapshot_id": snap_id,
+            "manual_fields": '{"monthly_income": 85000}',
+        },
+        headers=headers,
+    )
+    assert ev_resp.status_code == 200, ev_resp.text
+    evidence_id = ev_resp.json()["evidence_id"]
+
+    resp = await client.post(
+        f"/api/v1/journeys/{journey['journey_id']}/actions",
+        json={
+            "action_id": "UPLOAD_INCOME_PROOF",
+            "expected_snapshot_id": snap_id,
+            "idempotency_key": str(uuid4()),
+            "input": {"evidence_id": evidence_id},
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    snap_id = resp.json()["journey"]["snapshot_id"]
+
+    resp = await client.post(
+        f"/api/v1/journeys/{journey['journey_id']}/actions",
+        json={
+            "action_id": "SUBMIT_EMPLOYMENT_INFO",
+            "expected_snapshot_id": snap_id,
+            "idempotency_key": str(uuid4()),
+            "input": {"employment_type": "SALARIED"},
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    snap_id = resp.json()["journey"]["snapshot_id"]
+
+    resp = await client.post(
+        f"/api/v1/journeys/{journey['journey_id']}/actions",
+        json={
+            "action_id": "VERIFY_EMPLOYER_RECORD",
+            "expected_snapshot_id": snap_id,
+            "idempotency_key": str(uuid4()),
+            "input": {"employer_name": "Infosys Ltd"},
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    snap_id = resp.json()["journey"]["snapshot_id"]
+
+    resp = await client.post(
+        f"/api/v1/journeys/{journey['journey_id']}/actions",
+        json={
+            "action_id": "ACCEPT_LOAN_TERMS",
+            "expected_snapshot_id": snap_id,
+            "idempotency_key": str(uuid4()),
+            "input": {"accept_terms": True},
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    final_journey = resp.json()["journey"]
+    assert final_journey["readiness"] == "READY", final_journey
+    return final_journey
+
+
 def _event_types(mock_dispatch: AsyncMock) -> list[str]:
     return [call.args[0]["event"] for call in mock_dispatch.await_args_list]
 
@@ -330,3 +406,118 @@ class TestN8nNotifications:
             )
         assert resp.status_code == 200, resp.text
         assert resp.json()["journey"]["readiness"] == "NEEDS_REVIEW"
+
+    # -- JOURNEY_COMPLETED: fires when the journey's OWN readiness reaches
+    # READY, independent of whether it ever went through Review Center. --
+
+    async def test_journey_reaching_ready_fires_journey_completed(
+        self, client: AsyncClient, session_headers: dict, monkeypatch
+    ) -> None:
+        _enable_n8n(monkeypatch)
+        journey = await _create_lending_journey(client, session_headers)
+
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()) as mock_dispatch:
+            await _drive_journey_to_ready(client, session_headers, journey)
+
+        assert "JOURNEY_COMPLETED" in _event_types(mock_dispatch)
+        _assert_valid_payload(mock_dispatch)
+
+    async def test_journey_completed_includes_real_customer_email_when_provided(
+        self, client: AsyncClient, session_headers: dict, monkeypatch
+    ) -> None:
+        _enable_n8n(monkeypatch)
+        journey = await _create_lending_journey(
+            client, session_headers, customer_email="customer@example.com"
+        )
+
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()) as mock_dispatch:
+            await _drive_journey_to_ready(client, session_headers, journey)
+
+        payload = next(
+            call.args[0]
+            for call in mock_dispatch.await_args_list
+            if call.args[0]["event"] == "JOURNEY_COMPLETED"
+        )
+        assert payload["customer_email"] == "customer@example.com"
+
+    async def test_journey_completed_email_is_empty_when_never_provided(
+        self, client: AsyncClient, session_headers: dict, monkeypatch
+    ) -> None:
+        """Missing email must never crash journey completion - it degrades
+        to an empty string exactly like the five existing events."""
+        _enable_n8n(monkeypatch)
+        journey = await _create_lending_journey(client, session_headers)
+
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()) as mock_dispatch:
+            final_journey = await _drive_journey_to_ready(client, session_headers, journey)
+
+        assert final_journey["readiness"] == "READY"
+        payload = next(
+            call.args[0]
+            for call in mock_dispatch.await_args_list
+            if call.args[0]["event"] == "JOURNEY_COMPLETED"
+        )
+        assert payload["customer_email"] == ""
+
+    async def test_repeated_action_after_ready_does_not_duplicate_completion_event(
+        self, client: AsyncClient, session_headers: dict, monkeypatch
+    ) -> None:
+        """Idempotency: ACCEPT_LOAN_TERMS's own preconditions (monthly_income
+        and employer_name SATISFIED) remain met even after the journey is
+        already READY, so it can genuinely be re-submitted with a fresh
+        idempotency_key (see app/core/deterministic_check.py - preconditions
+        are checked, not whether the action's own target is already
+        satisfied). Readiness is recomputed and stays READY. This must NOT
+        re-fire JOURNEY_COMPLETED - only the actual NOT_READY -> READY edge
+        does, per journey_service.py's previous_readiness guard."""
+        _enable_n8n(monkeypatch)
+        journey = await _create_lending_journey(client, session_headers)
+
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()) as mock_dispatch:
+            final_journey = await _drive_journey_to_ready(client, session_headers, journey)
+        assert _event_types(mock_dispatch).count("JOURNEY_COMPLETED") == 1
+
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()) as mock_dispatch_2:
+            resp = await client.post(
+                f"/api/v1/journeys/{journey['journey_id']}/actions",
+                json={
+                    "action_id": "ACCEPT_LOAN_TERMS",
+                    "expected_snapshot_id": final_journey["snapshot_id"],
+                    "idempotency_key": str(uuid4()),
+                    "input": {"accept_terms": True},
+                },
+                headers=session_headers,
+            )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["journey"]["readiness"] == "READY"
+        assert "JOURNEY_COMPLETED" not in _event_types(mock_dispatch_2)
+
+    async def test_journey_completed_never_fires_for_the_five_existing_events(
+        self, client: AsyncClient, session_headers: dict, monkeypatch
+    ) -> None:
+        """Regression guard: the review-lifecycle flow (mismatch -> claim ->
+        resolve) must keep firing exactly the events it fired before this
+        change - JOURNEY_COMPLETED is a distinct event, never a relabeling
+        of JOURNEY_RESOLVED."""
+        _enable_n8n(monkeypatch)
+        journey = await _create_lending_journey(client, session_headers)
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()):
+            await _trigger_income_mismatch(client, session_headers, journey)
+        claimed = await _claim_case_for_journey(client, session_headers, journey["journey_id"])
+
+        with patch("app.integrations.n8n_client._dispatch", new=AsyncMock()) as mock_dispatch:
+            resp = await client.post(
+                f"/api/v1/review/cases/{claimed['case_id']}/resolve",
+                json={
+                    "resolution_type": "EVIDENCE_SUFFICIENT",
+                    "resolution_reason": "Bank statement confirms declared income.",
+                    "resolution_value": 30000,
+                    "expected_case_version": claimed["case_version"],
+                },
+                headers=session_headers,
+            )
+        assert resp.status_code == 200, resp.text
+        events = _event_types(mock_dispatch)
+        assert "JOURNEY_RESOLVED" in events
+        assert "JOURNEY_COMPLETED" not in events
+        _assert_valid_payload(mock_dispatch)

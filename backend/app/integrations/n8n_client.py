@@ -9,6 +9,22 @@ module only ever sends a notification, never receives a decision back -
 n8n cannot influence journey state, exactly like every other AI/notification
 integration in this codebase.
 
+Also fires JOURNEY_COMPLETED - a sixth event, orthogonal to the five above:
+those are all Review Center case lifecycle events (require a real
+ReviewCaseModel), while JOURNEY_COMPLETED fires the moment a journey's OWN
+readiness reaches READY (app/core/readiness.py's evaluate_readiness), with
+or without ever having gone through review. See
+app/services/journey_service.py's apply_action/submit_clarification for
+where it's queued - each guards it on the pre-mutation vs post-mutation
+readiness value so it fires exactly once per READY transition, never on a
+no-op recalculation. As of 2026-09-20 the live n8n workflow's own router
+does NOT yet have a branch for this event name - see the delivery notes
+recorded for this change. It is still safe to send: the workflow's "Valid
+Payload?" node only requires the shared fields to be non-empty, so an
+unrecognized `event` value is a rejected/no-route branch, not a crash - the
+same "never blocks or breaks the request that triggered it" guarantee
+covers this like every other event.
+
 Two invariants enforced by design, not by convention:
 
 1. **Never notify before the write is durable.** `queue_event()` only
@@ -76,6 +92,7 @@ VALID_EVENT_TYPES = frozenset(
         "EVIDENCE_UPLOADED",
         "JOURNEY_RESOLVED",
         "ESCALATED",
+        "JOURNEY_COMPLETED",
     }
 )
 
