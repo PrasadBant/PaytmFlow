@@ -12,15 +12,20 @@ export interface BootResult {
   error?: Error;
 }
 
+export interface BootOptions {
+  /** Skip MSW worker start/stop — used when retrying just the session fetch. */
+  skipWorkerSetup?: boolean;
+}
+
 /**
  * Executes the boot sequence:
  * 1. Initializes MSW in browser if in mock mode.
  * 2. Calls GET /session to establish anonymous session cookie before first paint.
  */
-export async function bootApp(): Promise<BootResult> {
+export async function bootApp(options: BootOptions = {}): Promise<BootResult> {
   const mode = import.meta.env.VITE_API_MODE === 'live' ? 'live' : 'mock';
 
-  if (typeof window !== 'undefined' && mode === 'mock') {
+  if (!options.skipWorkerSetup && typeof window !== 'undefined' && mode === 'mock') {
     try {
       const { worker } = await import('../mocks/browser');
       await worker.start({
@@ -30,7 +35,7 @@ export async function bootApp(): Promise<BootResult> {
     } catch {
       // Mock worker setup bypassed or running in headless / test environment
     }
-  } else if (typeof window !== 'undefined' && mode === 'live') {
+  } else if (!options.skipWorkerSetup && typeof window !== 'undefined' && mode === 'live') {
     try {
       const { worker } = await import('../mocks/browser');
       worker.stop();
