@@ -7,14 +7,25 @@ export interface ConnectionExperienceProps {
   slow: boolean;
 }
 
+// Deliberately more than a handful — on a slower connection the same 4
+// lines repeating within ~10s started to feel stale. This rotates for
+// nearly a minute before a viewer sees a line twice.
 const BASE_MESSAGES = [
   'Putting the pieces together…',
+  'Getting your journey ready…',
+  'Clearing the path ahead…',
+  'Organizing every step…',
   'Almost ready…',
+  'Bringing it all together…',
+  'Six journeys, one place.',
   'Good things take a moment.',
+  'Lining up what comes next…',
+  'One step closer…',
+  'Making this simple for you…',
   'Ready when you are.',
 ];
 
-const MESSAGE_INTERVAL_MS = 2600;
+const MESSAGE_INTERVAL_MS = 2200;
 const LONG_WAIT_JOKE_DELAY_MS = 6000;
 
 /**
@@ -60,7 +71,13 @@ export function ConnectionExperience({ slow }: ConnectionExperienceProps): React
         className="flex flex-col items-center gap-1 mb-8 md:mb-10 animate-pf-copy-in motion-reduce:animate-none"
         aria-hidden="true"
       >
-        <span className="font-bold text-2xl md:text-3xl tracking-tight bg-gradient-to-r from-paytm-blue to-paytm-blue-action bg-clip-text text-transparent">
+        <span
+          className={
+            'font-bold text-2xl md:text-3xl tracking-tight bg-gradient-to-r from-paytm-blue via-paytm-blue-action to-paytm-blue ' +
+            'bg-clip-text text-transparent bg-[length:200%_auto] ' +
+            (reducedMotion ? '' : 'animate-pf-shimmer')
+          }
+        >
           PaytmFlow
         </span>
         <span className="text-sm text-content-tertiary">Let&apos;s get things moving.</span>

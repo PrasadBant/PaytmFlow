@@ -35,9 +35,12 @@ const CONCEPT_CARDS: Array<{ label: string; className: string; delay: string; dx
 
 const AMBIENT_DOTS: Array<{ style: CSSProperties; delay: string }> = [
   { style: { top: '8%', left: '18%' }, delay: '0s' },
-  { style: { top: '68%', left: '8%' }, delay: '2.5s' },
-  { style: { top: '20%', right: '12%' }, delay: '5s' },
-  { style: { top: '78%', right: '20%' }, delay: '7.5s' },
+  { style: { top: '68%', left: '8%' }, delay: '1.2s' },
+  { style: { top: '20%', right: '12%' }, delay: '2.4s' },
+  { style: { top: '78%', right: '20%' }, delay: '3.6s' },
+  { style: { top: '42%', left: '4%' }, delay: '0.8s' },
+  { style: { top: '55%', right: '6%' }, delay: '2.9s' },
+  { style: { top: '4%', left: '48%' }, delay: '1.8s' },
 ];
 
 // Roughly matches when the primary particle (dur=4.5s) passes each node,
@@ -59,6 +62,15 @@ export function FlowVisual({ reducedMotion }: FlowVisualProps): ReactElement {
         entire layer invisible. Default (auto) stacking + DOM order after the
         svg keeps it visible while still reading as a background layer.
       */}
+      {!reducedMotion && (
+        <div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center animate-pf-breathe"
+          aria-hidden="true"
+        >
+          <div className="w-40 h-40 rounded-full bg-sky-400/20 blur-3xl" />
+        </div>
+      )}
+
       {!reducedMotion && (
         <div className="pointer-events-none absolute inset-0 hidden md:block">
           {AMBIENT_DOTS.map((dot, i) => (

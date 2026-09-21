@@ -103,7 +103,7 @@
 }
 
 .animate-pf-card-flow {
-  animation: pf-card-flow 5.6s ease-in-out infinite;
+  animation: pf-card-flow 4.4s ease-in-out infinite;
 }
 
 @keyframes pf-highlight {
@@ -121,14 +121,14 @@
 
 @keyframes pf-node-pulse {
   0%,
-  92%,
+  88%,
   100% {
     fill-opacity: 0.14;
     r: 9;
   }
-  4% {
-    fill-opacity: 0.4;
-    r: 12;
+  6% {
+    fill-opacity: 0.45;
+    r: 13;
   }
 }
 
@@ -140,15 +140,44 @@
   0%,
   100% {
     opacity: 0;
-    transform: translate(0, 0);
+    transform: translate(0, 0) scale(0.8);
   }
   50% {
-    opacity: 0.5;
-    transform: translate(6px, -6px);
+    opacity: 0.6;
+    transform: translate(7px, -7px) scale(1.15);
   }
 }
 
 .animate-pf-ambient {
-  animation: pf-ambient 9s ease-in-out infinite;
+  animation: pf-ambient 6s ease-in-out infinite;
+}
+
+@keyframes pf-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+.animate-pf-shimmer {
+  animation: pf-shimmer 5s ease-in-out infinite alternate;
+}
+
+@keyframes pf-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pf-breathe {
+  animation: pf-breathe 5s ease-in-out infinite;
 }
 
