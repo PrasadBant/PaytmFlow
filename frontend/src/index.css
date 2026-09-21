@@ -304,7 +304,14 @@
   animation: pf-branch-in 1s ease-out both;
 }
 
-/* A branch candidate that appears, then is visibly de-emphasised. */
+/*
+ * A branch candidate that appears, then is visibly de-emphasised — held at
+ * this end-opacity for the rest of the chapter (many seconds), so it must
+ * read as "secondary" rather than "gone". 0.55 is the floor: combined with
+ * the muted tone's already-light background/text tokens, anything lower
+ * made these labels effectively illegible on real screens (reported as
+ * "text becomes transparent" / "looks broken").
+ */
 @keyframes pf-branch-in-dim {
   0% {
     opacity: 0;
@@ -315,7 +322,7 @@
     transform: translate(-50%, 0) scale(1);
   }
   100% {
-    opacity: 0.35;
+    opacity: 0.55;
     transform: translate(-50%, 4px) scale(0.9);
   }
 }
@@ -367,7 +374,9 @@
   animation: pf-candidate-in 1.4s ease-out both;
 }
 
-/* An invalid candidate action appearing, then retracting. */
+/* An invalid candidate action appearing, then retracting — held at this
+ * opacity for the rest of the chapter, so it must stay legible enough to
+ * read as "unavailable", not disappear (see pf-branch-in-dim above). */
 @keyframes pf-candidate-in-retract {
   0% {
     opacity: 0;
@@ -378,7 +387,7 @@
     transform: translate(-50%, 0) scale(1);
   }
   100% {
-    opacity: 0.3;
+    opacity: 0.55;
     transform: translate(-50%, 8px) scale(0.88);
   }
 }
@@ -549,6 +558,9 @@
   animation: pf-cascade-valid 1s ease-out both;
 }
 
+/* Held at this opacity for the rest of the chapter — see pf-branch-in-dim
+ * above for why 0.55 is the floor for a de-emphasised label meant to stay
+ * legible, not a transient one that's allowed to fully vanish. */
 @keyframes pf-cascade-invalid {
   0% {
     opacity: 0;
@@ -559,7 +571,7 @@
     transform: translateY(0) scale(1);
   }
   100% {
-    opacity: 0.32;
+    opacity: 0.55;
     transform: translateY(2px) scale(0.9);
   }
 }
