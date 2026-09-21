@@ -3,7 +3,8 @@ import { RefreshCw, Wifi } from 'lucide-react';
 import { bootApp } from './boot';
 import { ApiError } from '../api/errors';
 import { Button } from '../components/primitives/Button';
-import { Spinner } from '../components/primitives/Spinner';
+import { ConnectionExperience } from './connection/ConnectionExperience';
+import { ConnectionSuccessTransition } from './connection/SuccessTransition';
 
 const MAX_ATTEMPTS = 4;
 const BASE_BACKOFF_MS = 800;
@@ -29,6 +30,7 @@ function sleep(ms: number): Promise<void> {
 
 type BootPhase =
   | { kind: 'booting'; slow: boolean }
+  | { kind: 'success' }
   | { kind: 'ready' }
   | { kind: 'failed' };
 
@@ -60,7 +62,7 @@ export function BootGate({ children }: BootGateProps): ReactElement {
       if (cancelledRef.current) return;
 
       if (!result.error) {
-        setPhase({ kind: 'ready' });
+        setPhase({ kind: 'success' });
         return;
       }
 
@@ -86,19 +88,23 @@ export function BootGate({ children }: BootGateProps): ReactElement {
     return <>{children}</>;
   }
 
+  if (phase.kind === 'success') {
+    return <ConnectionSuccessTransition onComplete={() => setPhase({ kind: 'ready' })} />;
+  }
+
   if (phase.kind === 'failed') {
     return (
       <div
         role="alert"
         data-testid="boot-gate-error"
-        className="min-h-screen flex flex-col items-center justify-center p-6 text-center"
+        className="min-h-screen flex flex-col items-center justify-center p-6 text-center animate-pf-copy-in motion-reduce:animate-none"
       >
         <div className="w-16 h-16 rounded-full bg-paytm-red-light text-paytm-red flex items-center justify-center mb-4">
           <Wifi className="w-8 h-8" aria-hidden="true" />
         </div>
-        <h1 className="text-2xl font-bold text-content-primary mb-2">Can&apos;t connect to PaytmFlow</h1>
+        <h1 className="text-2xl font-bold text-content-primary mb-2">Something didn&apos;t connect</h1>
         <p className="text-content-secondary max-w-md mb-6 text-sm">
-          We&apos;re having trouble reaching the server. Please check your connection and try again.
+          Let&apos;s try that again — check your connection and retry.
         </p>
         <Button
           variant="primary"
@@ -106,24 +112,13 @@ export function BootGate({ children }: BootGateProps): ReactElement {
           onClick={() => setRetryToken((t) => t + 1)}
         >
           <RefreshCw className="w-4 h-4 mr-2" aria-hidden="true" />
-          Retry
+          Try again
         </Button>
       </div>
     );
   }
 
-  return (
-    <div
-      role="status"
-      data-testid="boot-gate-loading"
-      className="min-h-screen flex flex-col items-center justify-center p-6 text-center"
-    >
-      <Spinner size="lg" className="text-paytm-blue-action mb-4" label="Connecting" />
-      <p className="text-content-secondary text-sm">
-        {phase.slow ? 'Waking up the service…' : 'Connecting to PaytmFlow…'}
-      </p>
-    </div>
-  );
+  return <ConnectionExperience slow={phase.slow} />;
 }
 
 export default BootGate;
