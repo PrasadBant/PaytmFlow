@@ -366,12 +366,6 @@ const CANDIDATES = [
   { label: 'Request review', valid: false },
 ];
 
-// Mobile can't fit four candidates across a 390px viewport without crowding
-// the outer two against the edges — instead of shrinking them, mobile gets
-// its own vertical evaluation cascade (a different, more compact layout, not
-// the desktop row at a smaller size). Desktop is untouched.
-const CASCADE_ROW_TOP = [6, 32, 58, 84];
-
 function ResolveScene(): ReactElement {
   return (
     <div className="relative w-full h-full">
@@ -404,20 +398,20 @@ function ResolveScene(): ReactElement {
 
       {/* Mobile — a vertical cascade: each candidate is evaluated in turn,
           invalid ones retract, the valid one strengthens and grows a second
-          line connecting it straight to "Next step" (no separate row needed,
-          so nothing has to compete for the same vertical space). */}
-      <div className="sm:hidden">
-        <div className="absolute inset-x-0 top-0 flex justify-center">
-          <span className="text-[8px] font-semibold uppercase tracking-wide text-content-tertiary animate-pf-label-in">
-            Candidate actions
-          </span>
-        </div>
+          line connecting it straight to "Next step". Laid out with flexbox
+          (not fixed `top:%` slots) so the extra line on the valid card can
+          never overlap a neighbouring row — flex reflows around real
+          content height instead of assuming every row is the same size. */}
+      <div className="sm:hidden absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-4">
+        <span className="text-[8px] font-semibold uppercase tracking-wide text-content-tertiary animate-pf-label-in">
+          Candidate actions
+        </span>
         {CANDIDATES.map((c, i) => (
           <span
             key={c.label}
-            style={{ left: '50%', top: `${CASCADE_ROW_TOP[i]}%`, animationDelay: `${0.3 + i * 0.35}s` } as CSSProperties}
+            style={{ animationDelay: `${0.3 + i * 0.35}s` } as CSSProperties}
             className={cn(
-              'absolute flex flex-col items-center gap-0.5 px-3 py-1 rounded-button border text-[9.5px] font-medium shadow-xs',
+              'flex flex-col items-center gap-0.5 px-3 py-1 rounded-button border text-[9.5px] font-medium shadow-xs w-[86%] max-w-[220px] text-center',
               c.valid
                 ? 'bg-paytm-blue-action text-white border-paytm-blue-action shadow-sm animate-pf-cascade-valid'
                 : 'bg-white/70 text-content-tertiary border-surface-border animate-pf-cascade-invalid'

@@ -268,4 +268,62 @@ describe('BootGate (initial loading / cold-start resilience)', () => {
     },
     LONG_TEST_TIMEOUT_MS
   );
+
+  it(
+    '15. backend ready mid-story: the current chapter finishes (no abrupt cut), then Home — without waiting for the rest of the story',
+    async () => {
+      let resolveSession!: (value: { session_id: string; created: boolean }) => void;
+      const pending = new Promise<{ session_id: string; created: boolean }>((resolve) => {
+        resolveSession = resolve;
+      });
+      vi.spyOn(apiClient, 'get').mockReturnValueOnce(pending);
+
+      renderBootGate();
+      expect(screen.getByTestId('boot-gate-loading')).toBeInTheDocument();
+
+      // 9s in: inside the "assemble" chapter's own entrance choreography
+      // (assemble starts at 8s), not at a chapter boundary.
+      await advance(9_000);
+      expect(screen.getByTestId('boot-gate-loading')).toBeInTheDocument();
+
+      resolveSession({ session_id: 's1', created: true });
+      await advance(200); // let the resolution flush into React state
+
+      // Not an abrupt jump — the current chapter's transition is still
+      // finishing, so the story is still on screen a moment later.
+      expect(screen.queryByTestId('app-content')).not.toBeInTheDocument();
+      expect(screen.getByTestId('boot-gate-loading')).toBeInTheDocument();
+
+      // But it must resolve to Home well before the remaining ~100+ seconds
+      // of story would ever have played out — proving later chapters are
+      // skipped, not merely deferred.
+      await advance(3_500);
+      expect(screen.getByTestId('app-content')).toBeInTheDocument();
+    },
+    LONG_TEST_TIMEOUT_MS
+  );
+
+  it(
+    '16. backend ready exactly at a chapter boundary: one clean Home navigation',
+    async () => {
+      let resolveSession!: (value: { session_id: string; created: boolean }) => void;
+      const pending = new Promise<{ session_id: string; created: boolean }>((resolve) => {
+        resolveSession = resolve;
+      });
+      vi.spyOn(apiClient, 'get').mockReturnValueOnce(pending);
+
+      renderBootGate();
+
+      await advance(22_000); // exactly the "documents" chapter's start boundary
+      resolveSession({ session_id: 's1', created: true });
+
+      // Up to MAX_EXIT_WAIT_MS (2.5s) for the chapter boundary, plus the
+      // success flourish and its own microtask overhead.
+      await advance(6_000);
+      expect(screen.getByTestId('app-content')).toBeInTheDocument();
+      // A clean single transition — no duplicate success/error states left behind.
+      expect(screen.queryByTestId('boot-gate-error')).not.toBeInTheDocument();
+    },
+    LONG_TEST_TIMEOUT_MS
+  );
 });

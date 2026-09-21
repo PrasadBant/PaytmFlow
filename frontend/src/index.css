@@ -522,22 +522,26 @@
 /* Mobile resolve cascade — a candidate row appearing, then either
    strengthening into the chosen path or retracting, in one keyframe
    timeline each (two classes both targeting `transform` on the same
-   element would silently override each other, not combine). */
+   element would silently override each other, not combine). Laid out in a
+   flex column (see FlowVisual's mobile ResolveScene), so no horizontal
+   centering needs to be baked into the transform here — flex handles it,
+   and reflows around each row's real height, so the valid row's extra
+   "→ Next step" line can never overlap a neighbour. */
 @keyframes pf-cascade-valid {
   0% {
     opacity: 0;
-    transform: translate(-50%, -6px) scale(0.95);
+    transform: translateY(-6px) scale(0.95);
   }
   40% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translateY(0) scale(1);
   }
   70% {
-    transform: translate(-50%, 0) scale(1.06);
+    transform: translateY(0) scale(1.06);
   }
   100% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -548,15 +552,15 @@
 @keyframes pf-cascade-invalid {
   0% {
     opacity: 0;
-    transform: translate(-50%, -6px) scale(0.95);
+    transform: translateY(-6px) scale(0.95);
   }
   40% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translateY(0) scale(1);
   }
   100% {
     opacity: 0.32;
-    transform: translate(-50%, 2px) scale(0.9);
+    transform: translateY(2px) scale(0.9);
   }
 }
 

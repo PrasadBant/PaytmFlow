@@ -43,7 +43,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 type BootPhase =
-  | { kind: 'booting'; slow: boolean }
+  | { kind: 'booting'; slow: boolean; backendReady: boolean }
   | { kind: 'success' }
   | { kind: 'ready' }
   | { kind: 'failed' };
@@ -58,17 +58,17 @@ export interface BootGateProps {
  * instead of a blank screen. Retries transient failures with backoff.
  */
 export function BootGate({ children }: BootGateProps): ReactElement {
-  const [phase, setPhase] = useState<BootPhase>({ kind: 'booting', slow: false });
+  const [phase, setPhase] = useState<BootPhase>({ kind: 'booting', slow: false, backendReady: false });
   const [retryToken, setRetryToken] = useState(0);
   const cancelledRef = useRef(false);
 
   const run = useCallback(async () => {
     cancelledRef.current = false;
-    setPhase({ kind: 'booting', slow: false });
+    setPhase({ kind: 'booting', slow: false, backendReady: false });
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
       const slowTimer = setTimeout(() => {
-        if (!cancelledRef.current) setPhase({ kind: 'booting', slow: true });
+        if (!cancelledRef.current) setPhase((prev) => (prev.kind === 'booting' ? { ...prev, slow: true } : prev));
       }, SLOW_HINT_MS);
 
       const result = await bootApp({ skipWorkerSetup: attempt > 1 });
@@ -76,7 +76,12 @@ export function BootGate({ children }: BootGateProps): ReactElement {
       if (cancelledRef.current) return;
 
       if (!result.error) {
-        setPhase({ kind: 'success' });
+        // Don't cut straight to the success transition — the story keeps
+        // playing until its current chapter reaches a natural stopping
+        // point (see ConnectionExperience's onReadyToExit), so a viewer
+        // mid-animation never sees an abrupt jump. `backendReady` is the
+        // real signal; `success` is only entered once that boundary fires.
+        setPhase((prev) => (prev.kind === 'booting' ? { ...prev, backendReady: true } : prev));
         return;
       }
 
@@ -97,6 +102,10 @@ export function BootGate({ children }: BootGateProps): ReactElement {
       cancelledRef.current = true;
     };
   }, [run, retryToken]);
+
+  const handleReadyToExit = useCallback(() => {
+    setPhase({ kind: 'success' });
+  }, []);
 
   if (phase.kind === 'ready') {
     return <>{children}</>;
@@ -132,7 +141,7 @@ export function BootGate({ children }: BootGateProps): ReactElement {
     );
   }
 
-  return <ConnectionExperience slow={phase.slow} />;
+  return <ConnectionExperience slow={phase.slow} backendReady={phase.backendReady} onReadyToExit={handleReadyToExit} />;
 }
 
 export default BootGate;
