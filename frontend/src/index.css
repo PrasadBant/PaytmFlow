@@ -86,70 +86,23 @@
   animation: pf-copy-in 0.4s ease-out both;
 }
 
-@keyframes pf-card-flow {
-  0% {
-    opacity: 0;
-    transform: translate(0, 6px) scale(0.96);
-  }
-  15%,
-  32% {
-    opacity: 1;
-    transform: translate(0, 0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(var(--pf-card-dx, 0), var(--pf-card-dy, 0)) scale(0.7);
-  }
-}
-
-.animate-pf-card-flow {
-  animation: pf-card-flow 4.4s ease-in-out infinite;
-}
-
-@keyframes pf-highlight {
-  0% {
-    stroke-dashoffset: 0;
-  }
-  100% {
-    stroke-dashoffset: -650;
-  }
-}
-
-.animate-pf-highlight {
-  animation: pf-highlight 4.5s linear infinite;
-}
-
+/* Active-stage pulse on the FLOW spine — the only looping animation left,
+   and it only ever plays on whichever spine node is currently "live". */
 @keyframes pf-node-pulse {
   0%,
   88%,
   100% {
-    fill-opacity: 0.14;
-    r: 9;
+    fill-opacity: 0.4;
+    r: 5.5;
   }
   6% {
-    fill-opacity: 0.45;
-    r: 13;
+    fill-opacity: 0.75;
+    r: 8;
   }
 }
 
 .animate-pf-node-pulse {
-  animation: pf-node-pulse 4.5s ease-out infinite;
-}
-
-@keyframes pf-ambient {
-  0%,
-  100% {
-    opacity: 0;
-    transform: translate(0, 0) scale(0.8);
-  }
-  50% {
-    opacity: 0.35;
-    transform: translate(7px, -7px) scale(1.15);
-  }
-}
-
-.animate-pf-ambient {
-  animation: pf-ambient 6s ease-in-out infinite;
+  animation: pf-node-pulse 3.2s ease-out infinite;
 }
 
 @keyframes pf-shimmer {
@@ -166,153 +119,471 @@
 }
 
 /*
- * Recovery beat — ONE cinematic reveal -> hold -> dissolve cycle, played
- * once (not looped) per entry into the recovery phase. The path and its
- * particle share this single opacity animation on their common <g>, so the
- * particle can never be visible while the guide path is invisible.
+ * Scene system — every class below is a ONE-SHOT transformation mounted
+ * fresh when its chapter (ConnectionPhase) becomes active (React remounts
+ * the scene via `key={phase}`), and each holds its final frame (`both`)
+ * until the chapter changes and the DOM node is torn down. Nothing here
+ * loops indefinitely except the two beats that represent an ongoing state
+ * (the amber "tension" wobble on an unresolved mismatch, and the FLOW
+ * spine's active-node pulse above) — nothing is decorative, everything maps
+ * to a concrete step of "what is physically happening to the journey".
+ *
+ * None of these elements carry a static Tailwind `-translate-x-*` utility:
+ * a CSS animation targeting `transform` fully replaces the computed
+ * transform for its whole duration, so any required centering/offset is
+ * baked directly into each keyframe instead.
  */
-@keyframes pf-recovery-path {
-  0% {
+
+/* A connector line drawing itself once. Every Wire path has pathLength=1, so
+   this dash math is identical regardless of the path's real geometry. */
+@keyframes pf-draw-in {
+  from {
+    stroke-dashoffset: 1;
     opacity: 0;
   }
-  16% {
-    opacity: 0.85;
+  15% {
+    opacity: 1;
   }
-  74% {
-    opacity: 0.85;
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+.animate-pf-draw-in {
+  stroke-dasharray: 1;
+  animation: pf-draw-in 0.8s ease-out both;
+}
+
+/* A plain SVG node (circle) fading into existence — no transform, so it
+   never needs a centering offset. */
+@keyframes pf-node-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-pf-node-in {
+  animation: pf-node-in 0.45s ease-out both;
+}
+
+/* A chip (horizontally centered on its `left` coordinate) settling into
+   place. */
+@keyframes pf-chip-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.animate-pf-chip-in {
+  animation: pf-chip-in 0.5s ease-out both;
+}
+
+/* A plain label (left/right-edge anchored, no horizontal centering needed). */
+@keyframes pf-label-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-pf-label-in {
+  animation: pf-label-in 0.45s ease-out both;
+}
+
+/* A live value chip travelling through the journey chain — Goal to Evidence
+   to Validation — via two waypoints supplied per-instance as CSS vars. */
+@keyframes pf-chip-travel {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0);
+  }
+  12% {
+    opacity: 1;
+  }
+  45% {
+    transform: translate(calc(-50% + var(--pf-tx1, 0px)), 0);
+  }
+  88% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--pf-tx2, 0px)), 0);
   }
   100% {
     opacity: 0;
+    transform: translate(calc(-50% + var(--pf-tx2, 0px)), 0);
   }
 }
 
-.animate-pf-recovery-path {
-  animation: pf-recovery-path 7s ease-in-out 1 both;
+.animate-pf-chip-travel {
+  animation: pf-chip-travel 3.6s cubic-bezier(0.42, 0, 0.58, 1) both;
 }
 
-/* A single ring-expand on the "Recover" node, timed to the particle's arrival. */
-@keyframes pf-recovery-ring {
+/* Documents entering from four directions, stacking centered, then
+   dissolving as their fields are extracted. */
+@keyframes pf-doc-stack {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--pf-fx, 0px)), calc(-50% + var(--pf-fy, 0px))) scale(0.85);
+  }
+  30%,
+  55% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 14px)) scale(0.7);
+  }
+}
+
+.animate-pf-doc-stack {
+  animation: pf-doc-stack 2.6s ease-in-out both;
+}
+
+/* A structured field emerging from the document stack and attaching below. */
+@keyframes pf-field-out {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.animate-pf-field-out {
+  animation: pf-field-out 0.6s ease-out both;
+}
+
+/* An unresolved mismatch — a genuinely ongoing state, so (unlike everything
+   else in this file) it loops for as long as the chapter is mounted. */
+@keyframes pf-tension {
   0%,
-  48% {
-    r: 9;
-    fill-opacity: 0;
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+.animate-pf-tension {
+  animation: pf-tension 1.8s ease-in-out infinite;
+}
+
+/* A branch candidate that appears and stays the chosen path. */
+@keyframes pf-branch-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px) scale(0.96);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.animate-pf-branch-in {
+  animation: pf-branch-in 1s ease-out both;
+}
+
+/* A branch candidate that appears, then is visibly de-emphasised. */
+@keyframes pf-branch-in-dim {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px) scale(0.96);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0.35;
+    transform: translate(-50%, 4px) scale(0.9);
+  }
+}
+
+.animate-pf-branch-in-dim {
+  animation: pf-branch-in-dim 1.3s ease-in both;
+}
+
+/* A deterministic-rule checklist row ticking on. */
+@keyframes pf-check-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
   }
   60% {
-    r: 16;
-    fill-opacity: 0.35;
+    opacity: 1;
+    transform: scale(1.15);
   }
   100% {
-    r: 22;
-    fill-opacity: 0;
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
-.animate-pf-recovery-ring {
-  animation: pf-recovery-ring 7s ease-out 1 both;
+.animate-pf-check-in {
+  animation: pf-check-in 0.45s ease-out both;
 }
 
-/* Reassembly beat — the flow itself reads very slightly brighter, once. */
-@keyframes pf-reassemble-glow {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  50% {
-    opacity: 0.45;
-  }
-}
-
-.animate-pf-reassemble-glow {
-  animation: pf-reassemble-glow 2.6s ease-in-out 1 both;
-  animation-delay: 9s;
-}
-
-/* Reassembly beat — each node illuminates once, in sequence. */
-@keyframes pf-reassemble-node {
-  0%,
-  100% {
-    r: 9;
-    fill-opacity: 0.14;
-  }
-  50% {
-    r: 14;
-    fill-opacity: 0.5;
-  }
-}
-
-.animate-pf-reassemble-node {
-  animation: pf-reassemble-node 0.9s ease-out 1 both;
-}
-
-/* Reassembly beat — a concept card converges into the flow instead of drifting away, then dissolves. */
-@keyframes pf-reassemble-converge {
+/* A validated candidate action strengthening into the chosen next step. */
+@keyframes pf-candidate-in {
   0% {
     opacity: 0;
-    transform: translate(0, 6px) scale(0.96);
+    transform: translate(-50%, 6px) scale(0.96);
   }
-  20%,
-  38% {
+  35% {
     opacity: 1;
-    transform: translate(0, 0) scale(1);
+    transform: translate(-50%, 0) scale(1);
+  }
+  65% {
+    transform: translate(-50%, 0) scale(1.08);
   }
   100% {
-    opacity: 0;
-    transform: translate(var(--pf-card-dx, 0), var(--pf-card-dy, 0)) scale(0.35);
-  }
-}
-
-.animate-pf-reassemble-converge {
-  animation: pf-reassemble-converge 4s ease-in-out 1 both;
-}
-
-/*
- * Mobile journey pill — one label at a time, in place, no horizontal travel.
- * The 30% stop confines visibility to a short window (instead of a slow
- * linear fade all the way to 100%), and `backwards` fill-mode keeps a label
- * hidden during its own delay instead of sitting at full opacity — without
- * both, every not-yet-active label was visible the whole time, and several
- * pills stacked on top of each other.
- */
-@keyframes pf-mobile-pill {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  8%,
-  22% {
     opacity: 1;
-  }
-  30% {
-    opacity: 0;
+    transform: translate(-50%, 0) scale(1);
   }
 }
 
-.animate-pf-mobile-pill {
-  animation-name: pf-mobile-pill;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-  animation-fill-mode: backwards;
+.animate-pf-candidate-in {
+  animation: pf-candidate-in 1.4s ease-out both;
 }
 
-/* Mobile reassembly chip — fades in, then dissolves inward once. */
-@keyframes pf-mobile-converge {
+/* An invalid candidate action appearing, then retracting. */
+@keyframes pf-candidate-in-retract {
   0% {
     opacity: 0;
-    transform: scale(0.9);
+    transform: translate(-50%, 6px) scale(0.96);
   }
-  25%,
-  55% {
+  35% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0.3;
+    transform: translate(-50%, 8px) scale(0.88);
+  }
+}
+
+.animate-pf-candidate-in-retract {
+  animation: pf-candidate-in-retract 1.2s ease-in both;
+}
+
+/* The journey's state label morphing: the blocked state dissolves... */
+@keyframes pf-morph-out {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+
+.animate-pf-morph-out {
+  animation: pf-morph-out 0.5s ease-in both;
+}
+
+/* ...and the unblocked state takes its place. */
+@keyframes pf-morph-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.animate-pf-morph-in {
+  animation: pf-morph-in 0.5s ease-out both;
+}
+
+/* Everything the viewer has seen collapsing inward into the FLOW. */
+@keyframes pf-collapse-item {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px) scale(0.96);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--pf-cx, 0px)), var(--pf-cy, 0px)) scale(0.3);
+  }
+}
+
+.animate-pf-collapse-item {
+  animation: pf-collapse-item 3.2s ease-in-out both;
+}
+
+/* The Recovery Layer hub: appears, brightens once as the six journeys
+   arrive, then dissolves to hand off to the architecture it contains. */
+@keyframes pf-hub-pulse {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  10% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  62% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(1.25);
+  }
+  80% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+}
+
+.animate-pf-hub-pulse {
+  animation: pf-hub-pulse 5.6s ease-in-out both;
+}
+
+/* A system-architecture component (both-axis centered) settling into place. */
+@keyframes pf-arch-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.animate-pf-arch-in {
+  animation: pf-arch-in 0.55s ease-out both;
+}
+
+/* The whole connected architecture compressing as ONE group — sharing a
+   single animation on the wrapping element keeps every component and wire
+   perfectly in sync, the same fix already proven for the recovery beat. */
+@keyframes pf-architecture-compress {
+  0% {
     opacity: 1;
     transform: scale(1);
   }
   100% {
     opacity: 0;
-    transform: scale(0.4);
+    transform: scale(0.22);
   }
 }
 
-.animate-pf-mobile-converge {
-  animation: pf-mobile-converge 4.5s ease-in-out 1 both;
+.animate-pf-architecture-compress {
+  animation: pf-architecture-compress 2s ease-in-out both;
+}
+
+/* The FLOW emerging as the payoff of the whole converge chapter. */
+@keyframes pf-flow-emerge {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-pf-flow-emerge {
+  animation: pf-flow-emerge 1s ease-out both;
+}
+
+/* Mobile resolve cascade — a candidate row appearing, then either
+   strengthening into the chosen path or retracting, in one keyframe
+   timeline each (two classes both targeting `transform` on the same
+   element would silently override each other, not combine). */
+@keyframes pf-cascade-valid {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -6px) scale(0.95);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  70% {
+    transform: translate(-50%, 0) scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.animate-pf-cascade-valid {
+  animation: pf-cascade-valid 1s ease-out both;
+}
+
+@keyframes pf-cascade-invalid {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -6px) scale(0.95);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0.32;
+    transform: translate(-50%, 2px) scale(0.9);
+  }
+}
+
+.animate-pf-cascade-invalid {
+  animation: pf-cascade-invalid 0.9s ease-in both;
+}
+
+/* Ambient chapter — one small, independent event fading in, holding, and
+   fading out, sized to fit inside its slot (see AMBIENT_EVENT_DURATION_S). */
+@keyframes pf-ambient-event {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  12%,
+  75% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+.animate-pf-ambient-event {
+  animation: pf-ambient-event 7s ease-in-out both;
 }
 
 @keyframes pf-breathe {
