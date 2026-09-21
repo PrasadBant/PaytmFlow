@@ -1,5 +1,6 @@
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,10 +14,43 @@ from app.packs.registry import pack_registry
 from app.schemas.chat import ChatRequest, ChatResponse, VoiceChatResponse
 from app.schemas.enums import ErrorCode
 from app.schemas.errors import ErrorEnvelope, ErrorObject
+from app.schemas.journeys import JourneyDiff, JourneyStateResponse
 from app.security.session import get_current_session, verify_journey_ownership
 from app.services.journey_service import JourneyService
 
 router = APIRouter()
+logger = structlog.get_logger(__name__)
+
+
+async def _get_diff_if_available(
+    journey: JourneyModel, journey_state: JourneyStateResponse, db: AsyncSession
+) -> JourneyDiff | None:
+    """The real deterministic before/after change since the previous
+    snapshot, for "why did my status change"/"what changed" - or None when
+    the journey hasn't moved past its first snapshot yet (nothing to diff).
+    Never fabricated in the frontend/AI layer: this is the same
+    JourneyService.get_diff the dedicated GET /diff endpoint uses.
+    """
+    if journey_state.version_number < 2:
+        return None
+    try:
+        return await JourneyService.get_diff(
+            journey=journey,
+            from_ver=journey_state.version_number - 1,
+            to_ver=journey_state.version_number,
+            db=db,
+        )
+    except HTTPException as exc:
+        # Defensive only - e.g. a snapshot somehow missing. The chat
+        # experience degrades gracefully to "no diff available" rather than
+        # failing the whole chat request over an advisory extra.
+        logger.warning(
+            "chat_diff_unavailable",
+            journey_id=str(journey.id),
+            version_number=journey_state.version_number,
+            error=str(exc.detail),
+        )
+        return None
 
 
 @router.post(
@@ -72,6 +106,7 @@ async def chat_with_assistant(
 
     journey_state = await JourneyService.get_journey_state(journey=journey, db=db)
     recommendation = await JourneyService.get_recommendation(journey=journey, db=db)
+    diff = await _get_diff_if_available(journey=journey, journey_state=journey_state, db=db)
 
     ai_provider = get_ai_provider()
     reply = await ai_provider.chat(
@@ -79,6 +114,7 @@ async def chat_with_assistant(
         manifest=manifest,
         journey_state=journey_state,
         recommendation=recommendation,
+        diff=diff,
     )
     return ChatResponse(reply=reply)
 
@@ -186,6 +222,7 @@ async def chat_with_assistant_voice(
 
     journey_state = await JourneyService.get_journey_state(journey=journey, db=db)
     recommendation = await JourneyService.get_recommendation(journey=journey, db=db)
+    diff = await _get_diff_if_available(journey=journey, journey_state=journey_state, db=db)
 
     ai_provider = get_ai_provider()
     reply = await ai_provider.chat(
@@ -193,6 +230,7 @@ async def chat_with_assistant_voice(
         manifest=manifest,
         journey_state=journey_state,
         recommendation=recommendation,
+        diff=diff,
     )
     return VoiceChatResponse(
         reply=reply, transcript=transcript, language_code=transcription.get("language_code")

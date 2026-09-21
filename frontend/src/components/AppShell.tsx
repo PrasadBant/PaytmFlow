@@ -1,8 +1,18 @@
 import type React from 'react';
+import { lazy, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { AssistantModal } from './AssistantModal';
+
+// Code-split out of the main bundle: the assistant's own chat/voice/
+// translate code has zero business being in the critical initial-load path
+// (per PaytmFlow's chat-must-never-block-boot rule). It already renders
+// `null` while closed and fires no network requests until the user acts, so
+// the only remaining win here is keeping its JS out of the eagerly-loaded
+// bundle too.
+const AssistantModal = lazy(() =>
+  import('./AssistantModal').then((m) => ({ default: m.AssistantModal }))
+);
 
 export const AppShell: React.FC = () => {
   const location = useLocation();
@@ -17,7 +27,9 @@ export const AppShell: React.FC = () => {
           <Outlet />
         </main>
       </div>
-      <AssistantModal />
+      <Suspense fallback={null}>
+        <AssistantModal />
+      </Suspense>
     </div>
   );
 };

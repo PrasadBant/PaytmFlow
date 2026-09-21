@@ -10,7 +10,7 @@ from app.ai.provider import AIProvider
 from app.config import settings
 from app.core.models import CoreSnapshot
 from app.packs.contract import ActionSpec, GoalFieldSpec, JourneyPackManifest
-from app.schemas.journeys import JourneyStateResponse, RecommendationResponse
+from app.schemas.journeys import JourneyDiff, JourneyStateResponse, RecommendationResponse
 
 logger = structlog.get_logger(__name__)
 
@@ -334,6 +334,7 @@ class GuardrailedAIProvider:
         manifest: JourneyPackManifest,
         journey_state: JourneyStateResponse,
         recommendation: RecommendationResponse | None,
+        diff: JourneyDiff | None = None,
     ) -> str:
         """Answers a free-form question with timeout, length bounding, and
 
@@ -348,6 +349,7 @@ class GuardrailedAIProvider:
             manifest=manifest,
             journey_state=journey_state,
             recommendation=recommendation,
+            diff=diff,
         )
 
         if not bounded_message:
@@ -360,6 +362,7 @@ class GuardrailedAIProvider:
                     manifest=manifest,
                     journey_state=journey_state,
                     recommendation=recommendation,
+                    diff=diff,
                 ),
                 timeout=self.timeout_seconds,
             )

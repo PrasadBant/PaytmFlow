@@ -52,6 +52,7 @@ from typing import Any
 
 import structlog
 
+from app.ai.chat_context import build_diff_context, build_other_valid_actions
 from app.ai.local_ml import LocalMLProvider
 from app.ai.models import ActionRankingResult, AIConflict, AIDetectedField, AIInterpretationResult
 from app.ai.provider import AIProvider
@@ -69,7 +70,7 @@ from app.config import settings
 from app.core.models import CoreSnapshot
 from app.packs.contract import ActionSpec, GoalFieldSpec, JourneyPackManifest
 from app.schemas.enums import FieldType
-from app.schemas.journeys import JourneyStateResponse, RecommendationResponse
+from app.schemas.journeys import JourneyDiff, JourneyStateResponse, RecommendationResponse
 
 logger = structlog.get_logger(__name__)
 
@@ -422,6 +423,7 @@ class SarvamProvider:
         manifest: JourneyPackManifest,
         journey_state: JourneyStateResponse,
         recommendation: RecommendationResponse | None,
+        diff: JourneyDiff | None = None,
     ) -> str:
         if (
             not settings.SARVAM_ENABLED
@@ -433,6 +435,7 @@ class SarvamProvider:
                 manifest=manifest,
                 journey_state=journey_state,
                 recommendation=recommendation,
+                diff=diff,
             )
         try:
             top_action = recommendation.recommendation if recommendation else None
@@ -461,12 +464,29 @@ class SarvamProvider:
                     if top_action
                     else None
                 ),
+                # Every OTHER currently-valid candidate action, not just the
+                # top recommendation - so the Copilot can answer "what are
+                # my options" completely instead of only naming one, while
+                # still only ever naming server-computed candidates (never
+                # inventing an action that isn't in this list).
+                "other_valid_actions": build_other_valid_actions(recommendation),
             }
+            # The actual deterministic before/after change - omitted
+            # entirely (not a null placeholder key) when there is nothing to
+            # diff yet, so the model is never tempted to explain a "change"
+            # that didn't happen.
+            diff_context = build_diff_context(diff)
+            if diff_context is not None:
+                context["journey_diff"] = diff_context
+
             system_prompt = (
                 "You are a helpful assistant answering a user's question about their OWN "
                 "financial-journey application. Answer ONLY using the JSON context provided - "
-                "never invent a status, document, or requirement that isn't in it. Keep the "
-                "answer to 1-3 sentences, plain and friendly. "
+                "never invent a status, document, or requirement that isn't in it. If the "
+                "context includes a 'journey_diff', use it to explain what changed and why "
+                "when asked - never invent a cause that isn't in it, and never claim something "
+                "changed if there is no journey_diff. Keep the answer to 1-3 sentences, plain "
+                "and friendly. "
                 "Do not use banned terms: 'approved', 'approval', 'probability', 'credit score', "
                 "'eligibility score', 'readiness score', 'guaranteed'. "
                 "Never claim to have taken any action - you are advisory only."
@@ -485,6 +505,7 @@ class SarvamProvider:
             manifest=manifest,
             journey_state=journey_state,
             recommendation=recommendation,
+            diff=diff,
         )
 
     async def general_chat(self, message: str) -> str:

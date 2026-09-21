@@ -4,13 +4,14 @@ from typing import Any
 import httpx
 import structlog
 
+from app.ai.chat_context import build_diff_context, build_other_valid_actions
 from app.ai.mock import MockAI
 from app.ai.models import ActionRankingResult, AIInterpretationResult
 from app.ai.provider import AIProvider
 from app.config import settings
 from app.core.models import CoreSnapshot
 from app.packs.contract import ActionSpec, GoalFieldSpec, JourneyPackManifest
-from app.schemas.journeys import JourneyStateResponse, RecommendationResponse
+from app.schemas.journeys import JourneyDiff, JourneyStateResponse, RecommendationResponse
 
 logger = structlog.get_logger(__name__)
 
@@ -366,6 +367,7 @@ class LLMProvider:
         manifest: JourneyPackManifest,
         journey_state: JourneyStateResponse,
         recommendation: RecommendationResponse | None,
+        diff: JourneyDiff | None = None,
     ) -> str:
         """Answers a free-form question about the user's own journey via LLM,
 
@@ -403,13 +405,20 @@ class LLMProvider:
                     if top_action
                     else None
                 ),
+                "other_valid_actions": build_other_valid_actions(recommendation),
             }
+            diff_context = build_diff_context(diff)
+            if diff_context is not None:
+                context["journey_diff"] = diff_context
 
             system_prompt = (
                 "You are a helpful assistant answering a user's question about their OWN "
                 "financial-journey application. Answer ONLY using the JSON context provided - "
-                "never invent a status, document, or requirement that isn't in it. Keep the "
-                "answer to 1-3 sentences, plain and friendly. "
+                "never invent a status, document, or requirement that isn't in it. If the "
+                "context includes a 'journey_diff', use it to explain what changed and why "
+                "when asked - never invent a cause that isn't in it, and never claim something "
+                "changed if there is no journey_diff. Keep the answer to 1-3 sentences, plain "
+                "and friendly. "
                 "Do not use banned terms: 'approved', 'approval', 'probability', 'credit score', "
                 "'eligibility score', 'readiness score', 'guaranteed'. "
                 "Never claim to have taken any action - you are advisory only."
@@ -430,6 +439,7 @@ class LLMProvider:
             manifest=manifest,
             journey_state=journey_state,
             recommendation=recommendation,
+            diff=diff,
         )
 
     async def general_chat(self, message: str) -> str:

@@ -19,6 +19,7 @@ import { Modal } from '@/components/primitives/Modal';
 import { IconButton } from '@/components/primitives/IconButton';
 import { useUiStore } from '@/state/ui';
 import { useJourney } from '@/api/hooks/useJourney';
+import type { JourneyStateResponse } from '@/api/hooks/useJourney';
 import { useChat, useGeneralChat, useVoiceChat } from '@/api/hooks/useChat';
 import { useTranslateText } from '@/api/hooks/useTranslate';
 
@@ -47,7 +48,9 @@ const LANGUAGE_OPTIONS: { code: string; label: string }[] = [
   { code: 'bn-IN', label: 'Bengali' },
 ];
 
-const SUGGESTED_QUESTIONS: { text: string; icon: ReactNode }[] = [
+// Generic quick actions shown before a journey exists, or while journey
+// data is still loading — the same defaults as before.
+const GENERIC_SUGGESTED_QUESTIONS: { text: string; icon: ReactNode }[] = [
   { text: "What's my next step?", icon: <Sparkles className="w-3 h-3" /> },
   { text: 'What documents are accepted?', icon: <FileCheck2 className="w-3 h-3" /> },
   { text: 'Why is this blocked?', icon: <HelpCircle className="w-3 h-3" /> },
@@ -63,14 +66,83 @@ function extractJourneyId(pathname: string): string | undefined {
   return match?.[1];
 }
 
-function welcomeMessageFor(journeyTitle: string | undefined, journeyContext: string | null): string {
-  if (journeyTitle) {
-    return `Hello! I'm here to help with your "${journeyTitle}" application. Ask me about your next step, required documents, or progress.`;
+// `pending_clarification` is only ever present when readiness is already
+// NEEDS_REVIEW (handled separately below), so for the general "something is
+// blocking me" case the real signal is a BLOCKED field with an explanation
+// — the same thing the deterministic chat fallback (MockAI) already keys
+// off server-side.
+function findBlockedField(
+  journeyData: JourneyStateResponse
+): JourneyStateResponse['fields'][number] | undefined {
+  return journeyData.fields.find((f) => f.status === 'BLOCKED' && f.explanation);
+}
+
+// Both the opening message and the quick-action suggestions are driven by
+// the SAME real journey state already fetched for the screen (readiness,
+// pending_clarification) — never a generic "how can I help" greeting when
+// the application already knows exactly what the user is doing.
+function welcomeMessageFor(
+  journeyData: JourneyStateResponse | undefined,
+  journeyContext: string | null
+): string {
+  const title = journeyData?.display?.title;
+  const titlePhrase = title ? ` "${title}"` : '';
+
+  if (journeyData?.readiness === 'READY') {
+    return `Your${titlePhrase} application is ready. Want me to explain what happens next?`;
+  }
+  if (journeyData?.readiness === 'NEEDS_REVIEW') {
+    return `Your${titlePhrase} application needs a review. I can explain what caused it and what you can do next.`;
+  }
+  const blockedField = journeyData ? findBlockedField(journeyData) : undefined;
+  if (blockedField) {
+    return `I can see you're working on your${titlePhrase} application. Right now it's waiting on ${blockedField.label}. Ask me why, or what to do next.`;
+  }
+  if (title) {
+    return `Hello! I'm here to help with your "${title}" application. Ask me about your next step, required documents, or progress.`;
   }
   if (journeyContext) {
     return `Hello! Ask me anything about your ${journeyContext} application.`;
   }
   return "Hello! I'm your PaytmFlow assistant. Ask me anything about filling out an application, or start one and I can guide you step by step.";
+}
+
+function suggestedQuestionsFor(
+  journeyData: JourneyStateResponse | undefined
+): { text: string; icon: ReactNode }[] {
+  if (!journeyData) return GENERIC_SUGGESTED_QUESTIONS;
+
+  if (journeyData.readiness === 'READY') {
+    return [
+      { text: 'Am I ready?', icon: <Check className="w-3 h-3" /> },
+      { text: "What's next?", icon: <Sparkles className="w-3 h-3" /> },
+    ];
+  }
+  if (journeyData.readiness === 'NEEDS_REVIEW') {
+    return [
+      { text: 'Why is this under review?', icon: <HelpCircle className="w-3 h-3" /> },
+      { text: 'What do I need to fix?', icon: <FileCheck2 className="w-3 h-3" /> },
+      { text: 'What can I do now?', icon: <Sparkles className="w-3 h-3" /> },
+    ];
+  }
+  if (journeyData.readiness === 'DEAD_END') {
+    return [
+      { text: 'Why am I stuck?', icon: <HelpCircle className="w-3 h-3" /> },
+      { text: 'What are my options?', icon: <PieChart className="w-3 h-3" /> },
+    ];
+  }
+  if (findBlockedField(journeyData)) {
+    return [
+      { text: 'Why am I stuck?', icon: <HelpCircle className="w-3 h-3" /> },
+      { text: 'What is missing?', icon: <FileCheck2 className="w-3 h-3" /> },
+      { text: 'What should I do?', icon: <Sparkles className="w-3 h-3" /> },
+    ];
+  }
+  return [
+    { text: "What's my next step?", icon: <Sparkles className="w-3 h-3" /> },
+    { text: 'What documents are accepted?', icon: <FileCheck2 className="w-3 h-3" /> },
+    { text: 'How much have I completed?', icon: <PieChart className="w-3 h-3" /> },
+  ];
 }
 
 export function AssistantModal(): ReactElement | null {
@@ -86,7 +158,8 @@ export function AssistantModal(): ReactElement | null {
   const voiceChatMutation = useVoiceChat();
   const translateMutation = useTranslateText();
 
-  const welcomeText = welcomeMessageFor(journeyData?.display?.title, journeyContext);
+  const welcomeText = welcomeMessageFor(journeyData, journeyContext);
+  const suggestedQuestions = suggestedQuestionsFor(journeyData);
 
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
@@ -440,7 +513,7 @@ export function AssistantModal(): ReactElement | null {
         {/* Suggested questions */}
         {messages.length <= 1 && (
           <div className="mt-3 flex flex-wrap gap-1.5" data-testid="assistant-suggestions">
-            {SUGGESTED_QUESTIONS.map((suggestion) => (
+            {suggestedQuestions.map((suggestion) => (
               <button
                 key={suggestion.text}
                 type="button"

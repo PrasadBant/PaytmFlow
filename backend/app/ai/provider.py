@@ -4,7 +4,7 @@ from app.ai.models import ActionRankingResult, AIInterpretationResult
 from app.config import settings
 from app.core.models import CoreSnapshot
 from app.packs.contract import ActionSpec, GoalFieldSpec, JourneyPackManifest
-from app.schemas.journeys import JourneyStateResponse, RecommendationResponse
+from app.schemas.journeys import JourneyDiff, JourneyStateResponse, RecommendationResponse
 
 
 class AIProvider(Protocol):
@@ -81,12 +81,19 @@ class AIProvider(Protocol):
         manifest: JourneyPackManifest,
         journey_state: JourneyStateResponse,
         recommendation: RecommendationResponse | None,
+        diff: JourneyDiff | None = None,
     ) -> str:
         """Answers a free-form question about the user's OWN journey.
 
         Grounded strictly in the already-computed journey_state/recommendation
         data supplied by the caller - advisory only, never writes state, and
         must never invent facts about the user's application.
+
+        `diff` is the actual deterministic before/after change (see
+        JourneyService.get_diff) when the caller has one available (e.g. the
+        journey has moved past its first snapshot) - optional and omitted
+        entirely from any prompt/answer when there is nothing to diff yet.
+        Implementations must never fabricate a diff when this is None.
         """
         ...
 

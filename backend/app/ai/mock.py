@@ -4,7 +4,12 @@ from typing import Any
 from app.ai.models import ActionRankingResult, AIInterpretationResult
 from app.core.models import CoreSnapshot
 from app.packs.contract import ActionSpec, FieldType, GoalFieldSpec, JourneyPackManifest
-from app.schemas.journeys import FieldState, JourneyStateResponse, RecommendationResponse
+from app.schemas.journeys import (
+    FieldState,
+    JourneyDiff,
+    JourneyStateResponse,
+    RecommendationResponse,
+)
 
 _CHAT_STOPWORDS = {
     "is",
@@ -76,6 +81,34 @@ def _field_reply(f: FieldState) -> str:
     if status == "BLOCKED":
         return f.explanation or f"{f.label} is still pending - it hasn't been submitted yet."
     return f"{f.label}: {f.display_value}."
+
+
+def _diff_reply(diff: JourneyDiff) -> str:
+    """Answers "what changed"/"why did my status change" from the real,
+    already-computed Journey Diff (see JourneyService.get_diff) - never a
+    re-derived or invented explanation."""
+    changed = diff.fields_changed
+    readiness_changed = bool(
+        diff.readiness
+        and diff.readiness.from_
+        and diff.readiness.to
+        and diff.readiness.from_ != diff.readiness.to
+    )
+    if not changed and not readiness_changed:
+        return "Nothing has changed since your last update."
+
+    sentences: list[str] = []
+    for fc in changed[:3]:
+        detail = f" ({fc.cause})" if fc.cause else ""
+        sentences.append(
+            f"{fc.label} moved from {fc.from_status.value} to {fc.to_status.value}{detail}."
+        )
+    if readiness_changed:
+        assert diff.readiness is not None  # narrowed by readiness_changed above
+        from_val = diff.readiness.from_.value
+        to_val = diff.readiness.to.value
+        sentences.append(f"Your overall status moved from {from_val} to {to_val}.")
+    return " ".join(sentences)
 
 
 class MockAI:
@@ -369,16 +402,27 @@ class MockAI:
         manifest: JourneyPackManifest,
         journey_state: JourneyStateResponse,
         recommendation: RecommendationResponse | None,
+        diff: JourneyDiff | None = None,
     ) -> str:
         """Answers free-form questions deterministically, grounded strictly in
         the already-computed journey_state/recommendation data - never in
         journey-type branching (all journeys share this same logic, driven
         by the data each pack manifest already produces).
+
+        `diff` (see JourneyService.get_diff) grounds "what changed"/"why did
+        my status change" - only answered from the real diff when one is
+        supplied; never fabricated when None.
         """
         q = message.lower()
         top_action = recommendation.recommendation if recommendation else None
         q_tokens = re.findall(r"[a-z]+", q)
         question_words = {w for w in q_tokens if len(w) > 2 and w not in _CHAT_STOPWORDS}
+
+        # "What changed" / "why did my status change" is answered from the
+        # actual Journey Diff, ahead of the more general blocked/review
+        # branch below (which would otherwise swallow "why did..." first).
+        if re.search(r"\bchanged?\b|\bchange\b", q) and diff is not None:
+            return _diff_reply(diff)
 
         if re.search(r"^(hi|hello|hey|good morning|good evening)\b", q.strip()):
             return (

@@ -232,3 +232,135 @@ async def test_select_action_and_explain():
 
     for w in BANNED_WORDS:
         assert w not in explanation.lower()
+
+
+def _mock_journey_state(lending_pack, **overrides):
+    from uuid import uuid4
+
+    from app.schemas.enums import JourneyStatus, Readiness
+    from app.schemas.journeys import DisplayInfo, JourneyStateResponse, ProgressCounts
+
+    defaults = dict(
+        journey_id=uuid4(),
+        journey_type=lending_pack.metadata.journey_type,
+        schema_version="1.0.0",
+        snapshot_id=uuid4(),
+        version_number=2,
+        readiness=Readiness.NEEDS_REVIEW,
+        status=JourneyStatus.NEEDS_REVIEW,
+        fields=[],
+        progress=ProgressCounts(completed=3, pending=1, blockers=0, total=5),
+        display=DisplayInfo(title="Personal Loan", summary="₹5,00,000 · Home Renovation"),
+    )
+    defaults.update(overrides)
+    return JourneyStateResponse(**defaults)
+
+
+def _mock_diff(**overrides):
+    from app.schemas.enums import FieldStatus, Readiness
+    from app.schemas.journeys import FieldChange, JourneyDiff, ReadinessDiff
+
+    defaults = dict(
+        from_version=1,
+        to_version=2,
+        fields_changed=[
+            FieldChange(
+                key="monthly_income",
+                label="Monthly Income",
+                from_status=FieldStatus.SATISFIED,
+                to_status=FieldStatus.AMBIGUOUS,
+                display_value="₹55,000",
+                cause="Uploaded evidence did not match declared income.",
+            )
+        ],
+        actions_unlocked=[],
+        actions_removed=[],
+        readiness=ReadinessDiff(**{"from": Readiness.NOT_READY, "to": Readiness.NEEDS_REVIEW}),
+    )
+    defaults.update(overrides)
+    return JourneyDiff(**defaults)
+
+
+@pytest.mark.asyncio
+async def test_mock_chat_explains_actual_diff_when_asked_what_changed():
+    """MockAI is the ultimate deterministic fallback (under GuardrailedAIProvider
+    and every real provider's own failure path) - "what changed"/"why did my
+    status change" must be answered from the real Journey Diff, not a generic
+    blocked/review blurb."""
+    lending_pack = pack_registry.get_pack(JourneyType.LENDING)
+    assert lending_pack is not None
+
+    ai = MockAI()
+    journey_state = _mock_journey_state(lending_pack)
+    diff = _mock_diff()
+
+    reply = await ai.chat(
+        message="Why did my status change?",
+        manifest=lending_pack,
+        journey_state=journey_state,
+        recommendation=None,
+        diff=diff,
+    )
+
+    assert "Monthly Income" in reply
+    assert "Uploaded evidence did not match declared income." in reply
+    assert "NOT_READY" in reply
+    assert "NEEDS_REVIEW" in reply
+
+
+@pytest.mark.asyncio
+async def test_mock_chat_never_fabricates_a_diff_when_none_available():
+    """When there's genuinely nothing to diff yet, "what changed" must not
+    invent a change - it should fall through to the generic deterministic
+    answer instead of hallucinating a before/after."""
+    lending_pack = pack_registry.get_pack(JourneyType.LENDING)
+    assert lending_pack is not None
+
+    ai = MockAI()
+    journey_state = _mock_journey_state(lending_pack, version_number=1)
+
+    reply = await ai.chat(
+        message="What changed?",
+        manifest=lending_pack,
+        journey_state=journey_state,
+        recommendation=None,
+        diff=None,
+    )
+
+    assert "Monthly Income" not in reply
+    assert "Uploaded evidence did not match declared income." not in reply
+
+
+@pytest.mark.asyncio
+async def test_mock_chat_blocker_explanation_unaffected_by_diff_param():
+    """Regression: adding the optional `diff` parameter must not change the
+    existing "why am I stuck" blocked-field explanation behavior."""
+    from app.schemas.enums import Readiness
+    from app.schemas.journeys import FieldState
+
+    lending_pack = pack_registry.get_pack(JourneyType.LENDING)
+    assert lending_pack is not None
+
+    ai = MockAI()
+    journey_state = _mock_journey_state(
+        lending_pack,
+        readiness=Readiness.NOT_READY,
+        fields=[
+            FieldState(
+                key="monthly_income",
+                label="Monthly Income",
+                status="BLOCKED",
+                explanation="Income proof is missing.",
+            )
+        ],
+    )
+
+    reply = await ai.chat(
+        message="Why am I stuck?",
+        manifest=lending_pack,
+        journey_state=journey_state,
+        recommendation=None,
+        diff=None,
+    )
+
+    assert "Income proof is missing." in reply

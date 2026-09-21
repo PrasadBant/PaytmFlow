@@ -509,3 +509,247 @@ def test_extract_result_no_extractable_content_flag_parsed():
     raw = _zip_extraction({}, no_extractable_content=True)
     extraction = _parse_extract_payload(raw)
     assert extraction.no_extractable_content is True
+
+
+def _sample_journey_state(sample_manifest, **overrides):
+    from uuid import uuid4
+
+    from app.schemas.enums import JourneyStatus, Readiness
+    from app.schemas.journeys import DisplayInfo, JourneyStateResponse, ProgressCounts
+
+    defaults = dict(
+        journey_id=uuid4(),
+        journey_type=sample_manifest.metadata.journey_type,
+        schema_version="1.0.0",
+        snapshot_id=uuid4(),
+        version_number=1,
+        readiness=Readiness.NOT_READY,
+        status=JourneyStatus.IN_PROGRESS,
+        fields=[],
+        progress=ProgressCounts(completed=2, pending=2, blockers=1, total=5),
+        display=DisplayInfo(title="Personal Loan", summary="₹5,00,000 · Home Renovation"),
+    )
+    defaults.update(overrides)
+    return JourneyStateResponse(**defaults)
+
+
+@pytest.mark.asyncio
+async def test_chat_context_includes_other_valid_actions(sample_manifest, monkeypatch):
+    """Journey Copilot context enrichment: the chat context sent to Sarvam
+    must include every OTHER currently-valid candidate action
+    (recommendation.alternatives), not just the single top recommendation -
+    otherwise "what are my options" can only ever be answered with one
+    option, even when the deterministic engine has more than one valid
+    candidate action available right now."""
+    from uuid import uuid4
+
+    from app.schemas.enums import ActionKind, Readiness
+    from app.schemas.journeys import ActionOption, RecommendationResponse
+
+    monkeypatch.setattr(settings, "SARVAM_ENABLED", True)
+    monkeypatch.setattr(settings, "SARVAM_CHAT_ENABLED", True)
+    monkeypatch.setattr(settings, "SARVAM_API_KEY", "test-key")
+
+    provider = SarvamProvider(client=SarvamClient(api_key="test-key"))
+    provider.client.chat_completion = AsyncMock(return_value="A grounded reply.")
+
+    journey_state = _sample_journey_state(sample_manifest)
+    top_action = ActionOption(
+        action_id="UPLOAD_SALARY_SLIP",
+        title="Upload salary slip",
+        kind=ActionKind.EVIDENCE,
+        why="Confirms your declared income.",
+        unlocks=["monthly_income"],
+        accepts=["SALARY_SLIP"],
+    )
+    alternative_action = ActionOption(
+        action_id="CORRECT_DECLARED_INCOME",
+        title="Correct declared income",
+        kind=ActionKind.FORM,
+        why="Align the declared figure with your evidence.",
+        unlocks=["monthly_income"],
+    )
+    recommendation = RecommendationResponse(
+        snapshot_id=uuid4(),
+        readiness=Readiness.NOT_READY,
+        recommendation=top_action,
+        alternatives=[alternative_action],
+        minimum_path_length=1,
+    )
+
+    await provider.chat(
+        message="What can I do?",
+        manifest=sample_manifest,
+        journey_state=journey_state,
+        recommendation=recommendation,
+    )
+
+    provider.client.chat_completion.assert_awaited_once()
+    _system_prompt, user_prompt = provider.client.chat_completion.call_args.args[:2]
+    assert "other_valid_actions" in user_prompt
+    assert "Correct declared income" in user_prompt
+    # The alternative must never be presented as THE recommendation - only
+    # ever alongside it, under its own separate key.
+    assert '"recommended_action"' in user_prompt
+
+
+@pytest.mark.asyncio
+async def test_chat_context_other_valid_actions_empty_when_no_alternatives(
+    sample_manifest, monkeypatch
+):
+    """When the deterministic engine has no alternatives (only one valid
+    path), the context field must be an empty list, never omitted or
+    fabricated."""
+    from uuid import uuid4
+
+    from app.schemas.enums import ActionKind, Readiness
+    from app.schemas.journeys import ActionOption, RecommendationResponse
+
+    monkeypatch.setattr(settings, "SARVAM_ENABLED", True)
+    monkeypatch.setattr(settings, "SARVAM_CHAT_ENABLED", True)
+    monkeypatch.setattr(settings, "SARVAM_API_KEY", "test-key")
+
+    provider = SarvamProvider(client=SarvamClient(api_key="test-key"))
+    provider.client.chat_completion = AsyncMock(return_value="A grounded reply.")
+
+    journey_state = _sample_journey_state(sample_manifest)
+    recommendation = RecommendationResponse(
+        snapshot_id=uuid4(),
+        readiness=Readiness.NOT_READY,
+        recommendation=ActionOption(
+            action_id="UPLOAD_SALARY_SLIP",
+            title="Upload salary slip",
+            kind=ActionKind.EVIDENCE,
+            unlocks=["monthly_income"],
+        ),
+        alternatives=[],
+        minimum_path_length=1,
+    )
+
+    await provider.chat(
+        message="What can I do?",
+        manifest=sample_manifest,
+        journey_state=journey_state,
+        recommendation=recommendation,
+    )
+
+    user_prompt = provider.client.chat_completion.call_args.args[1]
+    assert '"other_valid_actions": []' in user_prompt
+
+
+def _sample_diff(sample_manifest, **overrides):
+    from app.schemas.enums import FieldStatus, Readiness
+    from app.schemas.journeys import FieldChange, JourneyDiff, ReadinessDiff
+
+    defaults = dict(
+        from_version=1,
+        to_version=2,
+        fields_changed=[
+            FieldChange(
+                key="monthly_income",
+                label="Monthly Income",
+                from_status=FieldStatus.SATISFIED,
+                to_status=FieldStatus.AMBIGUOUS,
+                display_value="₹55,000",
+                cause="Uploaded evidence did not match declared income.",
+            )
+        ],
+        actions_unlocked=[],
+        actions_removed=[],
+        readiness=ReadinessDiff(**{"from": Readiness.NOT_READY, "to": Readiness.NEEDS_REVIEW}),
+    )
+    defaults.update(overrides)
+    return JourneyDiff(**defaults)
+
+
+@pytest.mark.asyncio
+async def test_chat_context_includes_journey_diff_when_available(sample_manifest, monkeypatch):
+    """Journey Copilot context enrichment: when a real deterministic diff is
+    supplied, it must appear in the chat context so "why did my status
+    change" can be answered from the actual before/after state - never a
+    re-derived or invented explanation."""
+    from uuid import uuid4
+
+    from app.schemas.enums import ActionKind, Readiness
+    from app.schemas.journeys import ActionOption, RecommendationResponse
+
+    monkeypatch.setattr(settings, "SARVAM_ENABLED", True)
+    monkeypatch.setattr(settings, "SARVAM_CHAT_ENABLED", True)
+    monkeypatch.setattr(settings, "SARVAM_API_KEY", "test-key")
+
+    provider = SarvamProvider(client=SarvamClient(api_key="test-key"))
+    provider.client.chat_completion = AsyncMock(return_value="A grounded reply.")
+
+    journey_state = _sample_journey_state(sample_manifest)
+    recommendation = RecommendationResponse(
+        snapshot_id=uuid4(),
+        readiness=Readiness.NEEDS_REVIEW,
+        recommendation=ActionOption(
+            action_id="RESOLVE_INCOME_MISMATCH",
+            title="Resolve income mismatch",
+            kind=ActionKind.CLARIFICATION,
+            unlocks=[],
+        ),
+        alternatives=[],
+        minimum_path_length=1,
+    )
+    diff = _sample_diff(sample_manifest)
+
+    await provider.chat(
+        message="Why did my status change?",
+        manifest=sample_manifest,
+        journey_state=journey_state,
+        recommendation=recommendation,
+        diff=diff,
+    )
+
+    user_prompt = provider.client.chat_completion.call_args.args[1]
+    assert '"journey_diff"' in user_prompt
+    assert "Monthly Income" in user_prompt
+    assert "Uploaded evidence did not match declared income." in user_prompt
+    assert '"from": "NOT_READY"' in user_prompt
+    assert '"to": "NEEDS_REVIEW"' in user_prompt
+
+
+@pytest.mark.asyncio
+async def test_chat_context_omits_journey_diff_when_unavailable(sample_manifest, monkeypatch):
+    """When there is genuinely nothing to diff yet (diff=None), the context
+    must NOT contain a journey_diff key at all - never a null placeholder
+    that could read as "nothing changed" when the real answer is "there is
+    no prior version to compare against"."""
+    from uuid import uuid4
+
+    from app.schemas.enums import ActionKind, Readiness
+    from app.schemas.journeys import ActionOption, RecommendationResponse
+
+    monkeypatch.setattr(settings, "SARVAM_ENABLED", True)
+    monkeypatch.setattr(settings, "SARVAM_CHAT_ENABLED", True)
+    monkeypatch.setattr(settings, "SARVAM_API_KEY", "test-key")
+
+    provider = SarvamProvider(client=SarvamClient(api_key="test-key"))
+    provider.client.chat_completion = AsyncMock(return_value="A grounded reply.")
+
+    journey_state = _sample_journey_state(sample_manifest)
+    recommendation = RecommendationResponse(
+        snapshot_id=uuid4(),
+        readiness=Readiness.NOT_READY,
+        recommendation=ActionOption(
+            action_id="UPLOAD_SALARY_SLIP",
+            title="Upload salary slip",
+            kind=ActionKind.EVIDENCE,
+            unlocks=["monthly_income"],
+        ),
+        alternatives=[],
+        minimum_path_length=1,
+    )
+
+    await provider.chat(
+        message="Why did my status change?",
+        manifest=sample_manifest,
+        journey_state=journey_state,
+        recommendation=recommendation,
+        diff=None,
+    )
+
+    user_prompt = provider.client.chat_completion.call_args.args[1]
+    assert "journey_diff" not in user_prompt

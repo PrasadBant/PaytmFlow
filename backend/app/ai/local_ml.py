@@ -66,7 +66,7 @@ from app.docai.extraction import (
 from app.docai.ocr import OcrLine
 from app.packs.contract import ActionSpec, GoalFieldSpec, JourneyPackManifest
 from app.schemas.enums import FieldType
-from app.schemas.journeys import JourneyStateResponse, RecommendationResponse
+from app.schemas.journeys import JourneyDiff, JourneyStateResponse, RecommendationResponse
 
 logger = structlog.get_logger(__name__)
 
@@ -611,6 +611,7 @@ class LocalMLProvider:
         manifest: JourneyPackManifest,
         journey_state: JourneyStateResponse,
         recommendation: RecommendationResponse | None,
+        diff: JourneyDiff | None = None,
     ) -> str:
         """Conversational Q&A is out of this mission's document-intelligence scope,
 
@@ -630,6 +631,7 @@ class LocalMLProvider:
             manifest=manifest,
             journey_state=journey_state,
             recommendation=recommendation,
+            diff=diff,
         )
 
     async def general_chat(self, message: str) -> str:
