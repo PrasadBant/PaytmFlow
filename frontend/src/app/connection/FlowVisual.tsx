@@ -42,7 +42,12 @@ function chipToneClass(tone: ChipTone): string {
     case 'amber':
       return 'bg-amber-50 text-amber-700 border-amber-300';
     case 'muted':
-      return 'bg-white/70 text-content-tertiary border-surface-border';
+      // Secondary/invalid state — de-emphasised via a lighter fill and no
+      // bold color, NOT via low opacity: an already-pale token (tertiary,
+      // #94a3b8) faded further became unreadable on real screens. Contrast
+      // now comes from color/weight, so it stays legible however dim the
+      // element's own opacity ends up in its retract animation.
+      return 'bg-white/70 text-content-secondary border-surface-border';
     default:
       return 'bg-white/90 text-content-secondary border-surface-border';
   }
@@ -414,7 +419,7 @@ function ResolveScene(): ReactElement {
               'flex flex-col items-center gap-0.5 px-3 py-1 rounded-button border text-[9.5px] font-medium shadow-xs w-[86%] max-w-[220px] text-center',
               c.valid
                 ? 'bg-paytm-blue-action text-white border-paytm-blue-action shadow-sm animate-pf-cascade-valid'
-                : 'bg-white/70 text-content-tertiary border-surface-border animate-pf-cascade-invalid'
+                : 'bg-white/70 text-content-secondary border-surface-border animate-pf-cascade-invalid'
             )}
           >
             <span className="whitespace-nowrap">

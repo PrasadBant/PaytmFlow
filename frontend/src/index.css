@@ -305,12 +305,15 @@
 }
 
 /*
- * A branch candidate that appears, then is visibly de-emphasised — held at
- * this end-opacity for the rest of the chapter (many seconds), so it must
- * read as "secondary" rather than "gone". 0.55 is the floor: combined with
- * the muted tone's already-light background/text tokens, anything lower
- * made these labels effectively illegible on real screens (reported as
- * "text becomes transparent" / "looks broken").
+ * A branch candidate that appears, then is visibly de-emphasised — held for
+ * the rest of the chapter (many seconds), so it must read as "secondary",
+ * not "gone". A first attempt de-emphasised it by fading element opacity
+ * down (to 0.35, then 0.55); on real devices this still read as broken,
+ * because it was multiplying an already-pale text token — no opacity value
+ * fixes low contrast on a low-contrast color. Now held at full opacity;
+ * "secondary" comes entirely from color/weight (see chipToneClass's muted
+ * case), so legibility can never depend on how transparent the animation
+ * happens to leave it.
  */
 @keyframes pf-branch-in-dim {
   0% {
@@ -322,7 +325,7 @@
     transform: translate(-50%, 0) scale(1);
   }
   100% {
-    opacity: 0.55;
+    opacity: 1;
     transform: translate(-50%, 4px) scale(0.9);
   }
 }
@@ -374,9 +377,10 @@
   animation: pf-candidate-in 1.4s ease-out both;
 }
 
-/* An invalid candidate action appearing, then retracting — held at this
- * opacity for the rest of the chapter, so it must stay legible enough to
- * read as "unavailable", not disappear (see pf-branch-in-dim above). */
+/* An invalid candidate action appearing, then retracting — held at full
+ * opacity for the rest of the chapter; "unavailable" is conveyed by color
+ * and the retract motion, not by fading, so it can never become illegible
+ * (see pf-branch-in-dim above). */
 @keyframes pf-candidate-in-retract {
   0% {
     opacity: 0;
@@ -387,7 +391,7 @@
     transform: translate(-50%, 0) scale(1);
   }
   100% {
-    opacity: 0.55;
+    opacity: 1;
     transform: translate(-50%, 8px) scale(0.88);
   }
 }
@@ -558,9 +562,9 @@
   animation: pf-cascade-valid 1s ease-out both;
 }
 
-/* Held at this opacity for the rest of the chapter — see pf-branch-in-dim
- * above for why 0.55 is the floor for a de-emphasised label meant to stay
- * legible, not a transient one that's allowed to fully vanish. */
+/* Held at full opacity for the rest of the chapter — see pf-branch-in-dim
+ * above for why: "secondary" comes from color, not transparency, so this
+ * mobile row can never fade into illegibility. */
 @keyframes pf-cascade-invalid {
   0% {
     opacity: 0;
@@ -571,7 +575,7 @@
     transform: translateY(0) scale(1);
   }
   100% {
-    opacity: 0.55;
+    opacity: 1;
     transform: translateY(2px) scale(0.9);
   }
 }
