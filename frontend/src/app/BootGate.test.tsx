@@ -15,10 +15,10 @@ vi.mock('../mocks/browser', () => ({
 }));
 
 // Mirrors BootGate's own schedule (see BootGate.tsx): waits before attempts
-// 2..8 are 2s, 4s, 8s, 12s, 15s, 15s, 15s — sum 71s. Advancing fake timers
-// by a value comfortably larger than this (e.g. 80s) lets every attempt in
+// 2..8 are 2s, 4s, 8s, 12s, 15s, 15s, 20s — sum 76s. Advancing fake timers
+// by a value comfortably larger than this (e.g. 85s) lets every attempt in
 // an 8-attempt sequence fire, without the test ever waiting in real time.
-const FULL_SCHEDULE_MS = 80_000;
+const FULL_SCHEDULE_MS = 85_000;
 
 // Real wall-clock budget for tests that advance the full schedule (many
 // small steps, each with real act()/microtask overhead) — comfortably
@@ -323,6 +323,90 @@ describe('BootGate (initial loading / cold-start resilience)', () => {
       expect(screen.getByTestId('app-content')).toBeInTheDocument();
       // A clean single transition — no duplicate success/error states left behind.
       expect(screen.queryByTestId('boot-gate-error')).not.toBeInTheDocument();
+    },
+    LONG_TEST_TIMEOUT_MS
+  );
+
+  it('17. a stale request that resolves after the component has unmounted never touches state (no error, no warning)', async () => {
+    let resolveSession!: (value: { session_id: string; created: boolean }) => void;
+    const pending = new Promise<{ session_id: string; created: boolean }>((resolve) => {
+      resolveSession = resolve;
+    });
+    vi.spyOn(apiClient, 'get').mockReturnValueOnce(pending);
+
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { unmount } = render(
+      <BootGate>
+        <div data-testid="app-content">Loaded</div>
+      </BootGate>
+    );
+
+    unmount();
+    // The in-flight request settles only *after* unmount — this must not
+    // throw, warn about updating an unmounted component, or do anything
+    // observable; the generation this belongs to is invalidated by then.
+    await act(async () => {
+      resolveSession({ session_id: 's1', created: true });
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it(
+    '19. a response arriving near/just beyond the historical ~72s cold-start observation is still handled by the retry policy, not a premature failure',
+    async () => {
+      const getSpy = vi.spyOn(apiClient, 'get').mockRejectedValue(new ApiError({ status: 503, message: 'Service unavailable' }));
+
+      renderBootGate();
+
+      // 73s in — just past the single real ~72s cold-start observation this
+      // schedule is sized against. The final (8th) attempt isn't due until
+      // 76s (see BACKOFF_SCHEDULE_MS's cumulative sum in BootGate.tsx), so
+      // at this point the retry policy must still be actively waiting, not
+      // have already exhausted itself into the error screen.
+      await advance(73_000);
+      expect(screen.getByTestId('boot-gate-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('boot-gate-error')).not.toBeInTheDocument();
+
+      // The backend becomes ready right as that still-pending final attempt
+      // fires — proving a cold start finishing around this mark succeeds
+      // through the normal policy instead of being treated as exhausted.
+      getSpy.mockResolvedValueOnce({ session_id: 's1', created: true });
+      await advance(SUCCESS_FLOURISH_BUFFER_MS + 5_000);
+
+      expect(screen.getByTestId('app-content')).toBeInTheDocument();
+      expect(screen.queryByTestId('boot-gate-error')).not.toBeInTheDocument();
+    },
+    LONG_TEST_TIMEOUT_MS
+  );
+
+  it(
+    '18. rapid double-click on "Try again" starts exactly one clean boot cycle, not duplicate/overlapping requests',
+    async () => {
+      const getSpy = vi.spyOn(apiClient, 'get').mockRejectedValue(new ApiError({ status: 503, message: 'Service unavailable' }));
+
+      renderBootGate();
+      await advance(FULL_SCHEDULE_MS);
+      expect(screen.getByTestId('boot-gate-error')).toBeInTheDocument();
+      expect(getSpy).toHaveBeenCalledTimes(8);
+
+      getSpy.mockReset();
+      getSpy.mockResolvedValueOnce({ session_id: 's1', created: true });
+
+      // Two rapid clicks in the same synchronous block — React batches
+      // both retryToken updates into a single re-render, so this must still
+      // result in exactly one boot cycle (one request), not two.
+      await act(async () => {
+        const btn = screen.getByTestId('boot-gate-retry-btn');
+        fireEvent.click(btn);
+        fireEvent.click(btn);
+      });
+      await advance(SUCCESS_FLOURISH_BUFFER_MS);
+
+      expect(screen.getByTestId('app-content')).toBeInTheDocument();
+      expect(getSpy).toHaveBeenCalledTimes(1);
     },
     LONG_TEST_TIMEOUT_MS
   );
