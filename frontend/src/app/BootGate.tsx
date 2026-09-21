@@ -6,8 +6,22 @@ import { Button } from '../components/primitives/Button';
 import { ConnectionExperience } from './connection/ConnectionExperience';
 import { ConnectionSuccessTransition } from './connection/SuccessTransition';
 
-const MAX_ATTEMPTS = 4;
-const BASE_BACKOFF_MS = 800;
+// Render's free tier can take ~70s to wake a sleeping instance (observed
+// directly against the live backend: a cold health check took 72s before
+// the first byte, then responded immediately on every request after). The
+// schedule below is the wait *before* each retry (attempt 1 fires
+// immediately); its sum is the total time the last attempt can be delayed
+// by, and is sized to comfortably clear that ~72s cold start:
+//   2 + 4 + 8 + 12 + 15 + 15 + 15 = 71s
+// Growth backs off quickly at first (to avoid hammering a backend that's
+// still booting) then flattens to a steady 15s cadence rather than
+// continuing to grow unbounded — finite (8 attempts total), not a request
+// storm, not an infinite retry loop. No individual attempt has its own
+// timeout (see api/client.ts) — a request is allowed to complete naturally,
+// however long the cold start actually takes, rather than being cut short
+// by an arbitrary client-side limit shorter than that.
+const BACKOFF_SCHEDULE_MS = [2000, 4000, 8000, 12000, 15000, 15000, 15000];
+const MAX_ATTEMPTS = BACKOFF_SCHEDULE_MS.length + 1;
 const SLOW_HINT_MS = 3500;
 
 /**
@@ -72,7 +86,7 @@ export function BootGate({ children }: BootGateProps): ReactElement {
         return;
       }
 
-      await sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
+      await sleep(BACKOFF_SCHEDULE_MS[attempt - 1]);
       if (cancelledRef.current) return;
     }
   }, []);
