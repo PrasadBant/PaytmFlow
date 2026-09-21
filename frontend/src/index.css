@@ -143,7 +143,7 @@
     transform: translate(0, 0) scale(0.8);
   }
   50% {
-    opacity: 0.6;
+    opacity: 0.35;
     transform: translate(7px, -7px) scale(1.15);
   }
 }
@@ -163,6 +163,156 @@
 
 .animate-pf-shimmer {
   animation: pf-shimmer 5s ease-in-out infinite alternate;
+}
+
+/*
+ * Recovery beat — ONE cinematic reveal -> hold -> dissolve cycle, played
+ * once (not looped) per entry into the recovery phase. The path and its
+ * particle share this single opacity animation on their common <g>, so the
+ * particle can never be visible while the guide path is invisible.
+ */
+@keyframes pf-recovery-path {
+  0% {
+    opacity: 0;
+  }
+  16% {
+    opacity: 0.85;
+  }
+  74% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-pf-recovery-path {
+  animation: pf-recovery-path 7s ease-in-out 1 both;
+}
+
+/* A single ring-expand on the "Recover" node, timed to the particle's arrival. */
+@keyframes pf-recovery-ring {
+  0%,
+  48% {
+    r: 9;
+    fill-opacity: 0;
+  }
+  60% {
+    r: 16;
+    fill-opacity: 0.35;
+  }
+  100% {
+    r: 22;
+    fill-opacity: 0;
+  }
+}
+
+.animate-pf-recovery-ring {
+  animation: pf-recovery-ring 7s ease-out 1 both;
+}
+
+/* Reassembly beat — the flow itself reads very slightly brighter, once. */
+@keyframes pf-reassemble-glow {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.animate-pf-reassemble-glow {
+  animation: pf-reassemble-glow 2.6s ease-in-out 1 both;
+  animation-delay: 9s;
+}
+
+/* Reassembly beat — each node illuminates once, in sequence. */
+@keyframes pf-reassemble-node {
+  0%,
+  100% {
+    r: 9;
+    fill-opacity: 0.14;
+  }
+  50% {
+    r: 14;
+    fill-opacity: 0.5;
+  }
+}
+
+.animate-pf-reassemble-node {
+  animation: pf-reassemble-node 0.9s ease-out 1 both;
+}
+
+/* Reassembly beat — a concept card converges into the flow instead of drifting away, then dissolves. */
+@keyframes pf-reassemble-converge {
+  0% {
+    opacity: 0;
+    transform: translate(0, 6px) scale(0.96);
+  }
+  20%,
+  38% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--pf-card-dx, 0), var(--pf-card-dy, 0)) scale(0.35);
+  }
+}
+
+.animate-pf-reassemble-converge {
+  animation: pf-reassemble-converge 4s ease-in-out 1 both;
+}
+
+/*
+ * Mobile journey pill — one label at a time, in place, no horizontal travel.
+ * The 30% stop confines visibility to a short window (instead of a slow
+ * linear fade all the way to 100%), and `backwards` fill-mode keeps a label
+ * hidden during its own delay instead of sitting at full opacity — without
+ * both, every not-yet-active label was visible the whole time, and several
+ * pills stacked on top of each other.
+ */
+@keyframes pf-mobile-pill {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  8%,
+  22% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 0;
+  }
+}
+
+.animate-pf-mobile-pill {
+  animation-name: pf-mobile-pill;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-fill-mode: backwards;
+}
+
+/* Mobile reassembly chip — fades in, then dissolves inward once. */
+@keyframes pf-mobile-converge {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  25%,
+  55% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+.animate-pf-mobile-converge {
+  animation: pf-mobile-converge 4.5s ease-in-out 1 both;
 }
 
 @keyframes pf-breathe {

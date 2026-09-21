@@ -1,64 +1,42 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { FlowVisual } from './FlowVisual';
 import { usePrefersReducedMotion } from './usePrefersReducedMotion';
+import { useElapsedSeconds } from './useElapsedSeconds';
+import { AMBIENT_MESSAGES, MESSAGES, phaseForElapsedSeconds } from './connectionPhases';
 
 export interface ConnectionExperienceProps {
   /** Real elapsed-time signal owned by BootGate — never a fake timer here. */
   slow: boolean;
 }
 
-// Deliberately more than a handful — on a slower connection the same 4
-// lines repeating within ~10s started to feel stale. This rotates for
-// nearly a minute before a viewer sees a line twice.
-const BASE_MESSAGES = [
-  'Putting the pieces together…',
-  'Getting your journey ready…',
-  'Clearing the path ahead…',
-  'Organizing every step…',
-  'Almost ready…',
-  'Bringing it all together…',
-  'Six journeys, one place.',
-  'Good things take a moment.',
-  'Lining up what comes next…',
-  'One step closer…',
-  'Making this simple for you…',
-  'Ready when you are.',
-];
-
-const MESSAGE_INTERVAL_MS = 2200;
-const LONG_WAIT_JOKE_DELAY_MS = 6000;
+const MESSAGE_INTERVAL_MS = 2600;
+const AMBIENT_MESSAGE_INTERVAL_MS = 4600;
 
 /**
  * The premium first-connection experience. Purely presentational — BootGate
  * remains the sole owner of real connection state; this component only
- * reacts to the `slow` signal it's handed.
+ * reacts to the `slow` signal it's handed. Internally it also tracks its own
+ * elapsed mount time to choose which broad story phase to show — that clock
+ * never talks back to BootGate and never represents real progress.
  */
 export function ConnectionExperience({ slow }: ConnectionExperienceProps): ReactElement {
   const reducedMotion = usePrefersReducedMotion();
+  const elapsedSeconds = useElapsedSeconds();
+  const phase = phaseForElapsedSeconds(elapsedSeconds);
+  const isAmbient = phase === 'ambient';
   const [messageIndex, setMessageIndex] = useState(0);
-  const [longWaitJokeShown, setLongWaitJokeShown] = useState(false);
-  const longWaitStarted = useRef(false);
 
   useEffect(() => {
-    if (slow) return undefined;
+    const pool = isAmbient ? AMBIENT_MESSAGES : MESSAGES;
+    const interval = isAmbient ? AMBIENT_MESSAGE_INTERVAL_MS : MESSAGE_INTERVAL_MS;
     const id = setInterval(() => {
-      setMessageIndex((i) => (i + 1) % BASE_MESSAGES.length);
-    }, MESSAGE_INTERVAL_MS);
+      setMessageIndex((i) => (i + 1) % pool.length);
+    }, interval);
     return () => clearInterval(id);
-  }, [slow]);
+  }, [isAmbient]);
 
-  useEffect(() => {
-    if (!slow || longWaitStarted.current) return undefined;
-    longWaitStarted.current = true;
-    const timer = setTimeout(() => setLongWaitJokeShown(true), LONG_WAIT_JOKE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [slow]);
-
-  const copy = slow
-    ? longWaitJokeShown
-      ? "We promise we're not making you fill another form. 😄"
-      : 'Still getting things ready…'
-    : BASE_MESSAGES[messageIndex];
+  const pool = isAmbient ? AMBIENT_MESSAGES : MESSAGES;
+  const copy = pool[messageIndex % pool.length];
 
   const statusAnnouncement = slow ? 'Still connecting to PaytmFlow.' : 'Connecting to PaytmFlow.';
 
@@ -83,7 +61,7 @@ export function ConnectionExperience({ slow }: ConnectionExperienceProps): React
         <span className="text-sm text-content-tertiary">Let&apos;s get things moving.</span>
       </div>
 
-      <FlowVisual reducedMotion={reducedMotion} />
+      <FlowVisual reducedMotion={reducedMotion} phase={phase} />
 
       <div className="mt-8 md:mt-10 min-h-[1.5rem]">
         <p
