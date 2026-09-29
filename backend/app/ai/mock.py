@@ -105,6 +105,8 @@ def _diff_reply(diff: JourneyDiff) -> str:
         )
     if readiness_changed:
         assert diff.readiness is not None  # narrowed by readiness_changed above
+        assert diff.readiness.from_ is not None
+        assert diff.readiness.to is not None
         from_val = diff.readiness.from_.value
         to_val = diff.readiness.to.value
         sentences.append(f"Your overall status moved from {from_val} to {to_val}.")
