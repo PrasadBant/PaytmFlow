@@ -429,7 +429,9 @@ paths:
         Prototype-only: flips the CURRENT session's own role between CUSTOMER
         and REVIEW_OFFICER. This is not enterprise auth - see the Review
         Center product notes. Every /review/* endpoint still independently
-        enforces the resulting role server-side.
+        enforces the resulting role server-side. Outside local/ci, switching
+        to REVIEW_OFFICER requires the server-configured reviewer access code
+        (fails closed when none is configured); switching to CUSTOMER never does.
       requestBody:
         required: true
         content:
@@ -439,6 +441,7 @@ paths:
               required: [role]
               properties:
                 role: { $ref: "#/components/schemas/ReviewerRole" }
+                access_code: { type: string, maxLength: 256 }
       responses:
         "200":
           description: Role updated
@@ -449,6 +452,11 @@ paths:
                 required: [role]
                 properties:
                   role: { $ref: "#/components/schemas/ReviewerRole" }
+        "403":
+          description: Missing or invalid reviewer access code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
 
   /api/v1/review/dashboard:
     get:

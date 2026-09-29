@@ -15,9 +15,19 @@ export const Header: React.FC = () => {
 
   const handleRoleToggle = (): void => {
     const nextRole = role === 'REVIEW_OFFICER' ? 'CUSTOMER' : 'REVIEW_OFFICER';
-    switchRole.mutate(nextRole, {
-      onSuccess: () => navigate(nextRole === 'REVIEW_OFFICER' ? '/review' : '/'),
-    });
+    let accessCode: string | undefined;
+    if (nextRole === 'REVIEW_OFFICER') {
+      const entered = window.prompt('Enter the reviewer access code');
+      if (entered === null) return;
+      accessCode = entered.trim() || undefined;
+    }
+    switchRole.mutate(
+      { role: nextRole, accessCode },
+      {
+        onSuccess: () => navigate(nextRole === 'REVIEW_OFFICER' ? '/review' : '/'),
+        onError: () => window.alert('That access code was not accepted. Check it and try again.'),
+      },
+    );
   };
 
   return (

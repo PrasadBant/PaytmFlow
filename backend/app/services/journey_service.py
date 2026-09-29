@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.provider import get_ai_provider
 from app.audit.writer import AuditWriter
+from app.config import settings
 from app.core.dependencies import DependencyGraph
 from app.core.deterministic_check import (
     DeterministicCheckError,
@@ -65,6 +66,24 @@ from app.schemas.journeys import (
     ReadinessDiff,
     RecommendationResponse,
 )
+
+
+def _action_request_hash(
+    action_id: str, expected_snapshot_id: UUID, action_input: dict[str, Any] | None
+) -> str:
+    payload = {
+        "action_id": action_id,
+        "expected_snapshot_id": str(expected_snapshot_id),
+        "input": action_input or {},
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
+def _evidence_less_actions_allowed() -> bool:
+    configured = settings.ALLOW_EVIDENCE_ACTIONS_WITHOUT_EVIDENCE
+    if configured is not None:
+        return configured
+    return settings.APP_ENV in ("local", "ci")
 
 
 def format_inr(amount: int | float | None) -> str:
@@ -986,6 +1005,22 @@ class JourneyService:
         idempotency_repo = IdempotencyRepository(db)
         existing = await idempotency_repo.get(str(idempotency_key))
         if existing:
+            if (
+                existing.session_id != session.id
+                or existing.journey_id != journey.id
+                or existing.request_hash
+                != _action_request_hash(action_id, expected_snapshot_id, action_input)
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=ErrorEnvelope(
+                        error=ErrorObject(
+                            code=ErrorCode.VALIDATION_ERROR,
+                            message="This request was already submitted with different details. "
+                            "Please refresh and try again.",
+                        )
+                    ).model_dump(mode="json"),
+                )
             return ActionResponse.model_validate(existing.response_body)
 
         # 2. Acquire row lock on journey (Postgres FOR UPDATE / SQLite no-op)
@@ -1067,6 +1102,23 @@ class JourneyService:
         # to `deterministic_check` as plain, already-validated data.
         resolved_evidence: ResolvedEvidence | None = None
         raw_evidence_id = (action_input or {}).get("evidence_id")
+        action_spec_for_gate = next((a for a in manifest.actions if a.action_id == action_id), None)
+        if (
+            action_spec_for_gate is not None
+            and action_spec_for_gate.kind == ActionKind.EVIDENCE
+            and not raw_evidence_id
+            and not _evidence_less_actions_allowed()
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail=ErrorEnvelope(
+                    error=ErrorObject(
+                        code=ErrorCode.ACTION_INVALID,
+                        message="Please upload the requested document before completing this step.",
+                        details={"action_id": action_id, "missing": "evidence_id"},
+                    )
+                ).model_dump(mode="json"),
+            )
         if raw_evidence_id:
             try:
                 evidence_uuid = UUID(str(raw_evidence_id))
@@ -1161,6 +1213,20 @@ class JourneyService:
         # apply_action was already going to make.
         pending_ambiguity: CoreAmbiguity | None = None
         raw_ambiguity_id = (action_input or {}).get("ambiguity_id")
+        # Verified evidence means the server found no conflict, so a client-asserted
+        # ambiguity would only open a clarification letting the customer overwrite
+        # the verified value with an arbitrary one.
+        if raw_ambiguity_id and resolved_evidence is not None:
+            raise HTTPException(
+                status_code=422,
+                detail=ErrorEnvelope(
+                    error=ErrorObject(
+                        code=ErrorCode.ACTION_INVALID,
+                        message="This document was verified without any conflict to review.",
+                        details={"action_id": action_id, "ambiguity_id": str(raw_ambiguity_id)},
+                    )
+                ).model_dump(mode="json"),
+            )
         if raw_ambiguity_id:
             amb_rule = next(
                 (a for a in (manifest.ambiguity_rules or []) if a.ambiguity_id == raw_ambiguity_id),
@@ -1386,16 +1452,7 @@ class JourneyService:
             diff=journey_diff,
             next_recommendation=next_rec,
         )
-        req_hash = hashlib.sha256(
-            json.dumps(
-                {
-                    "action_id": action_id,
-                    "expected_snapshot_id": str(expected_snapshot_id),
-                    "input": action_input or {},
-                },
-                sort_keys=True,
-            ).encode()
-        ).hexdigest()
+        req_hash = _action_request_hash(action_id, expected_snapshot_id, action_input)
 
         await idempotency_repo.create(
             key=str(idempotency_key),
@@ -1518,6 +1575,31 @@ class JourneyService:
                             f"not '{field}'"
                         ),
                         details={"expected_field": amb_rule.field, "provided_field": field},
+                    )
+                ).model_dump(mode="json"),
+            )
+
+        # The ambiguity must actually be open on the current snapshot; otherwise a
+        # clarification would overwrite any ambiguity-rule field with an unverified value.
+        pending = curr_snap.pending_clarification or {}
+        field_data = (curr_snap.fields or {}).get(field)
+        field_amb = field_data.get("ambiguity") if isinstance(field_data, dict) else None
+        is_open = (
+            pending.get("ambiguity_id") == ambiguity_id and pending.get("field") == field
+        ) or (
+            isinstance(field_data, dict)
+            and field_data.get("status") == CoreFieldStatus.AMBIGUOUS.value
+            and isinstance(field_amb, dict)
+            and field_amb.get("ambiguity_id") == ambiguity_id
+        )
+        if not is_open:
+            raise HTTPException(
+                status_code=422,
+                detail=ErrorEnvelope(
+                    error=ErrorObject(
+                        code=ErrorCode.ACTION_INVALID,
+                        message="There is no open question for this field right now.",
+                        details={"ambiguity_id": ambiguity_id, "field": field},
                     )
                 ).model_dump(mode="json"),
             )

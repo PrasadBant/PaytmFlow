@@ -267,7 +267,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Prototype-only: flips the CURRENT session's own role between CUSTOMER and REVIEW_OFFICER. This is not enterprise auth - see the Review Center product notes. Every /review/* endpoint still independently enforces the resulting role server-side. */
+        /** @description Prototype-only: flips the CURRENT session's own role between CUSTOMER and REVIEW_OFFICER. This is not enterprise auth - see the Review Center product notes. Every /review/* endpoint still independently enforces the resulting role server-side. Outside local/ci, switching to REVIEW_OFFICER requires the server-configured reviewer access code (fails closed when none is configured); switching to CUSTOMER never does. */
         post: operations["switchPrototypeRole"];
         delete?: never;
         options?: never;
@@ -1416,6 +1416,7 @@ export interface operations {
             content: {
                 "application/json": {
                     role: components["schemas"]["ReviewerRole"];
+                    access_code?: string;
                 };
             };
         };
@@ -1429,6 +1430,15 @@ export interface operations {
                     "application/json": {
                         role: components["schemas"]["ReviewerRole"];
                     };
+                };
+            };
+            /** @description Missing or invalid reviewer access code */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
         };

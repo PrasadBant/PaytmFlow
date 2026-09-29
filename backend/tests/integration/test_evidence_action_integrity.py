@@ -307,3 +307,55 @@ async def test_form_action_without_evidence_unaffected_by_fix(
         f for f in resp.json()["journey"]["fields"] if f["key"] == "employment_type"
     )
     assert employment_field["value"] == "SALARIED"
+
+
+async def test_client_asserted_ambiguity_with_verified_evidence_rejected(
+    client: AsyncClient, session_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+):
+    """Verified evidence has no server-detected conflict. A client-supplied
+    ambiguity_id must not force the field AMBIGUOUS, which would let the
+    customer "clarify" it to an arbitrary value instead of the verified one."""
+    monkeypatch.setattr(settings, "AI_PROVIDER", "local_ml")
+
+    journey_id, snap = await _create_lending_journey(client, session_headers)
+    ev, fields = await _upload_real_salary_slip(client, session_headers, journey_id, snap, 9104)
+
+    resp = await _exec(
+        client,
+        session_headers,
+        journey_id,
+        snap,
+        "UPLOAD_INCOME_PROOF",
+        {"evidence_id": ev["evidence_id"], "ambiguity_id": "INCOME_MISMATCH"},
+    )
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["error"]["code"] == "ACTION_INVALID"
+
+    clar = await client.post(
+        f"/api/v1/journeys/{journey_id}/clarifications",
+        json={
+            "ambiguity_id": "INCOME_MISMATCH",
+            "field": "monthly_income",
+            "answer": 999999999,
+            "expected_snapshot_id": snap,
+        },
+        headers=session_headers,
+    )
+    assert clar.status_code != 200, clar.text
+
+    state = await client.get(f"/api/v1/journeys/{journey_id}", headers=session_headers)
+    income = next(f for f in state.json()["fields"] if f["key"] == "monthly_income")
+    assert income["value"] != 999999999
+    assert income["status"] != "AMBIGUOUS"
+
+    applied = await _exec(
+        client,
+        session_headers,
+        journey_id,
+        snap,
+        "UPLOAD_INCOME_PROOF",
+        {"evidence_id": ev["evidence_id"]},
+    )
+    assert applied.status_code == 200, applied.text
+    income = next(f for f in applied.json()["journey"]["fields"] if f["key"] == "monthly_income")
+    assert income["value"] == fields["net_amt"]

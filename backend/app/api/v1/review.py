@@ -22,6 +22,7 @@ from app.schemas.review import (
     RoleSwitchResponse,
 )
 from app.security.reviewer import (
+    authorize_role_switch,
     get_session_role,
     reviewer_display_name,
     set_session_role,
@@ -48,6 +49,7 @@ async def switch_role(
     """Prototype-only: flips the CURRENT session's own role. See
     app/security/reviewer.py's module docstring for why this is not
     real enterprise auth and why it is still backend-enforced."""
+    authorize_role_switch(body.role, body.access_code)
     updated = await set_session_role(session, body.role, db)
     return RoleSwitchResponse(role=get_session_role(updated))
 

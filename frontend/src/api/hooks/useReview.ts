@@ -20,11 +20,19 @@ export interface ReviewQueueFilters {
   mine?: boolean;
 }
 
+export interface RoleSwitchInput {
+  role: Role;
+  accessCode?: string;
+}
+
 export const useSwitchRole = () => {
   const queryClient = useQueryClient();
   const setRole = useRoleStore((s) => s.setRole);
-  return useMutation<{ role: Role }, Error, Role>({
-    mutationFn: (role) => apiClient.post<{ role: Role }>('/review/role', { role }),
+  return useMutation<{ role: Role }, Error, Role | RoleSwitchInput>({
+    mutationFn: (input) => {
+      const { role, accessCode } = typeof input === 'string' ? { role: input, accessCode: undefined } : input;
+      return apiClient.post<{ role: Role }>('/review/role', accessCode ? { role, access_code: accessCode } : { role });
+    },
     onSuccess: (data) => {
       setRole(data.role);
       queryClient.invalidateQueries({ queryKey: ['review'] });

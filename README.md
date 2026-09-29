@@ -271,6 +271,8 @@ lives in the `.example` files; the variables that matter most:
 | `APP_ENV` | Yes | `local` \| `ci` \| any other value (e.g. `production`) — see [Security](#security) |
 | `SESSION_SECRET` | Yes (outside local/ci) | Signs session cookies; app refuses to start with the placeholder value outside local/ci |
 | `DEMO_RESET_SECRET` | Yes (outside local/ci) | Gates the destructive `/demo/reset` endpoint |
+| `REVIEWER_ACCESS_CODE` | Yes (outside local/ci) to use the Review Center | Code required to switch a session into the reviewer role; with it unset outside local/ci, reviewer access is refused. Rotating it revokes existing reviewer sessions |
+| `ALLOW_EVIDENCE_ACTIONS_WITHOUT_EVIDENCE` | No | Test-fixture switch; defaults to on only in local/ci. Keep unset in deployed environments so upload steps require a real, verified document |
 | `CORS_ORIGINS` | Yes | Comma-separated list of allowed frontend origins |
 | `AI_PROVIDER` | Yes | `mock` \| `llm` \| `local_ml` \| `sarvam` |
 | `SARVAM_ENABLED` / `SARVAM_API_KEY` | No | Enables the real Sarvam AI cloud provider |
@@ -406,31 +408,20 @@ document.
 
 ## Testing
 
-| Suite | Command | Result (most recent full run) |
+| Suite | Command | Result (2026-09-30, see `AUDIT_FINAL_REPORT.md`) |
 |---|---|---|
-| Backend pytest | `cd backend && uv run pytest` | 660/660 passed as of the last full run; 3 new tests added since (`tests/integration/test_demo_documents.py`) independently verified passing, full suite not yet reconfirmed together — see note below |
-| Frontend unit tests (Vitest) | `cd frontend && npm run test` | 383/383 passed |
-| Ruff (lint + format) | `uv run ruff check . && uv run ruff format --check .` | Clean |
-| mypy (whole app) | `uv run mypy app` | Clean except pre-existing, unrelated missing-stub warnings in offline dataset-generation/benchmarking scripts, not part of the deployed application |
-| import-linter | `uv run lint-imports` | Clean — deterministic engine boundary intact |
+| Backend pytest (PostgreSQL 16) | `cd backend && REQUIRE_POSTGRES=1 uv run pytest` | 697/697 passed (unit 369, integration 220, contract 38, safety 15, packs 18, scenarios 37) |
+| Frontend unit tests (Vitest) | `cd frontend && npm run test` | 417/417 passed |
+| Frontend E2E (Playwright, MSW mocks) | `cd frontend && VITE_API_MODE=mock npm run test:e2e` | 52/52 passed. Requires mock mode: the tracked `frontend/.env` sets `live`, which makes the suite fail without a backend |
+| Ruff lint | `uv run ruff check app tests` | Clean |
+| Ruff format | `uv run ruff format --check app tests` | 7 pre-existing files would be reformatted |
+| mypy (whole app) | `uv run mypy app` | 41 errors, all missing library stubs; 39 in offline benchmark/dataset/training scripts, 2 in runtime modules (`docai/classifier.py`, `docai/ocr.py`) |
+| mypy strict (engine) | `uv run mypy --strict app/core` | Clean |
+| import-linter | `uv run lint-imports` | Clean - deterministic engine boundary intact |
 | ESLint + TypeScript | `npm run lint && npm run typecheck` | Clean |
-| Frontend production build | `npm run build` | Clean |
-| pip-audit (production dependency set) | `uv export --no-dev \| pip-audit -r -` | 0 known vulnerabilities |
-
-A Playwright end-to-end suite also exists under `frontend/tests/e2e/`,
-exercising real-browser flows against a live backend; no specific pass
-count is quoted here to avoid citing a stale number — run
-`npm run test:e2e` for a current result.
-
-The backend's full suite was last run in its entirety without the 3
-newly-added demo-document tests. In an environment without a locally
-running PostgreSQL instance, targeted verification was run instead: all
-359 DB-independent unit tests, plus 72 targeted integration/contract/
-safety tests covering every area the demo-document/email change touches
-(evidence endpoints, full journey flow, evidence-action integrity, system
-endpoints, n8n notifications, and the new demo-document tests
-themselves) — all passing. Run `uv run pytest` yourself against a real
-PostgreSQL instance for a current full-suite count.
+| Frontend production build | `npm run build` | Clean (chunk-size warning) |
+| pip-audit (production dependency set) | `uv export --no-dev --no-hashes \| uvx pip-audit -r - --no-deps --disable-pip` | 0 known vulnerabilities |
+| npm audit (production) | `npm audit --omit=dev` | 2 moderate (`react-router` < 7.18); dev-only tooling has further findings |
 
 ## Security
 
@@ -495,10 +486,11 @@ environment.
 ## Limitations
 
 - **Reviewer identity is a known prototype limitation, not real staff
-  authentication.** Any session can self-switch into the reviewer role via
-  `POST /review/role`; there is no separate employee/staff account system.
-  A real deployment would need an authenticated staff identity and
-  role-management system.
+  authentication.** Entering the reviewer role via `POST /review/role`
+  requires the shared `REVIEWER_ACCESS_CODE` outside local/ci, but anyone
+  holding that code is a reviewer; there is no separate employee/staff
+  account system or per-reviewer identity. A real deployment would need an
+  authenticated staff identity and role-management system.
 - **Anonymous, cookie-based customer sessions** — no customer account
   system, password, or multi-device login.
 - **Sarvam and n8n are optional, feature-flagged integrations** — the

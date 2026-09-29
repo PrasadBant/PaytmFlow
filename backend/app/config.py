@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     EVIDENCE_STORAGE_DIR: str = "./storage/evidence"
     EVIDENCE_MAX_BYTES: int = 10485760  # 10 MB
     DEMO_RESET_SECRET: str = "change-me-demo-reset-secret"
+    # Needed to become REVIEW_OFFICER outside local/ci; empty there = promotion refused.
+    REVIEWER_ACCESS_CODE: str = ""
+    # EVIDENCE actions without evidence_id trust client input; for test fixtures only.
+    # None = allowed only when APP_ENV is local/ci.
+    ALLOW_EVIDENCE_ACTIONS_WITHOUT_EVIDENCE: bool | None = None
     LOG_LEVEL: str = "INFO"
     GIT_SHA: str = "dev"
 

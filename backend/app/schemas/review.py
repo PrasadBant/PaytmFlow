@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.enums import (
     JourneyType,
@@ -145,6 +145,7 @@ class RoleSwitchRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     role: ReviewerRole
+    access_code: str | None = Field(default=None, max_length=256)
 
 
 class RoleSwitchResponse(BaseModel):
