@@ -1,4 +1,6 @@
-from pydantic import model_validator
+import re
+
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Final-hardening-phase startup guard (Part 3A): these are the literal
@@ -87,7 +89,17 @@ class Settings(BaseSettings):
     # None = allowed only when APP_ENV is local/ci.
     ALLOW_EVIDENCE_ACTIONS_WITHOUT_EVIDENCE: bool | None = None
     LOG_LEVEL: str = "INFO"
-    GIT_SHA: str = "dev"
+    # Falls back to the commit Render injects into every deploy.
+    GIT_SHA: str = Field(
+        default="dev", validation_alias=AliasChoices("GIT_SHA", "RENDER_GIT_COMMIT")
+    )
+
+    @field_validator("GIT_SHA")
+    @classmethod
+    def _git_sha_is_a_commit(cls, value: str) -> str:
+        # /health is public: only ever echo a commit hash, never arbitrary env text.
+        value = value.strip().lower()
+        return value if re.fullmatch(r"[0-9a-f]{7,40}", value) else "dev"
 
     @model_validator(mode="after")
     def _reject_placeholder_secrets_outside_local_or_ci(self) -> "Settings":

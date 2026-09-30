@@ -42,6 +42,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     must never block the API from starting or serving every other endpoint
     normally.
     """
+    logger.info("app_started", app_env=settings.APP_ENV, git_sha=settings.GIT_SHA)
+
     if settings.AI_BASE_URL.strip():
         from app.ai.llm import LLMProvider
 

@@ -277,6 +277,7 @@ lives in the `.example` files; the variables that matter most:
 | `AI_PROVIDER` | Yes | `mock` \| `llm` \| `local_ml` \| `sarvam` |
 | `SARVAM_ENABLED` / `SARVAM_API_KEY` | No | Enables the real Sarvam AI cloud provider |
 | `N8N_ENABLED` / `N8N_WEBHOOK_URL` / `N8N_WEBHOOK_SECRET` | No | Enables real outbound event notifications |
+| `GIT_SHA` | No | Commit reported by `/health`; falls back to Render's `RENDER_GIT_COMMIT` |
 | `EVIDENCE_STORAGE_DIR` / `EVIDENCE_MAX_BYTES` | No | Upload storage path and size limit (default 10 MB) |
 | `VITE_API_MODE` (frontend) | Yes | `mock` (MSW, no backend needed) \| `live` (real backend) |
 | `VITE_API_BASE` (frontend) | Yes | API base path, default `/api/v1` |
@@ -479,6 +480,13 @@ audit, or production-grade authentication — see
   `docker-compose.yml` development setup.
 - **n8n**: a separately hosted n8n Cloud instance that PaytmFlow only ever
   calls outbound to; it never calls back into PaytmFlow.
+
+- **Traceability**: `/api/v1/health` reports `git_sha` (from `GIT_SHA`, or
+  Render's `RENDER_GIT_COMMIT` when unset), and the frontend's
+  `index.html` carries `<meta name="app-commit">` from Vercel's
+  `VERCEL_GIT_COMMIT_SHA` (requires "Enable access to System Environment
+  Variables" in the Vercel project; otherwise it reads `dev`). Both values
+  are forced to a hex commit hash or `dev`.
 
 This is a hackathon/demo deployment, not a production financial-services
 environment.
