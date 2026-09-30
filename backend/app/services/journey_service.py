@@ -6,6 +6,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.provider import get_ai_provider
@@ -28,13 +29,13 @@ from app.core.models import (
 from app.core.planner import plan
 from app.core.readiness import evaluate_readiness
 from app.core.rules import derive_field_states
-from app.db.models import JourneyModel, SessionModel
+from app.db.models import IdempotencyKeyModel, JourneyModel, SessionModel
 from app.db.repositories.clarifications import ClarificationRepository
 from app.db.repositories.evidence import EvidenceRepository
 from app.db.repositories.idempotency import IdempotencyRepository
 from app.db.repositories.journeys import JourneyRepository
 from app.db.repositories.snapshots import SnapshotRepository
-from app.integrations.n8n_client import flush_n8n_events, queue_event
+from app.integrations.n8n_client import discard_n8n_events, flush_n8n_events, queue_event
 from app.packs.contract import ActionSpec, JourneyPackManifest
 from app.packs.registry import pack_registry
 from app.schemas.enums import (
@@ -77,6 +78,32 @@ def _action_request_hash(
         "input": action_input or {},
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
+def _replay_idempotent_action(
+    existing: IdempotencyKeyModel,
+    session_id: UUID,
+    journey_id: UUID,
+    request_hash: str,
+) -> ActionResponse:
+    """Replays a committed response only for the same session, journey and payload;
+    any other reuse of the key is rejected (never leaks another request's response)."""
+    if (
+        existing.session_id != session_id
+        or existing.journey_id != journey_id
+        or existing.request_hash != request_hash
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=ErrorEnvelope(
+                error=ErrorObject(
+                    code=ErrorCode.VALIDATION_ERROR,
+                    message="This request was already submitted with different details. "
+                    "Please refresh and try again.",
+                )
+            ).model_dump(mode="json"),
+        )
+    return ActionResponse.model_validate(existing.response_body)
 
 
 def _evidence_less_actions_allowed() -> bool:
@@ -1003,31 +1030,20 @@ class JourneyService:
         """
         # 1. Idempotency Check
         idempotency_repo = IdempotencyRepository(db)
+        req_hash = _action_request_hash(action_id, expected_snapshot_id, action_input)
         existing = await idempotency_repo.get(str(idempotency_key))
         if existing:
-            if (
-                existing.session_id != session.id
-                or existing.journey_id != journey.id
-                or existing.request_hash
-                != _action_request_hash(action_id, expected_snapshot_id, action_input)
-            ):
-                raise HTTPException(
-                    status_code=400,
-                    detail=ErrorEnvelope(
-                        error=ErrorObject(
-                            code=ErrorCode.VALIDATION_ERROR,
-                            message="This request was already submitted with different details. "
-                            "Please refresh and try again.",
-                        )
-                    ).model_dump(mode="json"),
-                )
-            return ActionResponse.model_validate(existing.response_body)
+            return _replay_idempotent_action(existing, session.id, journey.id, req_hash)
 
         # 2. Acquire row lock on journey (Postgres FOR UPDATE / SQLite no-op)
         journey_repo = JourneyRepository(db)
         locked_journey = await journey_repo.get_by_id_for_update(journey.id)
         if locked_journey:
             journey = locked_journey
+        # A concurrent duplicate may have committed while this request waited for the lock.
+        committed = await idempotency_repo.get(str(idempotency_key))
+        if committed:
+            return _replay_idempotent_action(committed, session.id, journey.id, req_hash)
         # Captured before any mutation below - the durable, pre-write readiness
         # this same row already had. Comparing it to the newly computed
         # readiness at step 9 is the JOURNEY_COMPLETED idempotency mechanism:
@@ -1452,18 +1468,28 @@ class JourneyService:
             diff=journey_diff,
             next_recommendation=next_rec,
         )
-        req_hash = _action_request_hash(action_id, expected_snapshot_id, action_input)
-
-        await idempotency_repo.create(
-            key=str(idempotency_key),
-            session_id=session.id,
-            journey_id=journey.id,
-            action_id=action_id,
-            request_hash=req_hash,
-            response_body=resp_obj.model_dump(mode="json"),
-            status_code=200,
-        )
-        await db.commit()
+        # Plain values: a rollback below expires every ORM instance in the session.
+        session_id, journey_id = session.id, journey.id
+        try:
+            await idempotency_repo.create(
+                key=str(idempotency_key),
+                session_id=session.id,
+                journey_id=journey.id,
+                action_id=action_id,
+                request_hash=req_hash,
+                response_body=resp_obj.model_dump(mode="json"),
+                status_code=200,
+            )
+            await db.commit()
+        except IntegrityError:
+            # The same key was committed concurrently for a different journey (no
+            # shared row lock). Discard this write and its queued notifications.
+            await db.rollback()
+            discard_n8n_events(db)
+            raced = await idempotency_repo.get(str(idempotency_key))
+            if raced is None:
+                raise
+            return _replay_idempotent_action(raced, session_id, journey_id, req_hash)
         # Flushes any n8n REVIEW_REQUIRED event queued above by
         # ReviewCaseService.create_or_get_open_case (step 10b) - only now,
         # since the transaction that made it durable just committed.
@@ -1514,6 +1540,20 @@ class JourneyService:
         locked_journey = await journey_repo.get_by_id_for_update(journey.id)
         if locked_journey:
             journey = locked_journey
+        if journey.current_snapshot_id != expected_snapshot_id:
+            raise HTTPException(
+                status_code=409,
+                detail=ErrorEnvelope(
+                    error=ErrorObject(
+                        code=ErrorCode.ACTION_STALE,
+                        message=(
+                            "The journey state has changed since this clarification was requested. "
+                            "Please refresh."
+                        ),
+                        details={"current_snapshot_id": str(journey.current_snapshot_id)},
+                    )
+                ).model_dump(mode="json"),
+            )
         # See apply_action's identical capture for why: the JOURNEY_COMPLETED
         # idempotency mechanism is comparing this durable pre-write value
         # against the readiness this clarification computes below.

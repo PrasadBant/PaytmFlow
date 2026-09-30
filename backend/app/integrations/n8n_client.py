@@ -139,6 +139,12 @@ def queue_event(
     )
 
 
+def discard_n8n_events(db: AsyncSession) -> None:
+    """Drops events queued on `db` - call after a rollback, since `db.info`
+    outlives the transaction that queued them."""
+    db.info.pop(_PENDING_KEY, None)
+
+
 async def flush_n8n_events(db: AsyncSession) -> None:
     """Dispatches every event queued on `db` since the last flush. Call
     this ONLY immediately after the governing `await db.commit()` for

@@ -28,7 +28,14 @@ class JourneyRepository:
         journey_id: UUID,
     ) -> JourneyModel | None:
         """Row lock journey record for atomic mutation (SELECT ... FOR UPDATE)."""
-        stmt = select(JourneyModel).where(JourneyModel.id == journey_id).with_for_update()
+        # populate_existing: the row may already be in this session's identity map from
+        # the ownership check; without it, values read before the lock would be reused.
+        stmt = (
+            select(JourneyModel)
+            .where(JourneyModel.id == journey_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
         return await self.session.scalar(stmt)
 
     async def list_by_session(
