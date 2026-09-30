@@ -277,6 +277,7 @@ lives in the `.example` files; the variables that matter most:
 | `AI_PROVIDER` | Yes | `mock` \| `llm` \| `local_ml` \| `sarvam` |
 | `SARVAM_ENABLED` / `SARVAM_API_KEY` | No | Enables the real Sarvam AI cloud provider |
 | `N8N_ENABLED` / `N8N_WEBHOOK_URL` / `N8N_WEBHOOK_SECRET` | No | Enables real outbound event notifications |
+| `N8N_MAX_ATTEMPTS` / `N8N_RETRY_BACKOFF_SECONDS` / `N8N_FLUSH_BUDGET_SECONDS` | No | Retries per event (default 3, backoff 0.5s then 1s), within an 8s total budget per request; anything undelivered is stored in `notification_failures` |
 | `RATE_LIMIT_*` | No | Per-minute limits on the AI endpoints: chat 20 and translate 30 per session, 120 per client IP, 600 per instance overall. `RATE_LIMIT_TRUSTED_PROXY_HOPS` (default 0) controls how the client IP is read from `X-Forwarded-For` |
 | `GIT_SHA` | No | Commit reported by `/health`; falls back to Render's `RENDER_GIT_COMMIT` |
 | `EVIDENCE_STORAGE_DIR` / `EVIDENCE_MAX_BYTES` | No | Upload storage path and size limit (default 10 MB) |
@@ -458,6 +459,14 @@ directly against the live deployment this session:
   voice, `/translate`): per-session, per-client-IP and per-instance sliding windows,
   `429` with `Retry-After` when exceeded. Counters are in process memory,
   so each API instance enforces its own limits.
+- **n8n delivery reliability**: bounded retries with exponential backoff
+  on timeouts, connection errors and 408/425/429/5xx; no retry on other
+  4xx; the same `event_id` (and an `Idempotency-Key` header) on every
+  try; at most 8 seconds of delivery per request (so a slow n8n cannot
+  push responses into proxy timeouts); undeliverable events are kept in
+  `notification_failures` and can be redelivered with
+  `python -m app.integrations.n8n_redeliver`, which claims one row at a
+  time under a row lock so concurrent runs never send the same event.
 - **Security response headers** on every API response
   (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
   `Permissions-Policy`, `Cache-Control: no-store`).
@@ -518,6 +527,10 @@ environment.
   deployment needs a shared store for a global limit. Behind a proxy with
   `RATE_LIMIT_TRUSTED_PROXY_HOPS=0`, the per-IP limit acts as one shared
   ceiling for all clients.
+- **n8n events are not stored before delivery**: an event is retried and,
+  if it still fails, recorded, but a process crash between the database
+  commit and the first delivery attempt loses it. Redelivery of recorded
+  failures is a manual/cron command, not an automatic scheduler.
 - **No CI pipeline is configured in this repository** — the test/lint/
   type commands above are run manually, not automatically on every push.
 - **Six journeys' worth of synthetic training/test documents** back the

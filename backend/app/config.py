@@ -80,6 +80,12 @@ class Settings(BaseSettings):
     # credential in n8n, not necessarily "Authorization".
     N8N_WEBHOOK_HEADER_NAME: str = "X-Webhook-Secret"
     N8N_TIMEOUT_SECONDS: int = 5
+    # Per event: tries before it is recorded in notification_failures, and the
+    # base of the exponential backoff between tries (0.5s, 1s, ...).
+    N8N_MAX_ATTEMPTS: int = 3
+    N8N_RETRY_BACKOFF_SECONDS: float = 0.5
+    # Total time one request may spend delivering its events after commit.
+    N8N_FLUSH_BUDGET_SECONDS: float = 8.0
     EVIDENCE_STORAGE_DIR: str = "./storage/evidence"
     EVIDENCE_MAX_BYTES: int = 10485760  # 10 MB
     DEMO_RESET_SECRET: str = "change-me-demo-reset-secret"

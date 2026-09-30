@@ -70,6 +70,8 @@ invented, never required.
 
 from __future__ import annotations
 
+import asyncio
+import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -77,9 +79,11 @@ from uuid import UUID
 
 import httpx
 import structlog
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.db.models import NotificationFailureModel
 
 logger = structlog.get_logger(__name__)
 
@@ -148,46 +152,209 @@ def discard_n8n_events(db: AsyncSession) -> None:
 async def flush_n8n_events(db: AsyncSession) -> None:
     """Dispatches every event queued on `db` since the last flush. Call
     this ONLY immediately after the governing `await db.commit()` for
-    whichever write(s) queued them has already succeeded."""
+    whichever write(s) queued them has already succeeded.
+
+    Each event gets bounded retries (see `_dispatch`); one that still fails
+    is written to `notification_failures` for later redelivery. Never raises.
+
+    This runs inside the HTTP request that made the write, so all events share
+    one N8N_FLUSH_BUDGET_SECONDS budget: a down or slow n8n can delay the
+    response by at most that much (not attempts x timeout per event), keeping
+    it clear of proxy timeouts that would make a user retry a committed write.
+    Events that do not fit are recorded for redelivery instead."""
     events = db.info.pop(_PENDING_KEY, None)
     if not events:
         return
     if not settings.N8N_ENABLED or not settings.N8N_WEBHOOK_URL:
         return
+    deadline = time.monotonic() + settings.N8N_FLUSH_BUDGET_SECONDS
     for event in events:
         try:
-            await _dispatch(event)
+            await _dispatch(event, deadline)
+        except N8nDeliveryError as exc:
+            await _record_failure(db, event, exc)
         except Exception as exc:  # defense-in-depth: see module docstring invariant 2 -
             # this must hold even if _dispatch itself has a bug, not only for
-            # the httpx.HTTPError subset it already catches internally.
+            # the httpx errors it already classifies.
             logger.warning(
                 "n8n_webhook_unexpected_dispatch_error",
                 event_type=event.get("event"),
                 event_id=event.get("event_id"),
                 error=str(exc),
             )
+            await _record_failure(
+                db, event, N8nDeliveryError(FAILURE_PERMANENT, 1, None, f"unexpected: {exc}")
+            )
 
 
-async def _dispatch(event: dict[str, Any]) -> None:
-    headers = {"Content-Type": "application/json"}
+FAILURE_TRANSIENT = "TRANSIENT_EXHAUSTED"
+FAILURE_PERMANENT = "PERMANENT"
+# Status codes worth retrying; any other non-2xx (bad payload, bad secret,
+# wrong URL) fails identically on every attempt.
+_RETRYABLE_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
+
+
+class N8nDeliveryError(Exception):
+    def __init__(self, kind: str, attempts: int, status_code: int | None, error: str) -> None:
+        super().__init__(error)
+        self.kind = kind
+        self.attempts = attempts
+        self.status_code = status_code
+        self.error = error[:500]
+
+
+async def _dispatch(event: dict[str, Any], deadline: float | None = None) -> None:
+    """POSTs one event with up to N8N_MAX_ATTEMPTS tries and exponential
+    backoff, never past `deadline` (time.monotonic()). Every try carries the
+    same event_id (body and Idempotency-Key header), which the workflow
+    deduplicates on, so a retry after a lost response cannot double-notify.
+    Raises N8nDeliveryError when it gives up."""
+    headers = {"Content-Type": "application/json", "Idempotency-Key": str(event["event_id"])}
     if settings.N8N_WEBHOOK_SECRET:
         headers[settings.N8N_WEBHOOK_HEADER_NAME] = settings.N8N_WEBHOOK_SECRET
 
+    max_attempts = max(1, settings.N8N_MAX_ATTEMPTS)
+    status_code: int | None = None
+    error = ""
+    attempts = 0
+
+    def remaining() -> float:
+        return float("inf") if deadline is None else deadline - time.monotonic()
+
+    async with httpx.AsyncClient(timeout=float(settings.N8N_TIMEOUT_SECONDS)) as client:
+        for attempt in range(1, max_attempts + 1):
+            if remaining() <= 0:
+                error = error or "flush time budget exhausted before sending"
+                break
+            attempts = attempt
+            timeout = min(float(settings.N8N_TIMEOUT_SECONDS), remaining())
+            try:
+                response = await client.post(
+                    settings.N8N_WEBHOOK_URL, headers=headers, json=event, timeout=timeout
+                )
+            except httpx.TransportError as exc:  # timeouts, connect/read errors
+                # Never log the webhook secret; httpx errors carry the URL only.
+                status_code, error = None, f"{type(exc).__name__}: {exc}"
+            else:
+                status_code = response.status_code
+                if 200 <= status_code < 300:
+                    logger.info(
+                        "n8n_webhook_dispatched",
+                        event_type=event.get("event"),
+                        event_id=event.get("event_id"),
+                        status_code=status_code,
+                        attempt=attempt,
+                    )
+                    return
+                error = f"HTTP {status_code}"
+                if status_code not in _RETRYABLE_STATUS:
+                    logger.warning(
+                        "n8n_webhook_rejected",
+                        event_type=event.get("event"),
+                        event_id=event.get("event_id"),
+                        status_code=status_code,
+                    )
+                    raise N8nDeliveryError(FAILURE_PERMANENT, attempt, status_code, error)
+            logger.warning(
+                "n8n_webhook_dispatch_failed",
+                event_type=event.get("event"),
+                event_id=event.get("event_id"),
+                attempt=attempt,
+                max_attempts=max_attempts,
+                error=error,
+            )
+            if attempt < max_attempts:
+                backoff = settings.N8N_RETRY_BACKOFF_SECONDS * 2 ** (attempt - 1)
+                if backoff >= remaining():
+                    break
+                await asyncio.sleep(backoff)
+    raise N8nDeliveryError(FAILURE_TRANSIENT, attempts, status_code, error)
+
+
+async def _record_failure(db: AsyncSession, event: dict[str, Any], exc: N8nDeliveryError) -> None:
+    """Upserts the durable failure row in its OWN session, so a problem here
+    can never roll back or expire the caller's already-committed objects."""
+    bind = db.bind if isinstance(db, AsyncSession) else None
+    if bind is None:
+        logger.error("n8n_failure_not_recorded", event_id=event.get("event_id"), reason="no_bind")
+        return
     try:
-        async with httpx.AsyncClient(timeout=float(settings.N8N_TIMEOUT_SECONDS)) as client:
-            response = await client.post(settings.N8N_WEBHOOK_URL, headers=headers, json=event)
-        logger.info(
-            "n8n_webhook_dispatched",
-            event_type=event.get("event"),
-            event_id=event.get("event_id"),
-            status_code=response.status_code,
-        )
-    except httpx.HTTPError as exc:
-        # Never log the webhook secret or raise - a notification failure
-        # must never surface as a failure of the request that triggered it.
+        async with AsyncSession(bind, expire_on_commit=False) as record_db:
+            await _upsert_failure(record_db, event, exc)
+            await record_db.commit()
         logger.warning(
-            "n8n_webhook_dispatch_failed",
+            "n8n_failure_recorded",
             event_type=event.get("event"),
             event_id=event.get("event_id"),
-            error=str(exc),
+            failure_kind=exc.kind,
+            attempts=exc.attempts,
         )
+    except Exception as record_exc:
+        logger.error(
+            "n8n_failure_not_recorded",
+            event_id=event.get("event_id"),
+            error=str(record_exc)[:300],
+        )
+
+
+async def _upsert_failure(db: AsyncSession, event: dict[str, Any], exc: N8nDeliveryError) -> None:
+    row = await db.get(NotificationFailureModel, str(event["event_id"]))
+    if row is None:
+        db.add(
+            NotificationFailureModel(
+                event_id=str(event["event_id"]),
+                event_type=str(event.get("event", "")),
+                journey_id=str(event.get("journey_id", "")),
+                payload=event,
+                failure_kind=exc.kind,
+                attempts=exc.attempts,
+                last_status_code=exc.status_code,
+                last_error=exc.error,
+            )
+        )
+    else:
+        row.failure_kind = exc.kind
+        row.attempts += exc.attempts
+        row.last_status_code = exc.status_code
+        row.last_error = exc.error
+
+
+async def redeliver_failed_events(db: AsyncSession, limit: int = 50) -> dict[str, int]:
+    """Retries undelivered TRANSIENT_EXHAUSTED events with their original
+    event_id. PERMANENT failures are left for a human (fix the payload,
+    secret or URL first). Run via `python -m app.integrations.n8n_redeliver`.
+
+    Rows are claimed one at a time with FOR UPDATE SKIP LOCKED and held until
+    that row's outcome is committed, so two concurrent runs never send the same
+    event; each row is tried at most once per run."""
+    counts = {"delivered": 0, "failed": 0}
+    if not settings.N8N_ENABLED or not settings.N8N_WEBHOOK_URL:
+        return counts
+    tried: list[str] = []
+    for _ in range(limit):
+        stmt = (
+            select(NotificationFailureModel)
+            .where(
+                NotificationFailureModel.delivered_at.is_(None),
+                NotificationFailureModel.failure_kind == FAILURE_TRANSIENT,
+            )
+            .order_by(NotificationFailureModel.created_at)
+            .limit(1)
+            .with_for_update(skip_locked=True)
+        )
+        if tried:
+            stmt = stmt.where(NotificationFailureModel.event_id.not_in(tried))
+        row = await db.scalar(stmt)
+        if row is None:
+            break
+        tried.append(row.event_id)
+        try:
+            await _dispatch(dict(row.payload))
+        except N8nDeliveryError as exc:
+            await _upsert_failure(db, row.payload, exc)
+            counts["failed"] += 1
+        else:
+            row.delivered_at = datetime.now(UTC)
+            counts["delivered"] += 1
+        await db.commit()
+    return counts
