@@ -69,5 +69,8 @@ export default defineConfig({
     timeout: 60_000,
     stdout: "ignore",
     stderr: "pipe",
+    // The committed .env selects live mode; this suite is MSW-only.
+    // Real-backend coverage lives in playwright.live.config.ts.
+    env: { VITE_API_MODE: "mock" },
   },
 });
