@@ -114,8 +114,19 @@ class Settings(BaseSettings):
     @classmethod
     def _git_sha_is_a_commit(cls, value: str) -> str:
         # /health is public: only ever echo a commit hash, never arbitrary env text.
+        # Anything else becomes "" and is labelled once APP_ENV is known (below).
         value = value.strip().lower()
-        return value if re.fullmatch(r"[0-9a-f]{7,40}", value) else "dev"
+        return value if re.fullmatch(r"[0-9a-f]{7,40}", value) else ""
+
+    @model_validator(mode="after")
+    def _label_missing_git_sha(self) -> "Settings":
+        # "dev" only where it is true; a deployed build without commit metadata
+        # says "unknown" rather than pretending to be a development build.
+        if not self.GIT_SHA:
+            self.GIT_SHA = (
+                "dev" if self.APP_ENV in _ENVS_WHERE_PLACEHOLDERS_ARE_ALLOWED else "unknown"
+            )
+        return self
 
     @model_validator(mode="after")
     def _reject_placeholder_secrets_outside_local_or_ci(self) -> "Settings":

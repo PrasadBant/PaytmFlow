@@ -1,24 +1,12 @@
 /// <reference types="vitest" />
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-
-// Deployment traceability: Vercel sets VERCEL_GIT_COMMIT_SHA at build time.
-// Hex-only so an unexpected value can never inject markup.
-const buildCommit = (process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_SHA ?? '').replace(
-  /[^0-9a-f]/gi,
-  ''
-) || 'dev';
-
-const buildCommitMeta: Plugin = {
-  name: 'build-commit-meta',
-  transformIndexHtml: (html) =>
-    html.replace('</head>', `  <meta name="app-commit" content="${buildCommit}" />\n  </head>`),
-};
+import { buildCommitMeta } from './build-tools/commitMeta';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), buildCommitMeta],
+  plugins: [react(), buildCommitMeta()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
