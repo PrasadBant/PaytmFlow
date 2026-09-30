@@ -338,6 +338,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/TranslateResponse" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "504":
           description: Translation timed out
           content:
@@ -363,6 +364,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ChatResponse" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/v1/journeys/{journey_id}/chat:
     post:
@@ -385,6 +387,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ChatResponse" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/v1/journeys/{journey_id}/chat/voice:
     post:
@@ -415,6 +418,7 @@ paths:
               schema: { $ref: "#/components/schemas/VoiceChatResponse" }
         "400": { $ref: "#/components/responses/ValidationError" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "504":
           description: Transcription timed out
           content:
@@ -748,6 +752,14 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    RateLimited:
+      description: Too many requests; retry after the number of seconds in the Retry-After header
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     ReviewCaseConflict:
       description: >
         REVIEW_CASE_STALE (case_version mismatch), REVIEW_CASE_LOCKED (claimed by
@@ -791,6 +803,7 @@ components:
         - REVIEW_CASE_STALE
         - REVIEW_CASE_LOCKED
         - REVIEW_CASE_INVALID_TRANSITION
+        - RATE_LIMITED
 
     ErrorEnvelope:
       type: object

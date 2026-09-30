@@ -8,6 +8,7 @@ from app.db.models import SessionModel
 from app.schemas.enums import ErrorCode
 from app.schemas.errors import ErrorEnvelope, ErrorObject
 from app.schemas.translate import TranslateRequest, TranslateResponse
+from app.security.rate_limit import rate_limited
 from app.security.session import get_current_session
 
 router = APIRouter()
@@ -18,10 +19,12 @@ router = APIRouter()
     response_model=TranslateResponse,
     responses={
         404: {"model": ErrorEnvelope, "description": "Not found or translation not enabled"},
+        429: {"model": ErrorEnvelope, "description": "Rate limit exceeded"},
         504: {"model": ErrorEnvelope, "description": "Translation timed out"},
     },
     tags=["ai"],
     operation_id="translateText",
+    dependencies=[Depends(rate_limited("translate", "RATE_LIMIT_TRANSLATE_PER_MINUTE"))],
 )
 async def translate_text(
     body: TranslateRequest,

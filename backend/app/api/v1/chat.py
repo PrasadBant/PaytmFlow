@@ -15,11 +15,14 @@ from app.schemas.chat import ChatRequest, ChatResponse, VoiceChatResponse
 from app.schemas.enums import ErrorCode
 from app.schemas.errors import ErrorEnvelope, ErrorObject
 from app.schemas.journeys import JourneyDiff, JourneyStateResponse
+from app.security.rate_limit import rate_limited
 from app.security.session import get_current_session, verify_journey_ownership
 from app.services.journey_service import JourneyService
 
 router = APIRouter()
 logger = structlog.get_logger(__name__)
+# One per-session bucket shared by text and voice chat.
+_chat_limit = Depends(rate_limited("chat", "RATE_LIMIT_CHAT_PER_MINUTE"))
 
 
 async def _get_diff_if_available(
@@ -56,8 +59,10 @@ async def _get_diff_if_available(
 @router.post(
     "/chat",
     response_model=ChatResponse,
+    responses={429: {"model": ErrorEnvelope, "description": "Rate limit exceeded"}},
     tags=["journeys"],
     operation_id="generalChat",
+    dependencies=[_chat_limit],
 )
 async def general_chat(
     body: ChatRequest,
@@ -77,9 +82,13 @@ async def general_chat(
 @router.post(
     "/journeys/{journey_id}/chat",
     response_model=ChatResponse,
-    responses={404: {"model": ErrorEnvelope, "description": "Not found"}},
+    responses={
+        404: {"model": ErrorEnvelope, "description": "Not found"},
+        429: {"model": ErrorEnvelope, "description": "Rate limit exceeded"},
+    },
     tags=["journeys"],
     operation_id="chatWithAssistant",
+    dependencies=[_chat_limit],
 )
 async def chat_with_assistant(
     journey_id: UUID,
@@ -125,10 +134,12 @@ async def chat_with_assistant(
     responses={
         400: {"model": ErrorEnvelope, "description": "Invalid or empty audio"},
         404: {"model": ErrorEnvelope, "description": "Not found or voice input not enabled"},
+        429: {"model": ErrorEnvelope, "description": "Rate limit exceeded"},
         504: {"model": ErrorEnvelope, "description": "Transcription timed out"},
     },
     tags=["journeys"],
     operation_id="chatWithAssistantVoice",
+    dependencies=[_chat_limit],
 )
 async def chat_with_assistant_voice(
     journey_id: UUID,

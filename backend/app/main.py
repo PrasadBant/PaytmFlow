@@ -120,7 +120,7 @@ async def validation_exception_handler(request, exc: RequestValidationError):
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request, exc: StarletteHTTPException):
     if isinstance(exc.detail, dict) and "error" in exc.detail:
-        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+        return JSONResponse(status_code=exc.status_code, content=exc.detail, headers=exc.headers)
 
     error_code = ErrorCode.VALIDATION_ERROR if exc.status_code == 400 else ErrorCode.ACTION_INVALID
     return JSONResponse(
@@ -131,6 +131,7 @@ async def http_exception_handler(request, exc: StarletteHTTPException):
                 message=str(exc.detail),
             )
         ).model_dump(mode="json"),
+        headers=exc.headers,
     )
 
 

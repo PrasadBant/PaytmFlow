@@ -22,6 +22,13 @@ import { useJourney } from '@/api/hooks/useJourney';
 import type { JourneyStateResponse } from '@/api/hooks/useJourney';
 import { useChat, useGeneralChat, useVoiceChat } from '@/api/hooks/useChat';
 import { useTranslateText } from '@/api/hooks/useTranslate';
+import { ApiError } from '@/api/errors';
+
+// The server's 429 message tells the user to wait; generic copy would invite
+// an immediate retry that is also refused.
+function rateLimitMessage(err: unknown): string | null {
+  return err instanceof ApiError && err.code === 'RATE_LIMITED' ? err.message : null;
+}
 
 interface Message {
   id: string;
@@ -255,8 +262,8 @@ export function AssistantModal(): ReactElement | null {
         { id: `a-${Date.now()}`, sender: 'assistant', text: displayReply, time: timeNow() },
       ]);
       setLastFailedQuestion(null);
-    } catch {
-      setError('Failed to receive a response.');
+    } catch (err) {
+      setError(rateLimitMessage(err) ?? 'Failed to receive a response.');
       setLastFailedQuestion(question);
     } finally {
       setIsLoading(false);
@@ -299,8 +306,11 @@ export function AssistantModal(): ReactElement | null {
         { id: `u-${Date.now()}`, sender: 'user', text: result.transcript, time: timeNow() },
         { id: `a-${Date.now() + 1}`, sender: 'assistant', text: displayReply, time: timeNow() },
       ]);
-    } catch {
-      setVoiceError('Could not process that recording. Please try typing your question instead.');
+    } catch (err) {
+      setVoiceError(
+        rateLimitMessage(err) ??
+          'Could not process that recording. Please try typing your question instead.',
+      );
     } finally {
       setIsLoading(false);
     }

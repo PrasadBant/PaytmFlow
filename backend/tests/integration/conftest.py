@@ -21,6 +21,7 @@ from app.config import settings
 from app.db.models import Base
 from app.db.session import create_immutability_triggers, get_db
 from app.main import app
+from app.security.rate_limit import limiter as rate_limiter
 
 # The integration suite exercises real relational behaviour (foreign keys, the
 # append-only triggers, row locking) that SQLite does not enforce the same way
@@ -172,6 +173,8 @@ async def client(db_engine: AsyncEngine) -> AsyncGenerator[AsyncClient, None]:
                 raise
 
     app.dependency_overrides[get_db] = override_get_db
+    # Rate-limit windows are process-global; start every test with empty buckets.
+    rate_limiter.reset()
 
     async with AsyncClient(
         transport=ASGITransport(app=app),

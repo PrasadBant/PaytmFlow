@@ -277,6 +277,7 @@ lives in the `.example` files; the variables that matter most:
 | `AI_PROVIDER` | Yes | `mock` \| `llm` \| `local_ml` \| `sarvam` |
 | `SARVAM_ENABLED` / `SARVAM_API_KEY` | No | Enables the real Sarvam AI cloud provider |
 | `N8N_ENABLED` / `N8N_WEBHOOK_URL` / `N8N_WEBHOOK_SECRET` | No | Enables real outbound event notifications |
+| `RATE_LIMIT_*` | No | Per-minute limits on the AI endpoints: chat 20 and translate 30 per session, 120 per client IP, 600 per instance overall. `RATE_LIMIT_TRUSTED_PROXY_HOPS` (default 0) controls how the client IP is read from `X-Forwarded-For` |
 | `GIT_SHA` | No | Commit reported by `/health`; falls back to Render's `RENDER_GIT_COMMIT` |
 | `EVIDENCE_STORAGE_DIR` / `EVIDENCE_MAX_BYTES` | No | Upload storage path and size limit (default 10 MB) |
 | `VITE_API_MODE` (frontend) | Yes | `mock` (MSW, no backend needed) \| `live` (real backend) |
@@ -453,6 +454,10 @@ directly against the live deployment this session:
   and `event_id`-based deduplication — *verified live*: missing/wrong
   secret → `403`, unknown event or missing required field → `400`,
   replayed `event_id` → no duplicate notification.
+- **Rate limits on the paid AI endpoints** (`/chat`, journey chat and
+  voice, `/translate`): per-session, per-client-IP and per-instance sliding windows,
+  `429` with `Retry-After` when exceeded. Counters are in process memory,
+  so each API instance enforces its own limits.
 - **Security response headers** on every API response
   (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
   `Permissions-Policy`, `Cache-Control: no-store`).
@@ -509,6 +514,10 @@ environment.
 - **No formal assistive-technology certification** — accessibility was
   verified via the browser's accessibility tree and manual keyboard
   testing, not a certified audit with a real screen reader.
+- **Rate limits are per API instance** (in memory); a multi-instance
+  deployment needs a shared store for a global limit. Behind a proxy with
+  `RATE_LIMIT_TRUSTED_PROXY_HOPS=0`, the per-IP limit acts as one shared
+  ceiling for all clients.
 - **No CI pipeline is configured in this repository** — the test/lint/
   type commands above are run manually, not automatically on every push.
 - **Six journeys' worth of synthetic training/test documents** back the

@@ -100,6 +100,42 @@ describe('AssistantModal - voice input (Sarvam speech-to-text)', () => {
   });
 });
 
+describe('AssistantModal - rate limiting', () => {
+  beforeEach(() => {
+    resetMockState();
+    Element.prototype.scrollIntoView = vi.fn();
+    useUiStore.getState().openAssistant();
+  });
+
+  it('shows the server wait message instead of a generic failure on 429', async () => {
+    server.use(
+      http.post('*/api/v1/chat', () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: 'RATE_LIMITED',
+              message: 'Too many requests. Please wait a moment and try again.',
+              details: { retry_after_seconds: 30 },
+            },
+          },
+          { status: 429, headers: { 'Retry-After': '30' } }
+        )
+      )
+    );
+    const user = userEvent.setup();
+    renderAssistant('/');
+
+    const textbox = await screen.findByLabelText('Assistant question');
+    await user.type(textbox, 'Hello');
+    await user.click(screen.getByRole('button', { name: 'Send message' }));
+
+    expect(
+      await screen.findByText('Too many requests. Please wait a moment and try again.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Failed to receive a response.')).not.toBeInTheDocument();
+  });
+});
+
 describe('AssistantModal - reply translation (Sarvam Mayura)', () => {
   beforeEach(() => {
     resetMockState();

@@ -88,6 +88,16 @@ class Settings(BaseSettings):
     # EVIDENCE actions without evidence_id trust client input; for test fixtures only.
     # None = allowed only when APP_ENV is local/ci.
     ALLOW_EVIDENCE_ACTIONS_WITHOUT_EVIDENCE: bool | None = None
+    # Sliding-window limits on the paid AI endpoints (app/security/rate_limit.py).
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_CHAT_PER_MINUTE: int = 20
+    RATE_LIMIT_TRANSLATE_PER_MINUTE: int = 30
+    RATE_LIMIT_IP_PER_MINUTE: int = 120
+    # All callers of one instance; cannot be bypassed by spoofing or new sessions.
+    RATE_LIMIT_GLOBAL_PER_MINUTE: int = 600
+    # Proxies in front of the API that append to X-Forwarded-For (0 = use the
+    # TCP peer). Set only after confirming the platform's actual header chain.
+    RATE_LIMIT_TRUSTED_PROXY_HOPS: int = 0
     LOG_LEVEL: str = "INFO"
     # Falls back to the commit Render injects into every deploy.
     GIT_SHA: str = Field(

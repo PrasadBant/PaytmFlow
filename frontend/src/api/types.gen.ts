@@ -489,7 +489,7 @@ export interface components {
         /** @enum {string} */
         FieldStatus: "SATISFIED" | "BLOCKED" | "AMBIGUOUS";
         /** @enum {string} */
-        ErrorCode: "INVALID_JOURNEY_TYPE" | "VALIDATION_ERROR" | "ACTION_INVALID" | "ACTION_STALE" | "NEEDS_REVIEW" | "DEAD_END" | "AI_TIMEOUT" | "AI_MALFORMED_OUTPUT" | "EVIDENCE_CONFLICT" | "NOT_FOUND" | "FORBIDDEN" | "REVIEW_CASE_STALE" | "REVIEW_CASE_LOCKED" | "REVIEW_CASE_INVALID_TRANSITION";
+        ErrorCode: "INVALID_JOURNEY_TYPE" | "VALIDATION_ERROR" | "ACTION_INVALID" | "ACTION_STALE" | "NEEDS_REVIEW" | "DEAD_END" | "AI_TIMEOUT" | "AI_MALFORMED_OUTPUT" | "EVIDENCE_CONFLICT" | "NOT_FOUND" | "FORBIDDEN" | "REVIEW_CASE_STALE" | "REVIEW_CASE_LOCKED" | "REVIEW_CASE_INVALID_TRANSITION" | "RATE_LIMITED";
         ErrorEnvelope: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -891,6 +891,16 @@ export interface components {
         /** @description FORBIDDEN. The current session's role does not permit this action. */
         Forbidden: {
             headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Too many requests; retry after the number of seconds in the Retry-After header */
+        RateLimited: {
+            headers: {
+                "Retry-After"?: number;
                 [name: string]: unknown;
             };
             content: {
@@ -1301,6 +1311,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
             /** @description Translation timed out */
             504: {
                 headers: {
@@ -1334,6 +1345,7 @@ export interface operations {
                     "application/json": components["schemas"]["ChatResponse"];
                 };
             };
+            429: components["responses"]["RateLimited"];
         };
     };
     chatWithAssistant: {
@@ -1361,6 +1373,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
         };
     };
     chatWithAssistantVoice: {
@@ -1394,6 +1407,7 @@ export interface operations {
             };
             400: components["responses"]["ValidationError"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
             /** @description Transcription timed out */
             504: {
                 headers: {
