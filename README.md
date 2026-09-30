@@ -411,11 +411,12 @@ document.
 
 ## Testing
 
-| Suite | Command | Result (2026-09-30, see `AUDIT_FINAL_REPORT.md`) |
+| Suite | Command | Result (2026-09-30) |
 |---|---|---|
-| Backend pytest (PostgreSQL 16) | `cd backend && REQUIRE_POSTGRES=1 uv run pytest` | 697/697 passed (unit 369, integration 220, contract 38, safety 15, packs 18, scenarios 37) |
-| Frontend unit tests (Vitest) | `cd frontend && npm run test` | 417/417 passed |
-| Frontend E2E (Playwright, MSW mocks) | `cd frontend && VITE_API_MODE=mock npm run test:e2e` | 52/52 passed. Requires mock mode: the tracked `frontend/.env` sets `live`, which makes the suite fail without a backend |
+| Backend pytest (PostgreSQL 16) | `cd backend && REQUIRE_POSTGRES=1 uv run pytest` | 760/760 passed with all non-loopback network access blocked (includes 7 PostgreSQL concurrency tests, which skip on SQLite) |
+| Frontend unit tests (Vitest 3) | `cd frontend && npm run test` | 418/418 passed |
+| Frontend E2E (Playwright, MSW mocks) | `cd frontend && npm run test:e2e` | 52/52 passed (the config pins `VITE_API_MODE=mock`) |
+| Frontend E2E (Playwright, real backend) | `cd frontend && npm run test:e2e:live` (needs local PostgreSQL from `backend/.env`) | 9/9 passed. Each test creates its own journeys: creation, status, real document upload, completion, resume/isolation, reviewer claim and resolve; a guard test fails if the mock service worker is active |
 | Ruff lint | `uv run ruff check app tests` | Clean |
 | Ruff format | `uv run ruff format --check app tests` | 7 pre-existing files would be reformatted |
 | mypy (whole app) | `uv run mypy app` | 41 errors, all missing library stubs; 39 in offline benchmark/dataset/training scripts, 2 in runtime modules (`docai/classifier.py`, `docai/ocr.py`) |
@@ -424,7 +425,7 @@ document.
 | ESLint + TypeScript | `npm run lint && npm run typecheck` | Clean |
 | Frontend production build | `npm run build` | Clean (chunk-size warning) |
 | pip-audit (production dependency set) | `uv export --no-dev --no-hashes \| uvx pip-audit -r - --no-deps --disable-pip` | 0 known vulnerabilities |
-| npm audit (production) | `npm audit --omit=dev` | 2 moderate (`react-router` < 7.18); dev-only tooling has further findings |
+| npm audit | `npm audit` | 6 findings (0 critical, 1 high, 5 moderate), all needing major upgrades of Vite 5 or React Router 6; production-bundle exposure is only `react-router` (not reachable) |
 
 ## Security
 
