@@ -25,6 +25,7 @@ from app.config import settings
 from app.logging import setup_logging
 from app.schemas.enums import ErrorCode
 from app.schemas.errors import ErrorEnvelope, ErrorObject
+from app.security.reviewer import reviewer_access_code_problem
 
 setup_logging()
 logger = structlog.get_logger(__name__)
@@ -42,6 +43,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     must never block the API from starting or serving every other endpoint
     normally.
     """
+    problem = reviewer_access_code_problem()
+    if problem:
+        logger.warning("reviewer_access_code_misconfigured", problem=problem)
     logger.info("app_started", app_env=settings.APP_ENV, git_sha=settings.GIT_SHA)
 
     if settings.AI_BASE_URL.strip():

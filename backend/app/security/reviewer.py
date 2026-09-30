@@ -95,6 +95,22 @@ def authorize_role_switch(role: ReviewerRole, access_code: str | None) -> None:
     )
 
 
+REVIEWER_CODE_MIN_LENGTH = 16
+
+
+def reviewer_access_code_problem() -> str | None:
+    """Startup self-check: names the problem with REVIEWER_ACCESS_CODE outside
+    local/ci, never the value. Unset is fail-closed (nobody can promote)."""
+    if settings.APP_ENV in ("local", "ci"):
+        return None
+    code = settings.REVIEWER_ACCESS_CODE
+    if not code:
+        return "unset: Review Center promotion is disabled"
+    if len(code) < REVIEWER_CODE_MIN_LENGTH or len(set(code)) < 6:
+        return f"weak: use at least {REVIEWER_CODE_MIN_LENGTH} random characters"
+    return None
+
+
 def _reviewer_code_open() -> bool:
     return not settings.REVIEWER_ACCESS_CODE and settings.APP_ENV in ("local", "ci")
 
