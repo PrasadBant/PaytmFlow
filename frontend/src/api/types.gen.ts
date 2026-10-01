@@ -1455,6 +1455,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+            429: components["responses"]["RateLimited"];
         };
     };
     getReviewDashboardMetrics: {

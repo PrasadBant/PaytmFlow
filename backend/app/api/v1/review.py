@@ -21,6 +21,7 @@ from app.schemas.review import (
     RoleSwitchRequest,
     RoleSwitchResponse,
 )
+from app.security.rate_limit import rate_limited
 from app.security.reviewer import (
     authorize_role_switch,
     get_session_role,
@@ -37,8 +38,22 @@ router = APIRouter()
 @router.post(
     "/review/role",
     response_model=RoleSwitchResponse,
+    responses={429: {"model": ErrorEnvelope, "description": "Too many attempts"}},
     tags=["review"],
     operation_id="switchPrototypeRole",
+    # The access code is a shared secret: cap guessing per session, per client
+    # IP and overall, in a pool separate from the AI endpoints.
+    dependencies=[
+        Depends(
+            rate_limited(
+                "reviewer_role",
+                "RATE_LIMIT_REVIEWER_ROLE_PER_MINUTE",
+                pool="reviewer_role",
+                ip_setting="RATE_LIMIT_REVIEWER_ROLE_IP_PER_MINUTE",
+                global_setting="RATE_LIMIT_REVIEWER_ROLE_GLOBAL_PER_MINUTE",
+            )
+        )
+    ],
 )
 async def switch_role(
     body: RoleSwitchRequest,

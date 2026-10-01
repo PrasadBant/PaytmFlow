@@ -4,6 +4,7 @@ import { Menu, Bell, User, Bot, ShieldCheck } from 'lucide-react';
 import { useUiStore } from '../state/ui';
 import { useRoleStore } from '../state/role';
 import { useSwitchRole } from '../api/hooks/useReview';
+import { ApiError } from '../api/errors';
 import { IconButton } from './primitives/IconButton';
 
 export const Header: React.FC = () => {
@@ -25,7 +26,12 @@ export const Header: React.FC = () => {
       { role: nextRole, accessCode },
       {
         onSuccess: () => navigate(nextRole === 'REVIEW_OFFICER' ? '/review' : '/'),
-        onError: () => window.alert('That access code was not accepted. Check it and try again.'),
+        onError: (err) =>
+          window.alert(
+            err instanceof ApiError && err.code === 'RATE_LIMITED'
+              ? err.message
+              : 'That access code was not accepted. Check it and try again.'
+          ),
       },
     );
   };

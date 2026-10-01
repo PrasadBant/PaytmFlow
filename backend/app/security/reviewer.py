@@ -82,7 +82,13 @@ def authorize_role_switch(role: ReviewerRole, access_code: str | None) -> None:
     configured = settings.REVIEWER_ACCESS_CODE
     if _reviewer_code_open():
         return
-    if configured and access_code and secrets.compare_digest(access_code, configured):
+    # Compare bytes: compare_digest raises on non-ASCII str, which would turn a
+    # wrong guess into a 500 instead of a 403.
+    if (
+        configured
+        and access_code
+        and secrets.compare_digest(access_code.encode(), configured.encode())
+    ):
         return
     raise HTTPException(
         status_code=403,

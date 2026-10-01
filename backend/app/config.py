@@ -104,6 +104,10 @@ class Settings(BaseSettings):
     # Proxies in front of the API that append to X-Forwarded-For (0 = use the
     # TCP peer). Set only after confirming the platform's actual header chain.
     RATE_LIMIT_TRUSTED_PROXY_HOPS: int = 0
+    # POST /review/role checks the shared reviewer access code: bound guessing.
+    RATE_LIMIT_REVIEWER_ROLE_PER_MINUTE: int = 5
+    RATE_LIMIT_REVIEWER_ROLE_IP_PER_MINUTE: int = 20
+    RATE_LIMIT_REVIEWER_ROLE_GLOBAL_PER_MINUTE: int = 60
     LOG_LEVEL: str = "INFO"
     # Falls back to the commit Render injects into every deploy.
     GIT_SHA: str = Field(

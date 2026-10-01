@@ -461,6 +461,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/v1/review/dashboard:
     get:

@@ -146,6 +146,18 @@ async def test_malformed_access_code_rejected(
     assert (await client.get("/api/v1/review/cases", headers=headers)).status_code == 403
 
 
+@pytest.mark.parametrize("guess", ["correct-hors\u00e9", "\u5bc6\u7801", "correct-horse\u200b"])
+async def test_non_ascii_access_code_is_refused_not_a_server_error(
+    client: AsyncClient, production_like, guess: str
+) -> None:
+    production_like("correct-horse")
+    headers = _headers()
+    r = await _switch(client, headers, "REVIEW_OFFICER", guess)
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "FORBIDDEN"
+    assert (await client.get("/api/v1/review/cases", headers=headers)).status_code == 403
+
+
 async def test_every_reviewer_endpoint_rejects_ungranted_session(
     client: AsyncClient, production_like
 ) -> None:
