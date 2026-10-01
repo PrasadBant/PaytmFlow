@@ -28,7 +28,7 @@ async def clear_database_tables(session: AsyncSession) -> None:
         await session.execute(
             text(
                 "TRUNCATE TABLE audit_events, idempotency_keys, evidence, "
-                "clarifications, journey_snapshots, journeys, sessions CASCADE;"
+                "clarifications, journey_snapshots, journeys, sessions, n8n_outbox CASCADE;"
             )
         )
     else:
@@ -45,6 +45,7 @@ async def clear_database_tables(session: AsyncSession) -> None:
         await session.execute(text("DELETE FROM journey_snapshots;"))
         await session.execute(text("DELETE FROM journeys;"))
         await session.execute(text("DELETE FROM sessions;"))
+        await session.execute(text("DELETE FROM n8n_outbox;"))
         await session.execute(text("PRAGMA foreign_keys = ON;"))
         await create_immutability_triggers(session)
 

@@ -121,8 +121,10 @@ an advisory aid, always labeled as such.
 ### Event-driven notifications (n8n Cloud)
 Six real lifecycle events — review required, evidence uploaded, customer
 action required, journey resolved, escalated, and journey completed — are
-dispatched to a production n8n workflow with header-secret auth, an event
-allowlist, and `event_id`-based replay/duplicate protection.
+dispatched to a production n8n workflow with header-secret auth and an event
+allowlist. Each event is written to a transactional outbox in the same commit
+as the change that emits it, then delivered at least once with one stable
+`event_id`.
 
 ### Session-scoped, cookie-based access control
 A signed, anonymous session cookie (`itsdangerous`; `HttpOnly`, `Secure`,
@@ -277,9 +279,11 @@ lives in the `.example` files; the variables that matter most:
 | `AI_PROVIDER` | Yes | `mock` \| `llm` \| `local_ml` \| `sarvam` |
 | `SARVAM_ENABLED` / `SARVAM_API_KEY` | No | Enables the real Sarvam AI cloud provider |
 | `N8N_ENABLED` / `N8N_WEBHOOK_URL` / `N8N_WEBHOOK_SECRET` | No | Enables real outbound event notifications |
-| `N8N_MAX_ATTEMPTS` / `N8N_RETRY_BACKOFF_SECONDS` / `N8N_FLUSH_BUDGET_SECONDS` | No | Retries per event (default 3, backoff 0.5s then 1s), within an 8s total budget per request; anything undelivered is stored in `notification_failures` |
-| `RATE_LIMIT_*` | No | Per-minute limits on the AI endpoints: chat 20 and translate 30 per session, 120 per client IP, 600 per instance overall. `RATE_LIMIT_TRUSTED_PROXY_HOPS` (default 0) controls how the client IP is read from `X-Forwarded-For` |
-| `GIT_SHA` | No | Commit reported by `/health`; falls back to Render's `RENDER_GIT_COMMIT` |
+| `N8N_MAX_ATTEMPTS` / `N8N_RETRY_BACKOFF_SECONDS` / `N8N_FLUSH_BUDGET_SECONDS` | No | HTTP tries per send (default 3, backoff 0.5s then 1s, or `Retry-After`), within an 8s total budget per request; anything undelivered stays `PENDING` in `n8n_outbox` |
+| `N8N_OUTBOX_SWEEP_SECONDS` / `N8N_OUTBOX_LEASE_SECONDS` / `N8N_OUTBOX_MAX_ATTEMPTS` / `N8N_RETRY_AFTER_MAX_SECONDS` | No | Background sweep interval (default 30s, 0 = off), claim lease (60s), HTTP tries across all sends before `PERMANENT` (30), `Retry-After` ceiling (1h) |
+| `N8N_FAILURE_RETENTION_DAYS` | **Yes when `N8N_ENABLED=true` outside local/ci** | Days `n8n_outbox` rows are kept. No default: an engineering retention control whose production value must be selected and approved by the application/data owner; the API refuses to start without it |
+| `RATE_LIMIT_*` | No | Per-minute limits on the AI endpoints: chat 20 and translate 30 per session, 120 per client IP, 600 per instance overall. `RATE_LIMIT_TRUSTED_PROXY_HOPS` (default 0) controls how the client IP is read from `X-Forwarded-For`; the per-IP limit applies only to public addresses. `RATE_LIMIT_REVIEWER_ROLE_*` bound reviewer access-code attempts (5 per session, 20 per IP, 60 overall per minute) |
+| `GIT_SHA` | No | Commit reported by `/health`; falls back to Render's `RENDER_GIT_COMMIT`. Without metadata it reports `dev` in local/ci and `unknown` elsewhere |
 | `EVIDENCE_STORAGE_DIR` / `EVIDENCE_MAX_BYTES` | No | Upload storage path and size limit (default 10 MB) |
 | `VITE_API_MODE` (frontend) | Yes | `mock` (MSW, no backend needed) \| `live` (real backend) |
 | `VITE_API_BASE` (frontend) | Yes | API base path, default `/api/v1` |
@@ -452,22 +456,46 @@ directly against the live deployment this session:
   AI-selected action is membership-checked against a server-computed
   candidate list (a model cannot invent an action ID); AI output is
   scanned against a banned-word list.
-- **n8n webhook authentication**: header-secret auth, an event allowlist,
-  and `event_id`-based deduplication — *verified live*: missing/wrong
-  secret → `403`, unknown event or missing required field → `400`,
-  replayed `event_id` → no duplicate notification.
+- **n8n webhook authentication**: header-secret auth and an event
+  allowlist, enforced by the workflow (checked live on 2026-09-20: missing
+  or wrong secret → `403`, unknown event or missing required field →
+  `400`). That check also reported no duplicate notification for a replayed
+  `event_id`; receiver-side deduplication has not been re-verified since and
+  cannot be verified from this repository.
 - **Rate limits on the paid AI endpoints** (`/chat`, journey chat and
   voice, `/translate`): per-session, per-client-IP and per-instance sliding windows,
   `429` with `Retry-After` when exceeded. Counters are in process memory,
   so each API instance enforces its own limits.
-- **n8n delivery reliability**: bounded retries with exponential backoff
-  on timeouts, connection errors and 408/425/429/5xx; no retry on other
-  4xx; the same `event_id` (and an `Idempotency-Key` header) on every
-  try; at most 8 seconds of delivery per request (so a slow n8n cannot
-  push responses into proxy timeouts); undeliverable events are kept in
-  `notification_failures` and can be redelivered with
-  `python -m app.integrations.n8n_redeliver`, which claims one row at a
-  time under a row lock so concurrent runs never send the same event.
+- **n8n delivery (transactional outbox)**: `queue_event()` adds an
+  `n8n_outbox` row to the caller's own transaction, so an event exists
+  exactly when the change that emits it commits (a rollback leaves none).
+  Dispatchers claim one row at a time (`FOR UPDATE SKIP LOCKED`, then a
+  lease with a random token), send it with no database transaction open,
+  and record the outcome only while still holding the lease. A request
+  tries its own events for at most 8 seconds after its commit; whatever is
+  left is retried by an in-app background sweeper (every
+  `N8N_OUTBOX_SWEEP_SECONDS`) or `python -m app.integrations.n8n_redeliver`
+  (`--status` prints counts per status, `--purge` applies retention).
+  Timeouts, connection errors and 408/425/429/5xx are retried with backoff
+  or the server's `Retry-After` (bounded); other 4xx, or 30 HTTP tries in
+  total (`N8N_OUTBOX_MAX_ATTEMPTS`), mark the event `PERMANENT` for a human.
+  Once the cause is fixed (payload, secret, URL), an operator runs
+  `python -m app.integrations.n8n_redeliver --requeue <event_id>`: it returns
+  that one `PERMANENT` event to `PENDING` with a fresh attempt budget and its
+  original `event_id`, sends nothing itself, and refuses `PENDING`,
+  `DELIVERED`, `EXPIRED` or redacted events. A cancelled or crashed
+  dispatcher never loses a committed event: it is reclaimed when its lease
+  expires (a cancelled send releases it at once) and sent with the same
+  `event_id` and `Idempotency-Key`.
+- **n8n data lifecycle**: an undelivered event keeps its full payload so
+  the notification can be reproduced exactly; once `DELIVERED` (or
+  `EXPIRED`) only `event`, `event_id`, `case_id`, `journey_id` and
+  `timestamp` remain — the customer email, session id and message are
+  removed. Stored error text is stripped of URLs and secret-like values.
+  With `N8N_FAILURE_RETENTION_DAYS` set, the sweeper deletes `DELIVERED` and
+  `EXPIRED` rows not updated within that period, and marks older `PENDING`
+  or `PERMANENT` rows `EXPIRED` (personal fields removed, never sent again)
+  so they are deleted one period later. The demo reset clears the outbox.
 - **Security response headers** on every API response
   (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
   `Permissions-Policy`, `Cache-Control: no-store`).
@@ -501,7 +529,8 @@ audit, or production-grade authentication — see
   `index.html` carries `<meta name="app-commit">` from Vercel's
   `VERCEL_GIT_COMMIT_SHA` (requires "Enable access to System Environment
   Variables" in the Vercel project; otherwise it reads `dev`). Both values
-  are forced to a hex commit hash or `dev`.
+  are forced to a hex commit hash; without metadata a deployed backend or
+  production build reports `unknown`, and only local/dev reports `dev`.
 
 This is a hackathon/demo deployment, not a production financial-services
 environment.
@@ -525,13 +554,25 @@ environment.
   verified via the browser's accessibility tree and manual keyboard
   testing, not a certified audit with a real screen reader.
 - **Rate limits are per API instance** (in memory); a multi-instance
-  deployment needs a shared store for a global limit. Behind a proxy with
-  `RATE_LIMIT_TRUSTED_PROXY_HOPS=0`, the per-IP limit acts as one shared
-  ceiling for all clients.
-- **n8n events are not stored before delivery**: an event is retried and,
-  if it still fails, recorded, but a process crash between the database
-  commit and the first delivery attempt loses it. Redelivery of recorded
-  failures is a manual/cron command, not an automatic scheduler.
+  deployment needs a shared store for a global limit. The per-IP limit
+  applies only to public client addresses, so behind a proxy with
+  `RATE_LIMIT_TRUSTED_PROXY_HOPS=0` only the per-session and per-instance
+  limits apply; and because the Render URL is publicly reachable, a client
+  that bypasses Vercel can choose its own `X-Forwarded-For` when hops are
+  configured. The per-instance ceiling is the limit that cannot be dodged,
+  at the cost that one abusive client can exhaust it for everyone.
+- **n8n delivery is at least once**: if n8n accepts an event but the
+  success is never recorded (lost response, or a crash before the outcome
+  commits), the event is sent again with the same `event_id`. Whether that
+  produces a second Slack/email notification depends on the n8n workflow
+  deduplicating on `event_id`, which is **not verified** from this
+  repository.
+- **No production deletion lifecycle for customer data**: nothing in the
+  application deletes or expires sessions, journeys or evidence (sessions
+  carry an `expires_at` that no cleanup enforces). Outbox rows are not tied
+  to journey/session deletion; they follow `N8N_FAILURE_RETENTION_DAYS`
+  only. The retention value itself is a decision for the application/data
+  owner.
 - **No CI pipeline is configured in this repository** — the test/lint/
   type commands above are run manually, not automatically on every push.
 - **Six journeys' worth of synthetic training/test documents** back the

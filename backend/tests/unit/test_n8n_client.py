@@ -1,24 +1,31 @@
-"""Unit tests for the n8n outbound webhook dispatcher (app/integrations/n8n_client.py).
-
-Covers: queue/flush semantics (never notify before commit, never flush
-twice), disabled/unconfigured no-op, dispatch failure never raises, header
-auth, rejection of an unknown event_type, and the real payload schema
-(event/case_id/journey_id/customer_id/customer_email/message/timestamp -
-verified directly against the live n8n workflow's own validation node).
+"""Unit tests for the n8n dispatcher (app/integrations/n8n_client.py) that need
+no database: event validation, the disabled/unconfigured no-op, Retry-After
+parsing, error redaction and payload minimisation. Queue/flush behaviour
+through the outbox is covered against PostgreSQL in
+tests/integration/test_n8n_outbox.py and test_n8n_reliability.py.
 """
 
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
 from app.config import settings
-from app.integrations.n8n_client import flush_n8n_events, queue_event
+from app.integrations.n8n_client import (
+    PERSONAL_FIELDS,
+    REDELIVERY_REQUIRED_FIELDS,
+    _minimal_payload,
+    _parse_retry_after,
+    _safe_error,
+    flush_n8n_events,
+    queue_event,
+)
 
 
 class _FakeSession:
-    """Minimal stand-in for AsyncSession's `.info` dict - the only API
-    surface n8n_client actually uses."""
+    """Stand-in with only `.info`: any attempt to store an outbox row
+    (`add`) fails the test, proving the disabled paths write nothing."""
 
     def __init__(self) -> None:
         self.info: dict = {}
@@ -72,108 +79,6 @@ async def test_flush_is_noop_when_url_unconfigured(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_flush_dispatches_queued_events_with_header_auth_and_real_schema(monkeypatch):
-    monkeypatch.setattr(settings, "N8N_ENABLED", True)
-    monkeypatch.setattr(
-        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
-    )
-    monkeypatch.setattr(settings, "N8N_WEBHOOK_SECRET", "top-secret")
-    db = _FakeSession()
-    journey_id = uuid4()
-    queue_event(
-        db,
-        "REVIEW_REQUIRED",
-        journey_id,
-        case_id="case-abc",
-        message="Bank statement credit differs from salary slip",
-        customer_id="session-xyz",
-    )
-
-    mock_post = AsyncMock(return_value=_mock_response(200))
-    with patch("httpx.AsyncClient.post", new=mock_post):
-        await flush_n8n_events(db)
-
-    mock_post.assert_awaited_once()
-    _, kwargs = mock_post.call_args
-    assert kwargs["headers"][settings.N8N_WEBHOOK_HEADER_NAME] == "top-secret"
-    sent_json = kwargs["json"]
-    # Real field names verified against the live workflow's "Normalize
-    # Event"/"Valid Payload?" nodes - "event" (not "event_type"),
-    # "timestamp" (not "occurred_at").
-    assert sent_json["event"] == "REVIEW_REQUIRED"
-    assert sent_json["journey_id"] == str(journey_id)
-    assert sent_json["case_id"] == "case-abc"
-    assert sent_json["customer_id"] == "session-xyz"
-    assert sent_json["customer_email"] == ""
-    assert sent_json["message"] == "Bank statement credit differs from salary slip"
-    assert "event_id" in sent_json
-    assert "timestamp" in sent_json
-
-
-@pytest.mark.asyncio
-async def test_flush_dispatches_real_customer_email_when_provided(monkeypatch):
-    """When a caller looked up a real, customer-supplied email (see
-    review_service.resolve_case/request_information), it must reach the
-    payload verbatim - not be dropped, and not fall back to "" ."""
-    monkeypatch.setattr(settings, "N8N_ENABLED", True)
-    monkeypatch.setattr(
-        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
-    )
-    db = _FakeSession()
-    queue_event(
-        db,
-        "JOURNEY_RESOLVED",
-        uuid4(),
-        case_id="case-abc",
-        message="RESOLVED_NO_ACTION: resolved",
-        customer_id="session-xyz",
-        customer_email="customer@example.com",
-    )
-
-    mock_post = AsyncMock(return_value=_mock_response(200))
-    with patch("httpx.AsyncClient.post", new=mock_post):
-        await flush_n8n_events(db)
-
-    sent_json = mock_post.call_args.kwargs["json"]
-    assert sent_json["customer_email"] == "customer@example.com"
-
-
-@pytest.mark.asyncio
-async def test_flush_only_sends_once_even_if_called_twice(monkeypatch):
-    """Duplicate protection: flush POPS the queue, so a second flush call
-    (e.g. a bug in a caller) sends nothing."""
-    monkeypatch.setattr(settings, "N8N_ENABLED", True)
-    monkeypatch.setattr(
-        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
-    )
-    db = _FakeSession()
-    queue_event(db, "ESCALATED", uuid4(), case_id="case-1", message="Escalated for review")
-
-    mock_post = AsyncMock(return_value=_mock_response(200))
-    with patch("httpx.AsyncClient.post", new=mock_post):
-        await flush_n8n_events(db)
-        await flush_n8n_events(db)
-
-    assert mock_post.await_count == 1
-
-
-@pytest.mark.asyncio
-async def test_flush_never_raises_on_dispatch_failure(monkeypatch):
-    """n8n being down must never fail the request that triggered it."""
-    monkeypatch.setattr(settings, "N8N_ENABLED", True)
-    monkeypatch.setattr(
-        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
-    )
-    db = _FakeSession()
-    queue_event(db, "JOURNEY_RESOLVED", uuid4(), case_id="case-1", message="Resolved")
-
-    import httpx
-
-    with patch("httpx.AsyncClient.post", new=AsyncMock(side_effect=httpx.ConnectError("boom"))):
-        await flush_n8n_events(db)  # must not raise
-
-
-@pytest.mark.asyncio
 async def test_flush_with_nothing_queued_does_not_call_http(monkeypatch):
     monkeypatch.setattr(settings, "N8N_ENABLED", True)
     monkeypatch.setattr(
@@ -187,55 +92,61 @@ async def test_flush_with_nothing_queued_does_not_call_http(monkeypatch):
         await flush_n8n_events(db)
 
 
-@pytest.mark.asyncio
-async def test_flush_dispatches_journey_completed_with_real_customer_email(monkeypatch):
-    """JOURNEY_COMPLETED is a sixth, valid event type - orthogonal to the
-    five Review Center lifecycle events - fired when a journey's OWN
-    readiness reaches READY (see journey_service.py's apply_action/
-    submit_clarification), with or without ever going through review."""
-    monkeypatch.setattr(settings, "N8N_ENABLED", True)
-    monkeypatch.setattr(
-        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
+NOW = datetime(2026, 10, 2, 12, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        ("120", 120.0),
+        (" 7 ", 7.0),
+        ("0", 0.0),
+        ("Fri, 02 Oct 2026 12:00:30 GMT", 30.0),  # HTTP-date, 30 s ahead
+        ("Fri, 02 Oct 2026 11:59:00 GMT", 0.0),  # date in the past: no wait
+        ("99999999", 3600.0),  # capped at N8N_RETRY_AFTER_MAX_SECONDS
+        ("Sat, 01 Jan 2050 00:00:00 GMT", 3600.0),
+    ],
+)
+def test_retry_after_seconds_and_http_dates_are_parsed_and_capped(
+    monkeypatch: pytest.MonkeyPatch, header: str, expected: float
+) -> None:
+    monkeypatch.setattr(settings, "N8N_RETRY_AFTER_MAX_SECONDS", 3600.0)
+    assert _parse_retry_after(header, NOW) == expected
+
+
+@pytest.mark.parametrize(
+    "header",
+    [None, "", "soon", "-5", "1.5", "12abc", "\u00b2", "Mon, 99 Foo 2026", 42, b"10", "1" * 11],
+)
+def test_malformed_retry_after_is_ignored(header: object) -> None:
+    assert _parse_retry_after(header, NOW) is None
+
+
+def test_error_text_is_stripped_of_urls_and_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "N8N_WEBHOOK_URL", "https://hooks.invalid/webhook/abc123")
+    monkeypatch.setattr(settings, "N8N_WEBHOOK_SECRET", "s3cr3t-value")
+    text = _safe_error(
+        "ConnectError: failed https://hooks.invalid/webhook/abc123 "
+        "via http://proxy.local:8080/x with s3cr3t-value; token=abcdef api_key: zzz"
     )
-    db = _FakeSession()
-    journey_id = uuid4()
-    queue_event(
-        db,
-        "JOURNEY_COMPLETED",
-        journey_id,
-        case_id=str(journey_id),
-        message="Your LENDING journey is complete and ready.",
-        customer_id="session-xyz",
-        customer_email="customer@example.com",
-    )
-
-    mock_post = AsyncMock(return_value=_mock_response(200))
-    with patch("httpx.AsyncClient.post", new=mock_post):
-        await flush_n8n_events(db)
-
-    sent_json = mock_post.call_args.kwargs["json"]
-    assert sent_json["event"] == "JOURNEY_COMPLETED"
-    assert sent_json["journey_id"] == str(journey_id)
-    assert sent_json["customer_email"] == "customer@example.com"
+    for leaked in ("hooks.invalid", "abc123", "proxy.local", "s3cr3t-value", "abcdef", "zzz"):
+        assert leaked not in text
+    assert "ConnectError" in text
+    assert len(_safe_error("x" * 2000)) == 500
 
 
-@pytest.mark.asyncio
-async def test_multiple_queued_events_all_dispatched_in_order(monkeypatch):
-    monkeypatch.setattr(settings, "N8N_ENABLED", True)
-    monkeypatch.setattr(
-        settings, "N8N_WEBHOOK_URL", "https://example.n8n.cloud/webhook/paytmflow-events"
-    )
-    db = _FakeSession()
-    journey_id = uuid4()
-    queue_event(
-        db, "EVIDENCE_UPLOADED", journey_id, case_id="evidence-1", message="Salary Slip uploaded"
-    )
-    queue_event(db, "REVIEW_REQUIRED", journey_id, case_id="case-abc", message="Review required")
-
-    mock_post = AsyncMock(return_value=_mock_response(200))
-    with patch("httpx.AsyncClient.post", new=mock_post):
-        await flush_n8n_events(db)
-
-    assert mock_post.await_count == 2
-    sent_events = [call.kwargs["json"]["event"] for call in mock_post.await_args_list]
-    assert sent_events == ["EVIDENCE_UPLOADED", "REVIEW_REQUIRED"]
+def test_minimal_payload_keeps_only_the_redelivery_contract() -> None:
+    full = {
+        "event": "JOURNEY_RESOLVED",
+        "event_id": "e1",
+        "case_id": "c1",
+        "journey_id": "j1",
+        "timestamp": "2026-10-02T00:00:00+00:00",
+        "customer_id": "s1",
+        "customer_email": "person@example.com",
+        "message": "reviewer text",
+    }
+    minimal = _minimal_payload(full)
+    assert set(minimal) == set(REDELIVERY_REQUIRED_FIELDS)
+    assert not set(PERSONAL_FIELDS) & set(minimal)
+    assert all(minimal[k] == full[k] for k in REDELIVERY_REQUIRED_FIELDS)

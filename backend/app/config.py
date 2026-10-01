@@ -80,12 +80,25 @@ class Settings(BaseSettings):
     # credential in n8n, not necessarily "Authorization".
     N8N_WEBHOOK_HEADER_NAME: str = "X-Webhook-Secret"
     N8N_TIMEOUT_SECONDS: int = 5
-    # Per event: tries before it is recorded in notification_failures, and the
-    # base of the exponential backoff between tries (0.5s, 1s, ...).
+    # Per dispatch: HTTP tries for one event, and the base of the exponential
+    # backoff between them (0.5s, 1s, ...).
     N8N_MAX_ATTEMPTS: int = 3
     N8N_RETRY_BACKOFF_SECONDS: float = 0.5
     # Total time one request may spend delivering its events after commit.
     N8N_FLUSH_BUDGET_SECONDS: float = 8.0
+    # Outbox (n8n_outbox): background sweep interval for due/abandoned events
+    # (0 disables the in-app sweeper), how long a claimed event is reserved for
+    # one dispatcher, and the HTTP tries across all dispatches after which an
+    # event is marked PERMANENT.
+    N8N_OUTBOX_SWEEP_SECONDS: float = 30.0
+    N8N_OUTBOX_LEASE_SECONDS: float = 60.0
+    N8N_OUTBOX_MAX_ATTEMPTS: int = 30
+    # Upper bound honoured for a Retry-After header from n8n.
+    N8N_RETRY_AFTER_MAX_SECONDS: float = 3600.0
+    # Engineering retention control for n8n_outbox rows, in days. No default:
+    # the production value must be chosen by the application/data owner.
+    # Required when N8N_ENABLED outside local/ci; unset elsewhere = no cleanup.
+    N8N_FAILURE_RETENTION_DAYS: int | None = None
     EVIDENCE_STORAGE_DIR: str = "./storage/evidence"
     EVIDENCE_MAX_BYTES: int = 10485760  # 10 MB
     DEMO_RESET_SECRET: str = "change-me-demo-reset-secret"
@@ -164,6 +177,37 @@ class Settings(BaseSettings):
                 "the known placeholder default from .env.example. Set a real, "
                 "unique value via environment variable or .env before starting "
                 "outside local/ci."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_n8n_outbox(self) -> "Settings":
+        # Names settings only, never values. A missing retention value outside
+        # local/ci is a startup failure rather than a silently chosen policy.
+        days = self.N8N_FAILURE_RETENTION_DAYS
+        if days is not None and days < 1:
+            raise ValueError("N8N_FAILURE_RETENTION_DAYS must be a whole number of days >= 1.")
+        if (
+            self.N8N_ENABLED
+            and days is None
+            and self.APP_ENV not in _ENVS_WHERE_PLACEHOLDERS_ARE_ALLOWED
+        ):
+            raise ValueError(
+                f"Refusing to start with APP_ENV={self.APP_ENV!r} and N8N_ENABLED=true: "
+                "N8N_FAILURE_RETENTION_DAYS is not set. It controls how long n8n_outbox "
+                "rows are kept; the value must be chosen by the application/data owner."
+            )
+        if (
+            self.N8N_OUTBOX_LEASE_SECONDS
+            <= self.N8N_FLUSH_BUDGET_SECONDS + self.N8N_TIMEOUT_SECONDS
+        ):
+            raise ValueError(
+                "N8N_OUTBOX_LEASE_SECONDS must exceed N8N_FLUSH_BUDGET_SECONDS + "
+                "N8N_TIMEOUT_SECONDS, or a slow send could outlive its lease."
+            )
+        if self.N8N_OUTBOX_SWEEP_SECONDS < 0 or self.N8N_OUTBOX_MAX_ATTEMPTS < 1:
+            raise ValueError(
+                "N8N_OUTBOX_SWEEP_SECONDS must be >= 0 and N8N_OUTBOX_MAX_ATTEMPTS >= 1."
             )
         return self
 

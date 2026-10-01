@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -22,6 +23,7 @@ from app.api.v1.review import router as review_router
 from app.api.v1.system import router as system_router
 from app.api.v1.translate import router as translate_router
 from app.config import settings
+from app.integrations.n8n_client import start_outbox_sweeper
 from app.logging import setup_logging
 from app.schemas.enums import ErrorCode
 from app.schemas.errors import ErrorEnvelope, ErrorObject
@@ -57,7 +59,16 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
         asyncio.create_task(_warm())
 
+    # Re-dispatches outbox events a request could not deliver (or whose
+    # dispatcher died); None when n8n is off or N8N_OUTBOX_SWEEP_SECONDS=0.
+    sweeper = start_outbox_sweeper()
+
     yield
+
+    if sweeper is not None:
+        sweeper.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await sweeper
 
 
 app = FastAPI(

@@ -13,6 +13,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -307,21 +309,32 @@ class PackMetadataModel(Base):
     )
 
 
-class NotificationFailureModel(Base):
-    """Durable record of an n8n event that could not be delivered after its
-    bounded retries (or was permanently rejected). Redelivery replays the
-    stored payload with the same event_id, which n8n deduplicates on."""
+class N8nOutboxModel(Base):
+    """Transactional outbox for n8n notifications (app/integrations/n8n_client.py).
 
-    __tablename__ = "notification_failures"
+    A row is added in the SAME transaction as the business change that emits
+    it, so the event is durable exactly when that change is. Dispatchers claim
+    a row with a lease (lease_until/lease_token), send it outside any
+    transaction, and record the outcome only while still holding the lease.
+    status: PENDING (to send) -> DELIVERED | PERMANENT (rejected; a human must
+    look) | EXPIRED (past N8N_FAILURE_RETENTION_DAYS, never sent again).
+    DELIVERED and EXPIRED rows keep identifiers only (personal fields removed,
+    redacted_at set)."""
+
+    __tablename__ = "n8n_outbox"
 
     event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     event_type: Mapped[str] = mapped_column(String(50), nullable=False)
     journey_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
-    failure_kind: Mapped[str] = mapped_column(String(30), nullable=False)
-    attempts: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False)
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
     last_status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    last_error: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    last_error: Mapped[str] = mapped_column(
+        String(500), nullable=False, default="", server_default=text("''")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
@@ -331,5 +344,17 @@ class NotificationFailureModel(Base):
         onupdate=lambda: datetime.now(UTC),
     )
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        server_default=func.now(),
+    )
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_token: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    redacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    __table_args__ = (Index("idx_notification_failures_pending", "delivered_at", "failure_kind"),)
+    __table_args__ = (
+        Index("idx_n8n_outbox_due", "status", "next_attempt_at"),
+        Index("idx_n8n_outbox_status_updated", "status", "updated_at"),
+    )
