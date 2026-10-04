@@ -3,12 +3,17 @@ background every N8N_OUTBOX_SWEEP_SECONDS).
 
 Usage:
   python -m app.integrations.n8n_redeliver                      send due PENDING events
-  python -m app.integrations.n8n_redeliver --status             counts per status, sends nothing
+  python -m app.integrations.n8n_redeliver --status             counts per status (outbox and
+                                                                receiver receipts), sends nothing
   python -m app.integrations.n8n_redeliver --purge              apply N8N_FAILURE_RETENTION_DAYS
   python -m app.integrations.n8n_redeliver --requeue EVENT_ID   PERMANENT -> PENDING, sends nothing
 
 --requeue is for an event n8n rejected (PERMANENT) once the cause is fixed: it
 is sent again by the normal dispatchers, with its original event_id.
+
+receipts_stale_claims in --status counts events the n8n workflow claimed but
+never completed: the notification may not have been sent. Check them by hand;
+they are never reclaimed automatically (that could notify twice).
 """
 
 import asyncio
@@ -21,6 +26,7 @@ from app.integrations.n8n_client import (
     requeue_permanent_event,
     sweep_outbox,
 )
+from app.integrations.n8n_receipts import purge_receipts, receipt_status
 
 USAGE = "usage: python -m app.integrations.n8n_redeliver [--status | --purge | --requeue EVENT_ID]"
 
@@ -53,8 +59,10 @@ async def _main(args: list[str]) -> int:
         if "--status" in args:
             async with async_session_factory() as db:
                 print(_line("n8n outbox", await notification_status(db)))
+                print(_line("n8n receipts", await receipt_status(db)))
         elif "--purge" in args:
             print(_line("n8n outbox purge", await purge_outbox(engine)))
+            print(_line("n8n receipts purge", {"deleted": await purge_receipts(engine)}))
         else:
             print(_line("n8n outbox dispatch", await sweep_outbox(engine)))
         return 0

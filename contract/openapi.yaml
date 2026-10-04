@@ -699,6 +699,83 @@ paths:
                   elapsed_ms: { type: integer }
         "401": { description: Bad or missing demo secret }
 
+  /api/v1/n8n/receipts/claim:
+    post:
+      tags: [n8n]
+      operationId: claimN8nReceipt
+      description: >-
+        Called only by the n8n workflow before it sends a notification. Atomically
+        claims event_id (primary key insert); exactly one caller per event_id gets
+        claimed=true and may notify, every other caller gets claimed=false.
+      security:
+        - n8nSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_id]
+              properties:
+                event_id: { type: string, pattern: "^[A-Za-z0-9._:-]{1,64}$" }
+                event_type: { type: string, maxLength: 50 }
+      responses:
+        "200":
+          description: Claim result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id: { type: string }
+                  claimed: { type: boolean }
+                  status: { type: string, enum: [CLAIMED, SENT] }
+        "401": { description: Bad or missing n8n secret }
+        "422": { description: Missing or malformed event_id }
+  /api/v1/n8n/receipts/{event_id}/complete:
+    post:
+      tags: [n8n]
+      operationId: completeN8nReceipt
+      description: Marks a claimed event SENT after its notification went out (idempotent).
+      security:
+        - n8nSecret: []
+      parameters:
+        - { name: event_id, in: path, required: true, schema: { type: string, pattern: "^[A-Za-z0-9._:-]{1,64}$" } }
+      responses:
+        "200":
+          description: Completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id: { type: string }
+                  status: { type: string }
+        "401": { description: Bad or missing n8n secret }
+        "404": { description: No claim for this event }
+  /api/v1/n8n/receipts/{event_id}/release:
+    post:
+      tags: [n8n]
+      operationId: releaseN8nReceipt
+      description: >-
+        Deletes a CLAIMED (never a SENT) claim after a clean notification failure,
+        so the sender's retry may claim and send again.
+      security:
+        - n8nSecret: []
+      parameters:
+        - { name: event_id, in: path, required: true, schema: { type: string, pattern: "^[A-Za-z0-9._:-]{1,64}$" } }
+      responses:
+        "200":
+          description: Release result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id: { type: string }
+                  released: { type: boolean }
+        "401": { description: Bad or missing n8n secret }
+
 components:
   securitySchemes:
     sessionCookie:
@@ -709,6 +786,11 @@ components:
       type: apiKey
       in: header
       name: X-Demo-Secret
+    n8nSecret:
+      type: apiKey
+      in: header
+      name: X-Webhook-Secret
+      description: Header name is N8N_WEBHOOK_HEADER_NAME (default shown); value is N8N_WEBHOOK_SECRET.
 
   parameters:
     JourneyIdPath:

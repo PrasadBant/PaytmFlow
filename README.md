@@ -496,6 +496,21 @@ directly against the live deployment this session:
   `EXPIRED` rows not updated within that period, and marks older `PENDING`
   or `PERMANENT` rows `EXPIRED` (personal fields removed, never sent again)
   so they are deleted one period later. The demo reset clears the outbox.
+- **n8n receiver idempotency (`n8n_receipts`)**: before sending any
+  notification the n8n workflow calls `POST /api/v1/n8n/receipts/claim`
+  with the `event_id`, authenticated with the same header secret the backend
+  sends to n8n. The claim is one `INSERT ... ON CONFLICT DO NOTHING
+  RETURNING` on a primary key, so of any number of concurrent or repeated
+  deliveries exactly one wins and notifies; the rest are answered as
+  duplicates. The winner then calls `.../complete` (`SENT`), or
+  `.../release` after a clean send failure so the retry can send. A `SENT`
+  claim is never released. Chosen semantics: **never notify twice**; the
+  cost is that a workflow crash after claiming and before the send finishes
+  leaves the claim `CLAIMED` and that one notification unsent. Such claims
+  are counted as `receipts_stale_claims` by `n8n_redeliver --status` for a
+  human to check - they are never reclaimed automatically, because that
+  could notify twice. Receipts hold identifiers only and are deleted after
+  `N8N_FAILURE_RETENTION_DAYS`.
 - **Security response headers** on every API response
   (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
   `Permissions-Policy`, `Cache-Control: no-store`).
@@ -561,12 +576,14 @@ environment.
   that bypasses Vercel can choose its own `X-Forwarded-For` when hops are
   configured. The per-instance ceiling is the limit that cannot be dodged,
   at the cost that one abusive client can exhaust it for everyone.
-- **n8n delivery is at least once**: if n8n accepts an event but the
-  success is never recorded (lost response, or a crash before the outcome
-  commits), the event is sent again with the same `event_id`. Whether that
-  produces a second Slack/email notification depends on the n8n workflow
-  deduplicating on `event_id`, which is **not verified** from this
-  repository.
+- **n8n delivery is at least once; notification is at most once**: if n8n
+  accepts an event but the success is never recorded (lost response, or a
+  crash before the outcome commits), the event is sent again with the same
+  `event_id`. A second Slack/email notification is prevented only by the
+  workflow claiming the `event_id` through the receipts endpoint before it
+  notifies (above); a workflow that skips the claim gets no protection.
+  Neither side is exactly-once: a crash after claiming loses that one
+  notification instead of duplicating it.
 - **No production deletion lifecycle for customer data**: nothing in the
   application deletes or expires sessions, journeys or evidence (sessions
   carry an `expires_at` that no cleanup enforces). Outbox rows are not tied

@@ -17,6 +17,7 @@ from app.api.v1.demo import router as demo_router
 from app.api.v1.diff import router as diff_router
 from app.api.v1.evidence import router as evidence_router
 from app.api.v1.journeys import router as journeys_router
+from app.api.v1.n8n_receipts import router as n8n_receipts_router
 from app.api.v1.packs import router as packs_router
 from app.api.v1.recommendation import router as recommendation_router
 from app.api.v1.review import router as review_router
@@ -159,3 +160,4 @@ app.include_router(demo_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(review_router, prefix="/api/v1")
 app.include_router(translate_router, prefix="/api/v1")
+app.include_router(n8n_receipts_router, prefix="/api/v1")

@@ -358,3 +358,31 @@ class N8nOutboxModel(Base):
         Index("idx_n8n_outbox_due", "status", "next_attempt_at"),
         Index("idx_n8n_outbox_status_updated", "status", "updated_at"),
     )
+
+
+class N8nReceiptModel(Base):
+    """Receiver-side claims for the n8n workflow (app/integrations/n8n_receipts.py).
+
+    The workflow claims an event_id here BEFORE sending any notification. The
+    primary key makes the claim atomic: of any number of concurrent attempts
+    with one event_id, exactly one inserts the row and may notify.
+    status: CLAIMED (winner is sending) -> SENT. A clean send failure deletes
+    the CLAIMED row so a retry may send; a stale CLAIMED row is never reclaimed
+    automatically (that could notify twice). Identifiers only - no payload."""
+
+    __tablename__ = "n8n_receipts"
+
+    event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="", server_default=text("''")
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    claimed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC),
+        server_default=func.now(),
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (Index("idx_n8n_receipts_status_claimed", "status", "claimed_at"),)

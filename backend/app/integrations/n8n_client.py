@@ -102,6 +102,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 
 from app.config import settings
 from app.db.models import N8nOutboxModel
+from app.integrations.n8n_receipts import purge_receipts
 
 logger = structlog.get_logger(__name__)
 
@@ -679,6 +680,7 @@ async def _sweeper_loop(bind: _Bind, interval: float) -> None:
             await sweep_outbox(bind)
             if settings.N8N_FAILURE_RETENTION_DAYS is not None:
                 await purge_outbox(bind)
+                await purge_receipts(bind)
         except Exception as exc:
             logger.error(
                 "n8n_outbox_sweep_failed",
