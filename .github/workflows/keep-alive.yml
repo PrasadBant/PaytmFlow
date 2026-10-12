@@ -10,4 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping backend health endpoint
-        run: curl -fsS --max-time 60 https://paytmflow-backend.onrender.com/api/v1/health
+        # Never fail the job: a failed run makes GitHub email a failure notice
+        # whenever Render is still waking up. The ping itself is what matters.
+        run: curl -fsS --max-time 60 https://paytmflow-backend.onrender.com/api/v1/health || echo "Backend not ready (likely waking up); ignoring"
